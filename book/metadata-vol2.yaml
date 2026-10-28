@@ -1,0 +1,17 @@
+---
+title: "Mastering Squad, Volume 2: Operating and Extending Squad"
+series: "Mastering Squad"
+series-index: 2
+subtitle: "AI Agent Teams for Any Project — From Advanced Coordination to Production and Squad 2.0"
+author: "Chris Woodruff"
+lang: en-US
+rights: "Text © 2026 Chris Woodruff, CC BY 4.0. Code samples MIT. Squad is © Brady Gaster and contributors (MIT)."
+description: "Volume 2 of an in-depth, hands-on guide to the Squad multi-agent coordination system: MCP, state backends, cross-squad orchestration, production operations, internals, the SDK, Squad 2.0 multi-client support, and mastery. Targets Squad v1.1.0 with a Squad 2.0 preview part."
+subject: "Software development; AI agents; GitHub Copilot"
+identifier:
+  - scheme: UUID
+    text: urn:uuid:7d1c1a52-3b4e-4b1e-9b8e-5a9a2f0c5e12
+toc-depth: 1
+css: styles/epub.css
+cover-image: book/images/cover-vol2.png
+...

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Tasktrack</title></head>
+<body>
+  <h1>Tasktrack</h1>
+  <form id="new"><input id="title" placeholder="New task" required> <button>Add</button></form>
+  <ul id="tasks"></ul>
+  <p id="error" role="alert"></p>
+  <script>
+    const API = localStorage.getItem('api') || 'http://localhost:3000';
+    const error = document.getElementById('error');
+    async function request(path, options) {
+      const response = await fetch(`${API}${path}`, options);
+      if (!response.ok) throw new Error(`Request failed (${response.status}): ${await response.text()}`);
+      return response.json();
+    }
+    async function load() {
+      const tasks = await request('/tasks');
+      document.getElementById('tasks').replaceChildren(...tasks.map(t => {
+        const li = document.createElement('li');
+        li.textContent = `[${t.status}] ${t.title}`;
+        return li;
+      }));
+    }
+    document.getElementById('new').onsubmit = async (e) => {
+      e.preventDefault();
+      error.textContent = '';
+      try {
+        await request('/tasks', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ title: document.getElementById('title').value }) });
+        e.target.reset();
+        await load();
+      } catch (err) {
+        error.textContent = err.message;
+      }
+    };
+    load().catch(err => { error.textContent = err.message; });
+  </script>
+</body>
+</html>

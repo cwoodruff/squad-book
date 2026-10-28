@@ -1,0 +1,12 @@
+{
+  "name": "tasktrack",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Companion project for the book Mastering Squad (zero dependencies; Node.js 22.18+ runs the TypeScript directly)",
+  "type": "module",
+  "engines": { "node": ">=22.18" },
+  "scripts": {
+    "start": "node api/src/server.ts",
+    "test": "node --test api/test/"
+  }
+}

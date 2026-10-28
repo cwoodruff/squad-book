@@ -1,0 +1,45 @@
+source_module,book_section
+packages/squad-sdk/src/adapter,book/vol2/part-03/ch11-architecture.md; book/vol2/part-01/ch05-dual-mode-clients.md; book/vol2/part-03/ch15-plugins-hooks.md
+packages/squad-sdk/src/agents,book/vol1/part-02/ch12-models-cost.md; book/vol2/part-03/ch14-sdk.md; book/vol2/part-03/ch17-specification.md
+packages/squad-sdk/src/build,book/vol2/part-03/ch14-sdk.md; book/vol2/part-03/ch17-specification.md
+packages/squad-sdk/src/builders,book/vol2/part-03/ch14-sdk.md; book/vol2/part-03/ch17-specification.md
+packages/squad-sdk/src/casting,book/vol1/part-01/ch04-meet-the-team.md; book/vol2/part-03/ch13-identity-provenance.md; book/vol2/part-03/ch17-specification.md
+packages/squad-sdk/src/client,book/vol2/part-01/ch05-dual-mode-clients.md; book/vol2/part-03/ch14-sdk.md; book/vol2/part-03/ch17-specification.md
+packages/squad-sdk/src/config,book/vol1/part-01/ch03-first-session.md; book/vol2/part-03/ch13-identity-provenance.md; book/vol1/part-02/ch06-parallel-work.md; book/vol1/part-02/ch12-models-cost.md; book/vol1/part-04/ch21-scenarios-b.md; book/vol2/part-03/ch14-sdk.md; book/vol2/part-03/ch17-specification.md
+packages/squad-sdk/src/coordinator,book/vol2/part-03/ch11-architecture.md; book/vol2/part-03/ch12-coordinator-internals.md; book/vol1/part-02/ch06-parallel-work.md; book/vol2/part-03/ch14-sdk.md
+packages/squad-sdk/src/hooks,book/vol1/part-03/ch18-governance.md; book/vol2/part-03/ch15-plugins-hooks.md
+packages/squad-sdk/src/index.ts,book/vol2/part-03/ch11-architecture.md; book/vol2/part-01/ch03-cross-squad.md; book/vol2/part-03/ch14-sdk.md; book/vol2/appendices/app-G-sdk-api.md
+packages/squad-sdk/src/marketplace,book/vol1/part-03/ch17-skills.md; book/vol2/part-02/ch06-security.md; book/vol2/part-03/ch15-plugins-hooks.md
+packages/squad-sdk/src/memory,book/vol1/part-03/ch15-memory.md; book/vol2/part-03/ch17-specification.md
+packages/squad-sdk/src/multi-squad.ts,book/vol2/part-01/ch03-cross-squad.md
+packages/squad-sdk/src/parsers.ts,book/vol2/appendices/app-G-sdk-api.md
+packages/squad-sdk/src/platform,book/vol2/part-03/ch11-architecture.md; book/vol1/part-02/ch07-github-workflow.md; book/vol1/part-02/ch08-gitlab-ado.md; book/vol1/part-02/ch13-notifications.md; book/vol2/part-01/ch05-dual-mode-clients.md; book/vol2/part-03/ch17-specification.md
+packages/squad-sdk/src/presets,book/vol1/part-01/ch04-meet-the-team.md
+packages/squad-sdk/src/ralph,book/vol1/part-02/ch05-routing.md; book/vol1/part-03/ch19-error-recovery.md; book/vol1/part-02/ch07-github-workflow.md; book/vol1/part-02/ch09-ralph-loop.md; book/vol1/part-02/ch12-models-cost.md; book/vol2/part-01/ch05-dual-mode-clients.md; book/vol2/part-02/ch07-containers-cloud.md; book/vol2/part-03/ch16-autonomous-agents.md
+packages/squad-sdk/src/remote,book/vol1/part-02/ch11-coding-agent-remote.md
+packages/squad-sdk/src/resolution.ts,book/vol1/part-02/ch06-parallel-work.md; book/vol1/part-04/ch21-scenarios-b.md; book/vol2/part-03/ch14-sdk.md
+packages/squad-sdk/src/roles,book/vol1/part-01/ch04-meet-the-team.md
+packages/squad-sdk/src/runtime,book/vol2/part-03/ch11-architecture.md; book/vol1/part-02/ch09-ralph-loop.md; book/vol1/part-02/ch12-models-cost.md; book/vol2/part-01/ch03-cross-squad.md; book/vol2/part-02/ch09-observability.md; book/vol2/part-02/ch10-troubleshooting-dr.md; book/vol2/part-03/ch14-sdk.md; book/vol2/part-03/ch17-specification.md; book/appendices/app-B-configuration.md
+packages/squad-sdk/src/sharing,book/vol1/part-02/ch05-routing.md; book/vol2/part-01/ch03-cross-squad.md; book/vol2/part-01/ch04-portability.md
+packages/squad-sdk/src/skills,book/vol1/part-03/ch17-skills.md
+packages/squad-sdk/src/state,book/vol2/part-01/ch02-state-backends.md; book/vol2/part-03/ch16-autonomous-agents.md; book/vol2/part-03/ch17-specification.md
+packages/squad-sdk/src/state-backend.ts,book/vol2/part-01/ch02-state-backends.md; book/vol2/part-03/ch16-autonomous-agents.md; book/vol2/part-03/ch17-specification.md
+packages/squad-sdk/src/storage,book/vol2/part-01/ch02-state-backends.md
+packages/squad-sdk/src/streams,book/vol1/part-02/ch10-prd-streams-fleet.md; book/vol2/part-01/ch03-cross-squad.md; book/vol2/part-02/ch07-containers-cloud.md; book/vol1/part-04/ch21-scenarios-b.md
+packages/squad-sdk/src/tools,book/vol2/part-03/ch15-plugins-hooks.md
+packages/squad-sdk/src/types.ts,book/vol2/appendices/app-G-sdk-api.md
+packages/squad-sdk/src/upstream,book/vol2/part-01/ch04-portability.md
+packages/squad-sdk/src/utils,book/vol2/appendices/app-G-sdk-api.md
+packages/squad-cli/src/cli,book/vol1/part-01/ch01-what-is-squad.md; book/vol1/part-01/ch02-installation.md; book/vol1/part-01/ch02-installation.md; book/vol1/part-01/ch03-first-session.md; book/vol1/part-01/ch04-meet-the-team.md; book/vol1/part-02/ch05-routing.md; book/vol2/part-03/ch12-coordinator-internals.md; book/vol2/part-03/ch13-identity-provenance.md; book/vol1/part-02/ch06-parallel-work.md; book/vol1/part-03/ch15-memory.md; book/vol1/part-03/ch16-tiered-memory-context.md; book/vol1/part-03/ch19-error-recovery.md; book/vol1/part-02/ch07-github-workflow.md; book/vol1/part-02/ch09-ralph-loop.md; book/vol1/part-02/ch10-prd-streams-fleet.md; book/vol1/part-02/ch11-coding-agent-remote.md; book/vol1/part-02/ch12-models-cost.md; book/vol1/part-02/ch13-notifications.md; book/vol1/part-02/ch14-upgrade-cleanup.md; book/vol2/part-01/ch01-mcp.md; book/vol2/part-01/ch03-cross-squad.md; book/vol2/part-01/ch04-portability.md; book/vol2/part-02/ch06-security.md; book/vol2/part-02/ch08-cicd-release.md; book/vol2/part-02/ch09-observability.md; book/vol2/part-03/ch14-sdk.md; book/vol2/part-03/ch15-plugins-hooks.md; book/vol2/part-03/ch17-specification.md; book/vol2/part-05/ch23-patterns-cookbook.md; book/vol2/part-05/ch24-capstone.md; book/appendices/app-A-cli-reference.md
+packages/squad-cli/src/cli-entry.ts,book/vol1/part-01/ch02-installation.md; book/vol1/part-02/ch13-notifications.md; book/vol1/part-02/ch14-upgrade-cleanup.md; book/vol2/part-05/ch23-patterns-cookbook.md; book/appendices/app-A-cli-reference.md
+packages/squad-cli/src/remote-ui,book/vol1/part-02/ch11-coding-agent-remote.md
+packages/squad-sdk/src/client/adapters,book/vol2/part-04/ch20-host-projections.md
+packages/squad-sdk/src/backend,book/vol2/part-04/ch21-state-boundary-backend.md
+packages/squad-sdk/src/casting/handwritten-registry.ts,book/vol2/part-04/ch22-upgrading-to-2.md
+packages/squad-cli/src/cli/core/clients.ts,book/vol2/part-04/ch19-across-clients.md; book/vol2/part-04/ch20-host-projections.md
+packages/squad-cli/src/cli/commands/client.ts,book/vol2/part-04/ch19-across-clients.md
+packages/squad-cli/src/cli/commands/roster.ts,book/vol2/part-04/ch18-squad-2-overview.md; book/vol2/part-04/ch22-upgrading-to-2.md
+packages/squad-cli/src/cli/commands/state-mcp.ts,book/vol2/part-04/ch21-state-boundary-backend.md
+packages/squad-cli/src/cli/core/backend-mcp.ts,book/vol2/part-04/ch21-state-boundary-backend.md
+packages/squad-cli/src/cli/core/squad-owned-files.ts,book/vol2/part-04/ch20-host-projections.md; book/vol2/part-04/ch22-upgrading-to-2.md
+packages/squad-sdk/src/upstream/resolver.ts,book/vol2/part-04/ch21-state-boundary-backend.md

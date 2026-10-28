@@ -1,0 +1,29 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+html,body{margin:0;width:1600px;height:2400px;overflow:hidden}
+body{background:linear-gradient(160deg,#1e1b4b 0%,#4c1d95 55%,#7c3aed 100%);font-family:"Helvetica Neue",Arial,sans-serif;color:#fff;position:relative}
+.grid{position:absolute;inset:0;opacity:.18;background-image:radial-gradient(#fff 2px,transparent 2px);background-size:60px 60px}
+.nodes{position:absolute;top:620px;left:0;width:1600px;height:900px}
+.t{position:absolute;left:120px;right:120px}
+h1{font-size:200px;margin:0;line-height:1;letter-spacing:-4px}
+h2{font-size:64px;font-weight:300;margin:30px 0 0;color:#ddd6fe}
+.sub{top:1700px;font-size:52px;color:#ede9fe;line-height:1.35}
+.au{bottom:140px;font-size:64px;font-weight:600}
+.ver{bottom:240px;font-size:40px;color:#c4b5fd}
+</style></head><body><div class="grid"></div>
+<div class="t" style="top:200px"><h1>Mastering<br>Squad</h1></div>
+<svg class="nodes" viewBox="0 0 1600 900">
+ <g stroke="#c4b5fd" stroke-width="6" opacity=".9">
+  <line x1="800" y1="450" x2="380" y2="220"/><line x1="800" y1="450" x2="1220" y2="220"/>
+  <line x1="800" y1="450" x2="330" y2="650"/><line x1="800" y1="450" x2="1270" y2="650"/>
+  <line x1="800" y1="450" x2="800" y2="820"/><line x1="380" y1="220" x2="1220" y2="220" stroke-dasharray="14 14"/>
+ </g>
+ <g fill="#fff"><circle cx="800" cy="450" r="110"/></g>
+ <g fill="#a78bfa" stroke="#fff" stroke-width="6">
+  <circle cx="380" cy="220" r="70"/><circle cx="1220" cy="220" r="70"/><circle cx="330" cy="650" r="70"/>
+  <circle cx="1270" cy="650" r="70"/><circle cx="800" cy="820" r="60"/></g>
+ <text x="800" y="468" text-anchor="middle" font-size="44" font-weight="700" fill="#4c1d95" font-family="Helvetica Neue,Arial">coord</text>
+</svg>
+<div class="t sub">{{SUBTITLE}}</div>
+<div class="t ver">{{VOLUME}}</div>
+<div class="t au">Chris Woodruff</div>
+</body></html>
