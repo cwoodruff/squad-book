@@ -15,3 +15,4 @@ node_modules/
 # squad:claude
 .claude/worktrees/
 .squad/backend/
+.idea/
