@@ -1,0 +1,31 @@
+{
+  "mcpServers": {
+    "squad_state": {
+      "command": "node",
+      "args": [
+        "-e",
+        "const p=require('path'),f=require('fs'),s=process.argv[1];let r=process.cwd();for(let d=r;;d=p.dirname(d)){if(f.existsSync(p.join(d,'.git'))){r=d;break}if(p.dirname(d)===d)break}const c=p.join(r,s);if(p.isAbsolute(s)||s.split(/[\\\\/]/).includes('..')||!f.existsSync(c)){console.error('squad: '+c+' was not found. Run squad upgrade at the repository root.');process.exit(1)}process.argv[1]=c;import(require('url').pathToFileURL(c).href).catch(e=>{console.error(e);process.exit(1)});",
+        ".squad/squad.mjs",
+        "state-mcp"
+      ],
+      "env": {},
+      "tools": [
+        "*"
+      ],
+      "x-squad": {
+        "managed": true,
+        "version": "2.0.0",
+        "machineSpecific": false,
+        "source": "repo-launcher",
+        "fallback": {
+          "command": "npx",
+          "args": [
+            "-y",
+            "@bradygaster/squad-cli@2.0.0",
+            "state-mcp"
+          ]
+        }
+      }
+    }
+  }
+}

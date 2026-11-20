@@ -1,0 +1,54 @@
+{
+  "schema": "squad-agent-provenance/v1",
+  "schema_version": 1,
+  "revision": 6,
+  "generated_at": "2026-11-20T19:00:00.766Z",
+  "agents": {
+    "arthur": {
+      "display_name": "Arthur",
+      "persistent_name": "Arthur",
+      "role": "Lead Editor",
+      "universe": "cli-cast",
+      "status": "active",
+      "created_at": "2026-11-20T18:59:59.651Z",
+      "updated_at": "2026-11-20T18:59:59.651Z"
+    },
+    "ford": {
+      "display_name": "Ford",
+      "persistent_name": "Ford",
+      "role": "Technical Writer",
+      "universe": "cli-cast",
+      "status": "active",
+      "created_at": "2026-11-20T18:59:59.924Z",
+      "updated_at": "2026-11-20T18:59:59.924Z"
+    },
+    "trillian": {
+      "display_name": "Trillian",
+      "persistent_name": "Trillian",
+      "role": "SDK Technical Writer",
+      "universe": "cli-cast",
+      "status": "active",
+      "created_at": "2026-11-20T19:00:00.206Z",
+      "updated_at": "2026-11-20T19:00:00.206Z"
+    },
+    "slartibartfast": {
+      "display_name": "Slartibartfast",
+      "persistent_name": "Slartibartfast",
+      "role": "Build Engineer",
+      "universe": "cli-cast",
+      "status": "active",
+      "created_at": "2026-11-20T19:00:00.499Z",
+      "updated_at": "2026-11-20T19:00:00.499Z"
+    },
+    "marvin": {
+      "display_name": "Marvin",
+      "persistent_name": "Marvin",
+      "role": "Test Engineer",
+      "universe": "cli-cast",
+      "status": "active",
+      "created_at": "2026-11-20T19:00:00.766Z",
+      "updated_at": "2026-11-20T19:00:00.766Z"
+    }
+  },
+  "transaction_id": "a0f2f2a7-f08c-4d97-8fad-033d4382be99"
+}

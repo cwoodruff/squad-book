@@ -1,0 +1,22 @@
+{
+  "owner": "Squad Claude permissions",
+  "added": [
+    "mcp__plugin_squad_squad_state__squad_decide",
+    "mcp__plugin_squad_squad_state__squad_state_read",
+    "mcp__plugin_squad_squad_state__squad_state_write",
+    "mcp__plugin_squad_squad_state__squad_state_append",
+    "mcp__plugin_squad_squad_state__squad_state_delete",
+    "mcp__plugin_squad_squad_state__squad_state_list",
+    "mcp__plugin_squad_squad_state__squad_state_create_if_absent",
+    "mcp__plugin_squad_squad_state__squad_state_health",
+    "mcp__plugin_squad_squad_state__squad_state_upstreams",
+    "Bash(squad cast:*)",
+    "Bash(squad client sync:*)",
+    "Bash(squad lockout reject:*)",
+    "Bash(squad lockout status:*)",
+    "Bash(node .squad/squad.mjs cast:*)",
+    "Bash(node .squad/squad.mjs client sync:*)",
+    "Bash(node .squad/squad.mjs lockout reject:*)",
+    "Bash(node .squad/squad.mjs lockout status:*)"
+  ]
+}
