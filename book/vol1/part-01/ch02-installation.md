@@ -136,12 +136,12 @@ flowchart TD
 
 ## Release channels
 
-**Stable** (`latest`) is the default and what this book teaches; it carries v2.0.0. **Preview** is the release-candidate channel and **insider** carries development snapshots. Both are published on demand from `dev`, and "preview" is a channel name, not a branch.
+**Stable** (`latest`) is the default and what this book teaches; it carries v2.0.0. **Insider** and **preview** are prerelease channels, both published on demand from `dev`; "preview" is a channel name, not a branch. On npm they share one tag: `insider` is the canonical prerelease tag and `preview` is an alias of it, so there is no separate release-candidate tag. Homebrew and WinGet keep separate preview and insider packages, which update only when a release run publishes to package managers. Chapter 8 (Volume 2) has the details.
 
 | Channel | npm tag | Homebrew cask | WinGet ID | Typical use |
 |---|---|---|---|---|
 | Stable | `latest` | `squad` | `bradygaster.Squad` | Normal use and this book. |
-| Preview | `preview` | `squad-preview` | `bradygaster.Squad.Preview` | Try a release candidate. |
+| Preview | `preview` (alias of `insider`) | `squad-preview` | `bradygaster.Squad.Preview` | Try a preview build. |
 | Insider | `insider` | `squad-insider` | `bradygaster.Squad.Insider` | Test ongoing development; expect rough edges. |
 
 All channels provide the same `squad` command, so do not install several side by side. Uninstall the active channel before switching package managers' channels, and check `squad --version` before running `squad upgrade` in any repository. Your `.squad/` data is designed to survive updates, but back it up before trying unstable builds, and test early builds in a disposable project or branch. When reporting an insider issue, include `squad --version`, your host and OS, and reproduction steps.
@@ -388,7 +388,7 @@ Install the CLI in the way that suits your runtime and network constraints, keep
 
 1. Which installation methods include a Node runtime rather than requiring a separately installed Node?
 2. What does `VERSION` control in the POSIX install script?
-3. Which npm tags carry stable releases, release candidates, and development snapshots?
+3. Which npm tag carries stable releases, which carries prereleases, and how does `preview` relate to them?
 4. True or false: `squad upgrade` and `squad upgrade --self` do the same update.
 5. Which two Copilot conversational hosts share the same project `.squad/` state?
 6. What per-spawn model selection limitation applies in VS Code?

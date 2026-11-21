@@ -1,6 +1,6 @@
 # Part V — Mastery {.unnumbered}
 
-Part V consolidates everything. It collects patterns and anti-patterns into a cookbook, takes Tasktrack from a sample to a production-ready system in a capstone, and shows how to contribute back to Squad. It comes last because it assumes the whole journey, and it returns to v1.1.0 after the Squad 2.0 preview.
+Part V consolidates everything. It collects patterns and anti-patterns into a cookbook, takes Tasktrack from a sample to a production-ready system in a capstone, and shows how to contribute back to Squad. It comes last because it assumes the whole journey, including Part IV's multi-host material. Like the rest of the book, it targets Squad v2.0.0.
 
 Read it when you want to tie the pieces together and give back.
 

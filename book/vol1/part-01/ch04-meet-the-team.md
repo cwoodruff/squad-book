@@ -117,7 +117,7 @@ squad roster add rai            # or fact-checker, or all
 squad roster remove fact-checker
 ```
 
-`roster add` prints the exact `team.md` diff before it applies it, and the first add writes a verified backup. `roster remove` (aliases `disable` and `uninstall`) deletes only the rows that `roster add` created. `squad health` reports a Rai or Fact Checker charter that is not on the roster as "available but not configured". When you cast with `squad cast` and the roster lacks the support-agent table, the command adds it, so Copilot and other hosts list the same team.
+`roster add` prints the exact `team.md` diff before it applies it, and the first add writes a verified backup. `roster remove` (aliases `disable` and `uninstall`) deletes only the rows that `roster add` created. `squad health` reports a Rai or Fact Checker charter that is not on the roster as "available but not configured". When `squad cast --name <Name> --role "<Role>"` adds a member to a `team.md` that lacks the support-agent table, it adds that table too, so Copilot and other hosts list the same team. Plain `squad cast` only shows the roster.
 
 | Identity | Responsibility | How to think about it |
 |---|---|---|

@@ -1,10 +1,10 @@
 # Preface {.unnumbered}
 
-Volume 1 taught you to *use* Squad. This volume teaches you to *run it well* and to *build on it*. It covers what changes when a squad serves more than one repository, runs unattended, meets a security review, or needs behavior the stock CLI does not provide. It also looks ahead to Squad 2.0, where one team can work through several AI clients.
+Volume 1 taught you to *use* Squad. This volume teaches you to *run it well* and to *build on it*. It covers what changes when a squad serves more than one repository, runs unattended, meets a security review, or needs behavior the stock CLI does not provide. It also covers Squad 2.0's biggest change: one team that works through several AI hosts.
 
 ## Who This Volume Is For {.unnumbered}
 
-This volume is for developers and platform engineers who already have a working squad, either from **Volume 1** or from equivalent hands-on experience with `squad init`, routing, issues, and the Ralph loop. It also suits readers who want to extend Squad with the SDK, plugins, and hooks, and readers evaluating Squad 2.0.
+This volume is for developers and platform engineers who already have a working squad, either from **Volume 1** or from equivalent hands-on experience with `squad init`, routing, issues, and the Ralph loop. It also suits readers who want to extend Squad with the SDK, plugins, and hooks, and teams whose members use different AI hosts.
 
 ## What Volume 1 Covered {.unnumbered}
 
@@ -24,7 +24,7 @@ Chapter and part numbering restart at 1 in this volume (Parts I–V, Chapters 1�
 | I | Advanced Coordination | 1–5 | 2 |
 | II | Production Operations | 6–10 | 2 |
 | III | Internals and Extension | 11–17 | 2 |
-| IV | Looking Ahead: Squad 2.0 (Preview) | 18–22 | 2 |
+| IV | Squad 2.0: One Team, Many Hosts | 18–22 | 2 |
 | V | Mastery | 23–25 | 2 |
 
 Appendices A–D and F are shared with Volume 1; Appendix E collects the quiz answers for this volume; Appendices G–J (SDK API, Feature Matrix, Specification Cheat Sheet, Version History) appear only here.
@@ -33,7 +33,8 @@ Appendices A–D and F are shared with Volume 1; Appendix E collects the quiz an
 
 - **Operator.** Read Part I (Chapters 1–5), then all of Part II (Chapters 6–10).
 - **Builder or extender.** Read Chapter 11 for the architecture, then Part III (Chapters 12–17), keeping Appendix G close at hand.
-- **Squad 2.0 evaluator.** Skim Chapter 2 (Volume 1) for the channels, then read Part IV (Chapters 18–22) and Appendix H.
+- **Multi-host teams.** Read Part IV (Chapters 18–22) and Appendix H. Copilot-only readers can skim it.
+- **Coming from Squad 1.x.** Start with Chapter 22, Migrating from Squad 1.x to Squad 2.0, then read Chapter 18 for what changed.
 - **Finishing the journey.** Read Part V (Chapters 23–25) once the earlier parts are familiar; the capstone brings Tasktrack to production.
 
 ## The Companion Project: Tasktrack {.unnumbered}
@@ -59,8 +60,12 @@ Each chapter opens with a **Prerequisites** callout, and its Hands-On section sa
 
 > **Warning:** Something that can lose work, leak secrets, or cost money.
 
-> **Preview:** A feature that wasn't in the stable v1.1.0 release when this book was written.
+> **Preview:** A feature that is still experimental in Squad v2.0.0.
 
 ## Versions {.unnumbered}
 
-Parts I–III and V target **Squad v1.1.0** (`latest`). Part IV targets **Squad v2.0.0-preview.2** (`insider`, with `preview` as an alias); that material is preview-only and may change. Chapter 2 (Volume 1) explains how to choose and switch channels. If your installed version differs from the book, check `squad --version`, the official docs at <https://bradygaster.github.io/squad/>, and Appendix J, Version History.
+The whole book targets **Squad v2.0.0** (`latest`, released 2026-11-18). If your project still runs Squad 1.x, Chapter 22 covers the migration. Chapter 2 (Volume 1) explains how to choose and switch channels. If your installed version differs from the book, check `squad --version`, the official docs at <https://github.github.com/squad/>, and Appendix J, Version History.
+
+## What's New in the Second Edition {.unnumbered}
+
+The first edition was written against Squad v1.1.0, with Part IV describing the 2.0 preview. This edition moves every chapter to Squad v2.0.0. Part IV is rewritten for the stable release as "Squad 2.0: One Team, Many Hosts": the Squad plugin for Claude Code and the full Claude Code projection, the other five hosts, host-neutral coordinators (ADR-003), and the committed `.squad/squad.mjs` launcher. Chapter 22 becomes "Migrating from Squad 1.x to Squad 2.0", with a migration drill on a scratch copy. Earlier parts pick up governed memory, work claims, the experimental execution harnesses and the removal of personal squads; Appendices G–J are updated for v2.0.0. If you still run Squad 1.1, the first edition remains available; it is tagged `book-squad-v1.1.0` in the book's repository.

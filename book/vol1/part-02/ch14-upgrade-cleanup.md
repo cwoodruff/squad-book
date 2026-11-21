@@ -79,7 +79,7 @@ The word *upgrade* can refer to the CLI executable installed on your machine or 
 | CLI self-upgrade | `squad upgrade --self` | Installs a newer `@bradygaster/squad-cli` package globally using npm, pnpm, or Yarn, on the channel you already use |
 | Project upgrade | `squad upgrade` | Refreshes the coordinator, managed templates, selected built-in skills, workflows, and applicable migrations in the current repository |
 | Preview project upgrade | `squad upgrade --dry-run` | Reports exactly which files a real run would write, and writes nothing (`--migrate-directory` still runs first if you combine them) |
-| Preview self-upgrade | `squad upgrade --self --dry-run` | Prints the install command it would run; installs nothing |
+| Preview self-upgrade | `squad upgrade --self --dry-run` | Prints the install command it would run; installs nothing (2.0 CLIs only; a 1.1.0 CLI installs) |
 
 A new CLI binary does not automatically mean that every repository has been upgraded. Run `squad upgrade` from each project whose managed files should be refreshed. The v2.0.0 implementation of `--self` installs the package and asks you to restart the terminal; on successful self-upgrade it returns before running the project upgrade.
 
@@ -90,7 +90,7 @@ A new CLI binary does not automatically mean that every repository has been upgr
 The package manager choice comes from the current process's `npm_execpath` or `npm_config_user_agent`. If those environment values identify pnpm or Yarn, the CLI selects that manager; otherwise it falls back to npm. This is not a detection based on a lock file in the current directory. The install targets are:
 
 ```bash
-squad upgrade --self --dry-run  # print the command; install nothing
+squad upgrade --self --dry-run  # 2.0 CLI: print the command; install nothing
 squad upgrade --self            # follow the installed channel
 squad upgrade --self --insider  # force @bradygaster/squad-cli@insider
 ```
@@ -101,7 +101,7 @@ Stable is the ordinary choice. Insider is a prerelease channel for testing; use 
 
 `--insider` by itself is not a project-upgrade channel: the CLI warns that it only applies with `--self` and ignores it for a repository upgrade. For a project upgrade, `--force` bypasses the repository's already-current version shortcut and re-processes every file. With `--self`, `--force` is what allows a downgrade; it does not change the package-manager command.
 
-Do not treat `--dry-run` as a universal dry-run across every combination. The dispatcher still performs `--migrate-directory` before it reaches the repository dry-run path, so that rename is real. `--self --dry-run` is safe: it previews the install and returns. Use `squad upgrade --dry-run` by itself to preview the project upgrade, and don't combine it with `--migrate-directory` expecting the rename to be simulated.
+Do not treat `--dry-run` as a universal dry-run across every combination. The dispatcher still performs `--migrate-directory` before it reaches the repository dry-run path, so that rename is real. On a 2.0 CLI, `--self --dry-run` is safe: it previews the install and returns. A 1.1.0 CLI ignores `--dry-run` with `--self` and installs `@bradygaster/squad-cli@latest`; check the target with `npm view @bradygaster/squad-cli dist-tags` instead (Chapter 22 (Volume 2)). Use `squad upgrade --dry-run` by itself to preview the project upgrade, and don't combine it with `--migrate-directory` expecting the rename to be simulated.
 
 ## What a Project Upgrade Preserves and Overwrites
 
@@ -326,7 +326,7 @@ The legacy `.ai-team/` rename is in `packages/squad-cli/src/cli/core/migrate-dir
 - `squad upgrade --self` updates the global CLI package. `squad upgrade` separately refreshes one repository.
 - Project upgrades preserve team knowledge and existing user-owned files, but refresh managed templates, built-in skills, coordinator, workflows, and eligible migration artifacts.
 - The project upgrade is content-aware: a customized Squad-owned file (coordinator, workflow or built-in skill) gets a verified `.local-backup` before it is overwritten, a customized `squad-ci.yml` is preserved, and `team.md`, `routing.md`, decisions, histories, casting state and `config.json` are never touched.
-- Self-upgrade follows the installed channel, refuses a downgrade without `--force`, and previews with `--dry-run`. Coming from 1.x, read Chapter 22 (Volume 2) first.
+- Self-upgrade follows the installed channel, refuses a downgrade without `--force`, and previews with `--dry-run` on a 2.0 CLI (a 1.1.0 CLI ignores it and installs). Coming from 1.x, read Chapter 22 (Volume 2) first.
 - Use a standalone dry run, back up important state, inspect the diff, test Tasktrack, and only then commit.
 - Old `.ai-team/` projects need an explicit migration. Very old incompatible state should be backed up and migrated deliberately, not deleted casually.
 

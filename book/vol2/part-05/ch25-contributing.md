@@ -5,7 +5,7 @@
 ## What You'll Learn
 
 - Find a useful contribution opportunity and report it with enough evidence to reproduce.
-- Build, test, and type-check Squad from its v1.1.0 monorepo source.
+- Build, test, and type-check Squad from its v2.0.0 monorepo source at `github/squad`.
 - Follow the dev-first contribution path: branch from `dev`, open a PR targeting `dev`, and leave release promotion to maintainers.
 - Understand how CI, changelog/version checks, preview releases, stable releases, and insider builds differ.
 - Participate in the community through code, reviews, issues, documentation, deployments, and discussions.
@@ -17,7 +17,7 @@ A healthy open-source project needs more than feature implementation. A precise 
 
 Start with the smallest contribution that addresses the real problem. Before opening an issue, search existing issues and discussions. Before changing behavior, read the code path and its tests. Before changing a template or policy document, identify which artifact is authoritative and who owns it. A small, well-supported PR is easier to review and safer to merge than a broad cleanup mixed with a feature.
 
-This book targets Squad v1.1.0. Repository guidance can change as the project evolves, and documentation pages may describe a different snapshot than a checked-out source tree. For a real contribution, inspect the branch, package scripts, workflow files, and contributor guide in the checkout you intend to change. The examples below describe the dev-first model and source behaviors verified for this book's target.
+This book targets Squad v2.0.0. The repository now lives at `github.com/github/squad`; the npm packages keep their `@bradygaster/` names. Repository guidance can change as the project evolves, and documentation pages may describe a different snapshot than a checked-out source tree. For a real contribution, inspect the branch, package scripts, workflow files, and contributor guide in the checkout you intend to change. The examples below describe the dev-first model and source behaviors verified for this book's target.
 
 ```mermaid
 flowchart LR
@@ -41,11 +41,11 @@ Prefer an issue with one clear failure mode. If an issue mixes a bug report with
 
 ### Propose a feature
 
-A feature issue should explain the user problem, the constraints, the expected behavior, and what is out of scope. For a change that affects coordination, state formats, command compatibility, or agent authority, first document the alternatives and migration impact. Use the project's proposal process for significant design work rather than asking maintainers to infer a product decision from a code diff.
+A feature issue should explain the user problem, the constraints, the expected behavior, and what is out of scope. For a change that affects coordination, state formats, command compatibility, or agent authority, first document the alternatives and migration impact. Use the project's proposal process for significant design work rather than asking maintainers to infer a product decision from a code diff. In v2.0.0 that means an issue or discussion first, and an architecture decision record under `docs/specification/` for a decision that changes a contract (ADR-002 and ADR-003 are recent examples; Chapter 17). The root `CONTRIBUTING.md` still points at a `docs/proposals/` folder, but stable promotion removed that folder from the v2.0.0 tree, so ask a maintainer where a new proposal should go.
 
 ### Improve documentation
 
-Documentation patches are often the best first contribution. Keep a correction narrow, test links and code snippets, and distinguish stable behavior from preview or environment-dependent behavior. Commands must match the installed CLI version, not an old screenshot or memory. A docs-only PR may have a different changeset requirement from a product-code change; check the current workflow and PR checklist.
+Documentation patches are often the best first contribution. Keep a correction narrow, test links and code snippets, and distinguish shipped behavior from experimental or environment-dependent behavior. Commands must match the installed CLI version, not an old screenshot or memory. A docs-only PR may have a different changeset requirement from a product-code change; check the current workflow and PR checklist.
 
 ### Contribute code or tests
 
@@ -57,29 +57,30 @@ Answer a question with a reproducible explanation, share a deployment case study
 
 ## Understand the Monorepo Before Editing
 
-Squad v1.1.0 is a workspace repository. The major implementation boundaries are:
+Squad v2.0.0 is a workspace repository. The major implementation boundaries are:
 
 | Area | Responsibility | What to inspect |
 |---|---|---|
-| `packages/squad-sdk/` | Runtime SDK, orchestration, state and tools | Public exports, tests, runtime abstractions |
+| `packages/squad-sdk/` | Runtime SDK, orchestration, state and tools, host adapters (`src/client/adapters/`) | Public exports, tests, runtime abstractions |
 | `packages/squad-cli/` | CLI command surface and implementation | Command routing, help text, command tests |
 | `templates/`, `.squad-templates/`, package templates | Scaffolding and agent instructions | Generated paths and any synchronization process |
-| `docs/` | User guides, technical specs, proposals, and release notes | Source page frontmatter, links, version qualification |
+| `plugins/squad/` | The Squad plugin for Claude Code (agents, skills, commands, hooks) | Plugin manifest and the files the plugin ships |
+| `docs/` | User guides, technical specs, architecture decision records, and release notes | Source page frontmatter, links, version qualification |
 | `.github/workflows/` | CI and release automation | Trigger branches, permissions, gates, artifacts |
 | `test/` and package tests | Regression and integration coverage | Existing test conventions and fixtures |
 
 The SDK and CLI are separate packages, but the release workflow and package manifests in this target release align their versions. Do not assume that “workspace” means every package can be independently published in every workflow. Read the actual release workflow before changing package metadata.
 
-Use repository search and tests to trace behavior. If a CLI command changes, search for its parser, help text, tests, docs, and template references. If the behavior is scaffolded into a new repo, unit tests alone may not prove the generated result; add a focused initialization or template test where appropriate. Avoid changing code and its tests in separate PRs when the API contract requires them to land together.
+Use repository search and tests to trace behavior. If a CLI command changes, search for its parser, help text, tests, docs, and template references. If the behavior is scaffolded into a new repo, unit tests alone may not prove the generated result; add a focused initialization or template test where appropriate. Avoid changing code and its tests in separate PRs when the API contract requires them to land together. Adding or changing a host adapter has its own checklist in the root `CONTRIBUTING.md`: the host id and projection in `adapters.ts`, its capability tokens, its dispatch section in `coordinator.ts`, additive config merging, tests in `test/clients.test.ts`, and the matching docs pages. Chapter 20 explains the projection model those steps implement.
 
 ## Set Up a Development Checkout
 
-The project contributor instructions describe a fork-and-upstream workflow. For an external contribution, fork `bradygaster/squad`, clone your fork, and configure the original repository as `upstream`:
+The project contributor instructions describe a fork-and-upstream workflow. For an external contribution, fork `github/squad`, clone your fork, and configure the original repository as `upstream`:
 
 ```bash
 git clone git@github.com:<your-account>/squad.git
 cd squad
-git remote add upstream git@github.com:bradygaster/squad.git
+git remote add upstream git@github.com:github/squad.git
 git fetch upstream dev
 git checkout dev
 git pull --ff-only upstream dev
@@ -119,7 +120,7 @@ Squad's contribution flow is organized around three concepts:
 |---|---|---|
 | `dev` | Integration branch for unreleased work | Base ordinary feature branches here; target PRs here |
 | `main` | Stable, released code | Do not push ordinary feature work directly; maintainers promote validated code |
-| `preview` / `insider` npm tags | Distribution channels | Do not treat them as Git branches; maintainers dispatch the relevant publishing workflow |
+| `preview` / `insider` channels | Prerelease distribution channels on npm, Homebrew and WinGet, both built from `dev` | Do not treat them as Git branches; maintainers dispatch the relevant publishing workflow |
 
 Create a focused feature branch from current `dev`. The `.squad` git-workflow skill, when installed for a working team, uses the `squad/{issue-number}-{kebab-case-slug}` convention:
 
@@ -135,7 +136,7 @@ For issue-driven work, mark the issue appropriately if the repository uses the `
 
 ```bash
 git push -u origin squad/217-fix-version-stamp
-gh pr create --repo bradygaster/squad --base dev --head <your-account>:squad/217-fix-version-stamp \
+gh pr create --repo github/squad --base dev --head <your-account>:squad/217-fix-version-stamp \
   --draft --title "Fix version stamp" --body "Closes #217"
 ```
 
@@ -161,7 +162,7 @@ External contributors generally cannot apply GitHub's suggestion buttons or merg
 
 ## CI and Release Channels
 
-CI is an engineering gate, not a release decision. In v1.1.0, the Squad CI workflow runs on pull requests targeting `dev` or `main` and on pushes to `dev`. It includes path-aware work, tests, build, TypeScript checking, linting, and additional repository-specific policy gates. Check the actual run because not every job runs for every path. A green check says the configured commands passed for that commit; it does not mean a human approved its design or that it is safe to deploy.
+CI is an engineering gate, not a release decision. In v2.0.0, the Squad CI workflow runs on pull requests targeting `dev` or `main` (and the `squad2-*` and `stack-*` stacked-PR bases) and on pushes to `dev`. It includes path-aware work, tests, build, TypeScript checking, linting, and additional repository-specific policy gates. One of the tests catches contributors who copy text from 1.x material: `test/retired-symbols.test.ts` searches every tracked file and the built `dist/` output for the names of removed features (personal squads, consult mode, the global squad) and fails if one reappears outside a tiny allowlist. Check the actual run because not every job runs for every path. A green check says the configured commands passed for that commit; it does not mean a human approved its design or that it is safe to deploy.
 
 Changesets and changelog checks serve release communication and version hygiene. The root `CONTRIBUTING.md` says to add a changeset when changing SDK/CLI source or governed scaffolding/template paths, and its CI gate also accepts a direct changelog edit in the documented compatibility path. Use the repository's current instructions and CI result; do not hand-edit versions merely to silence a check. The release automation validates that the root, SDK, CLI, and lockfile versions agree before publishing.
 
@@ -179,13 +180,13 @@ stateDiagram-v2
   Stable --> [*]
 ```
 
-In v1.1.0, the root `squad-release.yml` workflow accepts manual dispatch from `dev` for a version such as `X.Y.Z-preview.N`, or from `main` for a stable `X.Y.Z`; a push to `main` can also trigger a stable release. It validates the version, checks package consistency and changelog presence, creates the release tag if needed, and creates the GitHub Release. It then invokes the npm and standalone release workflows. Preview packages use the npm `preview` dist-tag; stable packages publish to npm `latest` when the npm job succeeds. The workflow marks the GitHub stable release as latest only after the npm and standalone jobs succeed and required release assets are present. The stable pipeline also produces standalone archives and updates the Homebrew and WinGet distribution paths when their release jobs succeed. A maintainer performs the release action; contributors do not tag or publish as part of an ordinary feature PR.
+In v2.0.0, the root `squad-release.yml` workflow runs only when a maintainer dispatches it; a push to `main` no longer starts a release. The dispatch names the release tag and an `expected_sha`, the full 40-character SHA of the reviewed commit, and the workflow refuses to run unless the branch tip and the workflow definition match it. From `dev` it accepts only an `X.Y.Z-preview.N` version, and the maintainer picks the npm dist-tag at dispatch time; from `main` it accepts only a stable `X.Y.Z`, which always goes to `latest`. Before it creates a tag or a GitHub Release, it runs the verification bundle in `squad-release-verify.yml`. It then publishes the SDK and CLI as a pair through the npm workflow, and builds the standalone archives. Attaching those archives and updating Homebrew and WinGet are separate opt-in inputs. A stable release is marked as the GitHub latest release only after every required asset is present. Chapter 8 walks through the channels in detail. A maintainer performs the release action; contributors do not tag or publish as part of an ordinary feature PR.
 
-The separate `squad-promote.yml` workflow validates the stable promotion path from `dev` to `main`, including version consistency and the absence of specified internal or consumed release artifacts on the promotion branch. It supports a dry-run path and a validated promotion-branch PR path. Promotion is not the same as merging a contributor's feature branch directly to `main`. After a stable release, the npm workflow also checks that the `insider` dist-tag is not left behind the stable `latest` version; that maintenance does not turn insider into a Git branch or replace the separate insider publishing workflow.
+The separate `squad-promote.yml` workflow handles the stable path from `dev` to `main`. It prepares a sanitized merge, removing internal team files such as `.squad/` and refusing consumed changeset fragments, then checks version consistency, the release notes and a build of the result. Its dry-run input validates all of that without pushing `main`. A real run pushes `main` and dispatches the stable release at that exact commit, with standalone and package-manager publication switched on. Promotion is not the same as merging a contributor's feature branch directly to `main`. After a stable release, the npm workflow also moves the `insider` dist-tag forward if it has fallen behind `latest`; that maintenance does not turn insider into a Git branch or replace the separate insider publishing workflow.
 
-Insider builds are also not a branch. The `squad-insider-publish.yml` workflow is manually dispatched, checks out `dev`, builds and tests, verifies npm registry access and credentials, computes the next `X.Y.Z-insider.N` version, and publishes the CLI and SDK with the npm `insider` dist-tag. It also creates an immutable GitHub prerelease and publishes standalone bundles. Preview and insider are distinct prerelease audiences and workflow paths. Do not infer that a green CI run automatically publishes an insider package; verify the workflow trigger and its successful run.
+Insider builds are also not a branch. The `squad-insider-publish.yml` workflow is manually dispatched, checks out `dev`, builds and tests, verifies npm registry access and credentials, computes the next `X.Y.Z-insider.N` version, and publishes the CLI and SDK with the npm `insider` dist-tag. It also creates an immutable GitHub prerelease and attaches the standalone bundles to it. It does not update Homebrew or WinGet: it never turns on `publish_package_managers` in the standalone workflow, and that input defaults to off. The `squad-insider` cask and `bradygaster.Squad.Insider` WinGet ID are what a run with package-manager publication enabled would target. Preview and insider are distinct prerelease audiences and workflow paths. Do not infer that a green CI run automatically publishes an insider package; verify the workflow trigger and its successful run.
 
-> **Note:** The repository's docs have drifted across snapshots. The v1.1.0 root contributor guide and checked-in workflows describe dev integration, explicit preview/insider publishing, and stable promotion; another docs-site guide describes independent package versioning and command names that do not match the root package scripts. This chapter uses the checked-in source and release workflows for concrete behavior. Recheck these files before following release steps on a newer checkout.
+> **Note:** The repository's docs have drifted across snapshots. The v2.0.0 checked-in workflows describe dev integration, explicit preview and insider publishing, and sanitized stable promotion. The root contributor guide still lists `preview` as a staging branch (dev → preview → main) and a `docs/proposals/` folder, neither of which exists in the v2.0.0 process, and the docs-site guide describes independent package versioning and a `build:cli` command that the root package scripts do not have. This chapter uses the checked-in source and release workflows for concrete behavior. Recheck these files before following release steps on a newer checkout.
 
 ## Contributors and Community
 
@@ -223,7 +224,7 @@ Expected result: the feature branch is based on `dev`, relevant checks pass, the
 
 ## Configuration Reference
 
-| Item | v1.1.0 purpose | Contributor check |
+| Item | v2.0.0 purpose | Contributor check |
 |---|---|---|
 | Node.js engine | Root `package.json` requires `>=22.5.0` | Compare `node --version` before installing/building |
 | `npm install` | Installs workspace dependencies and links local packages | Run from repo root; use the repository lockfile and current instructions |
@@ -235,22 +236,22 @@ Expected result: the feature branch is based on `dev`, relevant checks pass, the
 | `npm run dev:link` / `npm run dev:unlink` | Links or unlinks the local CLI development build | Do not commit machine-specific link state |
 | `dev` | Integration branch | Feature branches start here; PRs target here |
 | `main` | Stable line | Maintainers promote reviewed code and release it |
-| `squad-release.yml` | Creates preview or stable GitHub/npm release based on ref and version | Manual dispatch requires exact confirmation tag; stable push path is from `main` |
+| `squad-release.yml` | Creates a preview (from `dev`) or stable (from `main`) release based on ref and version | Manual dispatch only; requires the exact confirmation tag and a 40-character `expected_sha` |
 | `squad-promote.yml` | Validates and stages stable promotion | Maintainer action; inspect dry-run and validation results |
 | `squad-insider-publish.yml` | Publishes insider build from `dev` | Manual dispatch; requires configured npm credentials and passing gates |
 | `.changeset/*.md` | Describes user-facing package changes where the gate applies | Follow current path-specific changelog requirements |
 
 ## Under the Hood
 
-At v1.1.0, the root package manifest declares the workspace scripts. `build` chains the SDK and CLI workspace builds; `test` invokes Vitest; `lint` runs TypeScript checks for each package; `lint:eslint` covers package and test sources. The CI workflow in `.github/workflows/squad-ci.yml` confirms those commands and adds repository-specific checks. This is a more reliable guide to runnable commands than a docs page copied from another release state.
+At v2.0.0, the root package manifest declares the workspace scripts. `build` chains the SDK and CLI workspace builds; `test` invokes Vitest; `lint` runs TypeScript checks for each package; `lint:eslint` covers package and test sources. The CI workflow in `.github/workflows/squad-ci.yml` confirms those commands and adds repository-specific checks. This is a more reliable guide to runnable commands than a docs page copied from another release state.
 
-The release workflow `.github/workflows/squad-release.yml` selects a release channel from the checked-out branch, package version, and dispatch input. A manually dispatched `dev` release must have a preview SemVer suffix; a manually dispatched `main` release must be stable. A stable release is also triggered from `main`. The workflow compares the submitted confirmation tag with the exact package version, checks package and lockfile alignment, validates the changelog, and avoids recreating an existing tag.
+The release workflow `.github/workflows/squad-release.yml` selects a release channel from the checked-out branch, package version, and dispatch input. Its first job, the exact-SHA and channel guard, does most of the refusing: a `dev` release must have an `X.Y.Z-preview.N` version, a `main` release must be stable, the confirmation tag must equal `v` plus the package version, and the dispatch SHA, workflow SHA, checkout and live branch tip must all equal `expected_sha`. Only then does the verification bundle run and the tag get created. Nothing in the workflow fires on a push, so a merge to `main` alone never publishes.
 
 The promotion workflow `.github/workflows/squad-promote.yml` is deliberately separate. Its validation checks that a promotion branch descends from current `main`, filters prohibited internal paths and consumed changeset fragments, validates stable package versions and lockfile entries, checks the release notes entry, and builds/tests the resulting release tree before promotion. Its dry-run input is a validation mechanism, not a stable deployment.
 
 The insider workflow `.github/workflows/squad-insider-publish.yml` is a manually dispatched pipeline that checks out `dev`, builds and tests the source, checks registry health and the npm token, then computes an incremented insider version. The channel name in npm metadata is not a Git branch. Read the rest of the workflow before making assumptions about registry tags, publishing permissions, or artifact handling.
 
-The contributor doc and docs-site guide are not fully synchronized with one another. The docs-site `guide/contributing` page describes Node `>=20`, independent package versioning, and a `build:cli` command. The target root manifest requires Node `>=22.5`, the root contributor guide says release versions are aligned, and the verified root scripts use `npm run build` rather than a root `build:cli` script. Use the latter facts for v1.1.0 source and call out the drift rather than repeating an unverified command.
+The contributor doc and docs-site guide are not fully synchronized with one another or with the workflows. The docs-site `guide/contributing` page agrees with the root manifest on Node `>=22.5.0`, but it describes independent package versioning and lists a `build:cli` command in its CI section. The release workflows keep the root, SDK and CLI versions aligned, and the verified root scripts use `npm run build` rather than a root `build:cli` script. Use the manifest and workflow facts for v2.0.0 source and call out the drift rather than repeating an unverified command.
 
 ## Pitfalls and Troubleshooting
 
@@ -265,11 +266,12 @@ The contributor doc and docs-site guide are not fully synchronized with one anot
 | Confusing preview and insider | They have different versions, triggers, and audiences | Inspect `squad-release.yml` and `squad-insider-publish.yml` separately |
 | Treating `insider` as a branch | It is an npm channel in this release flow | Work on `dev`; maintainers dispatch the insider workflow |
 | Pushing directly to `dev` or `main` | It avoids review and can destabilize release branches | Use a feature branch and PR |
+| Copying 1.x text or names into a 2.0 patch | Personal-squad, consult-mode or `--global` wording fails the retired-symbol test | Run `npm test`; describe removed features only where the allowlist permits history |
 | Posting secrets in an issue | Public content is durable and searchable | Redact output; use private security reporting for sensitive issues |
 
 ## Summary
 
-Contributing to Squad is a path from evidence to a reviewable change, not merely a code edit. Learn the monorepo boundaries, use the verified Node and npm scripts, branch from `dev`, and target ordinary feature PRs at `dev`. Add tests and the required release notes, preserve a focused diff, and leave merge and release decisions to maintainers. Preview and insider are explicit release channels, not branches; stable releases are tied to the `main` line and validated promotion. The community also needs careful reports, documentation, reviews, discussions, and responsible deployment stories. That completes the journey from first use through production operations, internals, the 2.0 preview, and mastery: keep verifying what the version you run actually does, and contribute evidence that helps the next reader do the same.
+Contributing to Squad is a path from evidence to a reviewable change, not merely a code edit. Learn the monorepo boundaries, use the verified Node and npm scripts, branch from `dev`, and target ordinary feature PRs at `dev`. Add tests and the required release notes, preserve a focused diff, and leave merge and release decisions to maintainers. Preview and insider are explicit release channels, not branches; stable releases are tied to the `main` line, a sanitized promotion and a human dispatch pinned to one commit. The community also needs careful reports, documentation, reviews, discussions, and responsible deployment stories. That completes the journey from first use through production operations, internals, one team across many hosts, and mastery: keep verifying what the version you run actually does, and contribute evidence that helps the next reader do the same.
 
 ## Exercises
 
@@ -282,21 +284,21 @@ Contributing to Squad is a path from evidence to a reviewable change, not merely
 ## Quiz
 
 1. Which branch is the base for ordinary Squad feature work, and where should the PR target?
-2. What is the root Node.js engine requirement in the v1.1.0 source used here?
+2. What is the root Node.js engine requirement in the v2.0.0 source used here?
 3. Which root command builds both SDK and CLI workspaces?
 4. Does a green CI run itself authorize a stable release?
-5. Is `insider` a Git branch in the v1.1.0 release model described here?
+5. Is `insider` a Git branch in the v2.0.0 release model described here?
 6. Which workflow validates promotion to the stable line?
 7. Name two non-code contribution types that help the Squad community.
 8. Why should a contributor avoid using the docs-site guide's `build:cli` command without verification?
 
 ## Further Reading
 
-- [Squad Community](https://bradygaster.github.io/squad/docs/community/)
-- [Contributing Guide](https://bradygaster.github.io/squad/docs/guide/contributing/)
-- [Squad Contributors Guide](https://bradygaster.github.io/squad/docs/guide/contributors/)
-- [Repository CONTRIBUTING.md at v1.1.0](https://github.com/bradygaster/squad/blob/v1.1.0/CONTRIBUTING.md)
-- [Squad CI workflow at v1.1.0](https://github.com/bradygaster/squad/blob/v1.1.0/.github/workflows/squad-ci.yml)
-- [Squad release workflow at v1.1.0](https://github.com/bradygaster/squad/blob/v1.1.0/.github/workflows/squad-release.yml)
-- [Squad promotion workflow at v1.1.0](https://github.com/bradygaster/squad/blob/v1.1.0/.github/workflows/squad-promote.yml)
-- [Squad insider publish workflow at v1.1.0](https://github.com/bradygaster/squad/blob/v1.1.0/.github/workflows/squad-insider-publish.yml)
+- [Squad Community](https://github.github.com/squad/docs/community/)
+- [Contributing Guide](https://github.github.com/squad/docs/guide/contributing/)
+- [Squad Contributors Guide](https://github.github.com/squad/docs/guide/contributors/)
+- [Repository CONTRIBUTING.md at v2.0.0](https://github.com/github/squad/blob/v2.0.0/CONTRIBUTING.md)
+- [Squad CI workflow at v2.0.0](https://github.com/github/squad/blob/v2.0.0/.github/workflows/squad-ci.yml)
+- [Squad release workflow at v2.0.0](https://github.com/github/squad/blob/v2.0.0/.github/workflows/squad-release.yml)
+- [Squad promotion workflow at v2.0.0](https://github.com/github/squad/blob/v2.0.0/.github/workflows/squad-promote.yml)
+- [Squad insider publish workflow at v2.0.0](https://github.com/github/squad/blob/v2.0.0/.github/workflows/squad-insider-publish.yml)

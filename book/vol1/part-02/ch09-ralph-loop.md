@@ -160,7 +160,7 @@ A few rules keep claims honest:
 
 - Every watcher that may compete must use the same claims remote and the same `refPrefix`. A watcher without claims, or one writing to a different namespace, is invisible to the others.
 - The object form of `watch.claims` accepts `provider`, `ttlMs` (default 900000), `skewMarginMs` (default 120000), `remote` (default `origin`) and `refPrefix` (default `refs/squad/claims/`). `--claims` overrides only the provider. Lease timing must stay between 30 seconds and 24 hours, with `ttlMs` more than twice `skewMarginMs`, or watch refuses to start.
-- `watch.claims` is a reserved key. An invalid value stops watch instead of running without claims.
+- `watch.claims` is validated strictly. An invalid value stops watch instead of running without claims.
 - Watchers need push rights to the claims remote. A dedicated, claims-only repository limits what a leaked claim credential can do.
 - Set `SQUAD_MACHINE_ID` to a readable name (a pseudonym on public repositories) so you can tell holders apart.
 

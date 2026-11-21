@@ -2,65 +2,59 @@
 
 ## Baseline
 
-- Upstream: `https://github.com/bradygaster/squad`
-- Release: `v1.1.0`
-- Commit: `c24da2aad2ab7576f6b68dec2bc50b2fe2dc7a8a`
+- Upstream: `https://github.com/github/squad` (moved from `bradygaster/squad`; the npm scope `@bradygaster/` is unchanged).
+- Release: `v2.0.0` (second edition).
+- Commit: `26654f0c4dadb2625d764c1c69ec61da6c518094`.
 - Upstream license: MIT.
 
-The baseline source inventory contains 145 published-document source files and 30 additional specification, feature, internal-specification, migration, and overview files. `coverage.csv` maps these 175 files to the manuscript.
+The whole book targets v2.0.0. The first edition, written against v1.1.0 (commit `c24da2aad2ab7576f6b68dec2bc50b2fe2dc7a8a`), is tagged `book-squad-v1.1.0` in this repository. v1.1.0 and the 2.0 previews appear in the manuscript only as history (Volume 2, Chapter 22 and Appendix J).
 
-## Squad 2.0 documentation rescan
+## Source inventory and maps
 
-- Preview baseline: `v2.0.0-preview.2`, commit `481c944596abfa2053e2acd88d765639f994d795`.
-- All parts except Volume 2, Part IV retain their v1.1.0 teaching baseline. Volume 2, Part IV (Chapters 18–22) covers the preview, with cross-references in the existing chapters and preview sections in the appendices.
-- The rescan compared the documentation trees at the stable and preview tags, including published pages, specifications, tutorials, overview material, and proposals. Internal release-checklist changes, dependency lockfiles, navigation wiring, and blog posts are not treated as new teaching chapters.
-- `sources-2.0.txt` inventories 41 new or changed teaching sources. `coverage-2.0.csv` maps them to Volume 2, Part IV, with a second reference for the host matrix in Appendix H. Together the maps contain 217 citation assignments; this is not a count of 217 distinct documents.
-- Coverage includes all seven client projections, host capabilities, state MCP boundaries, experimental backend/harness contracts, runtime upstream inheritance, upgrade safety, removed personal/consult/global workflows, and proposal status.
-- `source-modules.csv` now maps 44 SDK/CLI source modules and files.
-- The live documentation can advance beyond this tag. Unreleased changes on `dev` are not asserted to be available in preview.2.
+There is one inventory and one map, both checked against v2.0.0:
+
+- `research/sources.txt` lists 186 upstream sources: the 183 `docs/**/*.md` pages outside the blog, `docs/_internal/` and `docs/research/` trees, plus 3 hand-curated `docs/_internal/specs/*` files. One repo-relative path per line, sorted. Lines starting with `#` are ignored by both checkers.
+- `research/coverage.csv` (`source,chapter`) has 213 rows that map those 186 sources to volume-qualified chapters or appendices. 213 is a count of citation assignments, not of distinct documents.
+- `research/source-modules.csv` maps 48 SDK/CLI source modules and files to the book sections that name them.
+
+Changes from the first edition: the separate 2.0-preview inventory and map were merged into these files and deleted. Sources removed upstream by v2.0.0 (`features/consult-mode.md`, `guide/personal-squad.md`) and the `multi-squad.ts` module were dropped, and no `docs/proposals/*` row remains (that tree is not in v1.1.0 or v2.0.0). All 13 docs pages added between v1.1.0 and v2.0.0 are inventoried. Links to the removed pages survive only as labelled v1.1.0 history pins in Appendix F.
+
+`coverage.csv` and `sources.txt` are maintained by hand. `research/build_coverage.py` no longer generates them. Run with `--src <checkout at the pinned tag>`, it checks that every inventoried source and listed module exists upstream, that the inventory and map agree, and it warns about upstream pages that are not inventoried.
 
 ## Automated and integration checks
 
-- `make coverage` checks inventory completeness, chapter citations, and package-module references.
-- `make manuscript` checks each volume's chapter sequence (Volume 1: 1–21; Volume 2: 1–25) and matching per-volume solution files, the prerequisites callout, required sections (Configuration Reference and Under the Hood are optional in Volume 1, Chapters 1–4), exercise/quiz solutions, at least two diagrams per chapter, shared appendices A–D and F, Volume 2 appendices G–J, per-volume front matter, and invalid XML control characters.
-- `make check` builds both volumes and validates each EPUB using epubcheck. Mermaid rendering is mandatory: a rendering error stops the build rather than leaving diagram source in a published book.
-- The Tasktrack API is exercised with `node --test sample/api/test/`. Tests cover health, task creation/listing, invalid and oversized JSON, status changes, missing IDs, and deletion.
-- The installed CLI reports `1.1.0`; its help output was checked against the baseline. Writers were instructed to inspect the assigned documentation and implementation and verify commands in disposable repositories.
-- An integration audit of explicitly backticked source paths found one nonexistent path, which Volume 2, Chapter 7 (Containers, Cloud Hosting, and Deployment Modes) identifies as an upstream documentation mismatch (`templates/keda/scaler-deployment.yaml` versus the checked-in `templates/keda-scaler.md`).
-- HTTP checks of 145 official documentation URLs found two removed live-site pages: consult mode and personal squad. Their manuscript links now point to the corresponding tagged v1.1.0 source files.
+- `make coverage` (`scripts/check-coverage.py`) checks that each mapped source is cited in its chapter, that every inventoried source is mapped, and that each module in `source-modules.csv` is named in at least one listed section. It matches bare repo paths, so it does not detect stale refs or dead links.
+- `make manuscript` checks each volume's chapter sequence (Volume 1: 1–21; Volume 2: 1–25) and matching per-volume solution files, the prerequisites callout, required sections, exercise and quiz solutions, at least two diagrams per chapter, shared appendices A–D and F, Volume 2 appendices G–J, per-volume front matter, and invalid XML control characters. It also regenerates both Appendix E files.
+- `make check` builds both volumes and validates each EPUB with epubcheck. Mermaid rendering is mandatory: a rendering error stops the build.
+- `make links` (`scripts/check-links.sh`) probes the external URLs in `book/` and `exercises/` (not `sample/` or the root README), skips loopback and placeholder hosts, and fails on any broken URL or any URL on the old `bradygaster` hosts.
+- The Tasktrack API is tested with `node --test` in `sample/` (`npm test`). The tests cover health, task creation and listing, invalid and oversized JSON, status changes, missing IDs, and deletion.
+
+## What was verified for the 2.0.0 update — November 2026
+
+Results as recorded in `research/reviews/` on 2026-11-21, branch `squad-2.0`, uncommitted:
+
+- **Inventory.** `python3 -I research/build_coverage.py --src <v2.0.0 checkout>`: 186 sources, 48 modules, 0 errors, and no "upstream doc not inventoried" warnings (`inventories-review.md`).
+- **Coverage.** `make coverage`: 213/213 sources cited, 48/48 source modules referenced.
+- **Manuscript.** `make manuscript`: 46 chapters (21 + 25), 0 structural errors. Reviewers reran it after each later chapter revision with the same result.
+- **EPUB.** `make epub` and epubcheck 5.4.0 (`build-review.md`): 0 fatals, 0 errors and 0 warnings for both EPUBs. Both were run outside the sandbox, because inside it mermaid-cli's Chrome cannot launch and Java image decoding reports every PNG as a false `PKG-021`. Chapters were revised after this build, so the EPUBs must be rebuilt and rechecked before release.
+- **Links.** `make links` (`build-review.md`, approved in Marvin's re-review): exit 0, 308 unique URLs found, 301 checked, 7 skipped (local or placeholder hosts), 0 broken. This is the rewritten script; the first version, which probed only 1 URL, was rejected (R1, R2). Known limitation: each URL is probed once with no retry, so a transient 5xx fails the run.
+- **End-to-end CLI checks** (`e2e-checks.md`), with the 2.0.0 CLI and an isolated 1.1.0 install, on scratch copies of `sample/` with a scratch `HOME`:
+  - Volume 1, Chapter 3: a real 2.0.0 `squad init` matches the annotated tree, the state-files table and the template table. Pass.
+  - Volume 2, Chapter 22: the 1.1.0 → 2.0.0 migration drill (init, dry run, upgrade, `--client claude`, doctor and health, rollback). Most steps pass. It found two accuracy errors about an uncast team (`doctor` exits 0 with no warnings, and `squad health` reports three failures and exits 1) and one minor wording issue (F1–F3). All three are fixed and approved, 2026-11-21: Trillian's fixes at Ch 22 l.434 (F3) and l.445 (F2) passed Arthur's review, and Ford's revision of l.392 (F1) passed Arthur's re-review (R1).
+  - Volume 2, Chapter 19: the Git removal route for a projected client (`client add claude,codex`, then removal). It works as written. Pass.
+- **Blocked.** The Tasktrack tests did not run in this update: the sandbox denies local port binding (`listen(0)` fails with `EPERM`), so the test's `before()` hook never resolves. The test code is unchanged since the first edition, where all six tests passed.
 
 ## Deliberate limits
 
-This is a complete **first manuscript**, not an independently reviewed publication. Source citations and structural checks do not prove that every explanation or API example is correct. The full prose has not received a separate line-by-line editorial review.
+Source citations and structural checks do not prove that every explanation or API example is correct. The full prose has not received a separate line-by-line editorial review.
 
-Cloud resources were not provisioned, chargeable services were not invoked, and GitHub Actions was not executed remotely. Infrastructure walkthroughs are source-based teaching material, not proof of a successful Azure deployment. SDK examples were not all compiled or executed. The Tasktrack tests run locally; npm itself was killed by the host environment, so direct Node commands were used for that verification.
+Only the steps listed above were run end-to-end. Of the seven hosts, the Copilot, Claude Code and Codex projections were generated and inspected as files. No host was installed, authenticated and driven through a session. The other multi-client commands and examples are source-based. SDK examples were not all compiled or executed. Cloud resources were not provisioned, chargeable services were not invoked, and GitHub Actions was not run remotely. Infrastructure walkthroughs are source-based teaching material.
 
-The local book build uses Pandoc 3.12.1, epubcheck 5.4.0, Mermaid CLI 12.0.0, and system Chrome. CI is configured separately and should be exercised after the repository is published.
+Sandbox effects on the checks: Node's built-in `https` ignores the sandbox proxy unless `NODE_USE_ENV_PROXY=1` is set. Without it, a 1.1.0 `squad init` pins `@insider` instead of `@1.1.0`. Mermaid rendering, epubcheck image decoding and the Tasktrack tests need to run outside the sandbox.
 
-## Updated artifact checks — October 27, 2026
+The local book build uses Pandoc 3.14, EPUBCheck 5.4.0, Mermaid CLI and system Chrome. CI (`.github/workflows/build-epub.yml`) runs coverage, manuscript and validate. It should be run once the branch is pushed.
 
-`make check` passed with 217/217 citation assignments, 44/44 source-module references, 47 chapters, zero structural errors, and zero EPUBCheck errors or warnings. `make html` rebuilt the HTML edition. All six Tasktrack API tests passed using the direct Node command above.
+## First edition history (v1.1.0)
 
-The seven external hosts were not each installed, authenticated, and exercised end-to-end. Multi-client commands and examples are source-based preview documentation, not a claim of independent certification of every host integration.
-
-## Two-volume restructure — October 28, 2026
-
-After a structural editorial review, the book was reorganized into two volumes with continuous chapter numbering. Volume 1, *Using Squad*, contains Parts I–IV and Chapters 1–21. Volume 2, *Operating and Extending Squad*, contains Parts V–IX and Chapters 22–46. The old Chapters 2 and 3 were merged. The old client-compatibility chapter was split: dual-mode deployment moved to Chapter 28 and platform adapters moved to Chapter 8. The internals chapters now open Part VII, and the Squad 2.0 preview part comes before Mastery. Each chapter now has a prerequisites line, and the TOC depth was reduced to one level.
-
-`make check` passed with 217/217 citation assignments, 44/44 source-module references, 46 chapters, zero structural errors, and zero EPUBCheck errors or warnings for both `dist/mastering-squad-vol1.epub` and `dist/mastering-squad-vol2.epub`. `make html` rebuilt both HTML editions. All six Tasktrack API tests passed.
-
-## Per-volume chapter numbering
-
-Volume 2 was renumbered to start at Chapter 1: Volume 1 has Chapters 1–21 and Volume 2 has Chapters 1–25 (formerly 22–46).
-- Volume 2 chapter files, exercise solutions (now in `exercises/solutions/vol1/` and `exercises/solutions/vol2/`), the chapter manifest, the coverage maps, the source-module map and the Tasktrack tags (`v2-chNN-*`) were updated to match.
-- Cross-references within a volume are unqualified. References to the other volume, and all references in the shared appendices, name the volume.
-- `make check` passed:
-  - 217/217 citations and 44/44 source modules
-  - 46 chapters (21 + 25) with zero structural errors
-  - Appendix E with 21 and 25 chapter sections
-  - zero EPUBCheck errors or warnings for both EPUBs
-- `make html` built both volumes, and the sample API tests passed (6/6).
-
-## Per-volume part numbering
-
-Volume 2's parts were renumbered from V–IX to I–V, and their directories were renamed from `book/vol2/part-05…09` to `part-01…05`. References that cross volumes name the volume, for example "Volume 2, Part IV". `make check` and `make html` passed: 217/217 citations, 44/44 modules, 0 structural errors, and 0 EPUBCheck errors or warnings for both EPUBs.
+- The first edition inventoried 175 sources at v1.1.0. A later preview rescan (v2.0.0-preview.2) added 41 sources in a separate preview inventory and map, for a total of 217 citation assignments and 44 source modules. The 2.0.0 update replaced both sets with the single inventory above.
+- October 27–28, 2026: `make check` passed with 217/217 citations, 44/44 modules, 0 structural errors and 0 EPUBCheck errors or warnings, and the six Tasktrack tests passed. The book was then split into two volumes, with per-volume chapter numbering (Volume 1: 1–21, Volume 2: 1–25) and per-volume part numbering (Volume 2: Parts I–V). The checks were rerun after each step with the same results.

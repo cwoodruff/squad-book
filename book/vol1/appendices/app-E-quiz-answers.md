@@ -16,7 +16,7 @@ This appendix collects the answers to the chapter quizzes in this volume (Chapte
 
 1. The install script, Homebrew cask, WinGet package, and direct release bundle vendor Node.js. An npm install does not; it needs Node 22.5+.
 2. It pins the release tag to install; the default is the latest stable release.
-3. `latest` is stable (v2.0.0), `preview` carries release candidates, and `insider` carries development snapshots.
+3. `latest` is stable (v2.0.0) and `insider` carries prereleases. `preview` is an alias of `insider`, not a separate release-candidate tag.
 4. False. `squad upgrade` refreshes project-managed files; `squad upgrade --self` updates the CLI package itself.
 5. GitHub Copilot CLI and VS Code with GitHub Copilot.
 6. VS Code uses the session model selected in the model picker; the per-spawn model selection documented for the CLI is not available there.
@@ -145,7 +145,7 @@ This appendix collects the answers to the chapter quizzes in this volume (Chapte
 5. Manifest-listed Squad-owned templates are refreshed. Team state such as histories and decisions is preserved.
 6. Yes, in Squad 2.0. A customized built-in skill is copied to a verified `.local-backup` before it is overwritten. Keep version control as well, because a later upgrade can replace that backup.
 7. It refuses if `.ai-team/` does not exist or if `.squad/` already exists.
-8. The dispatcher performs `--migrate-directory` before the project dry-run logic, so the rename is real and not simulated. `squad upgrade --self --dry-run` is safe: it prints the package manager, target version and install command, and installs nothing.
+8. The dispatcher performs `--migrate-directory` before the project dry-run logic, so the rename is real and not simulated. `squad upgrade --self --dry-run` is safe: it prints the package manager, target version and install command, and installs nothing. This holds on a 2.0 CLI; a 1.1.0 CLI ignores `--dry-run` with `--self` and installs.
 
 ## Chapter 15: Memory and Knowledge
 

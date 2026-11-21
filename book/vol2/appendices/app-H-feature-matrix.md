@@ -1,6 +1,6 @@
 # Appendix H: Host and Client Feature Matrix
 
-Squad's feature behavior depends on both the host (where the agent runs) and the Copilot client (which tools and agent runtime it exposes). The CLI is the most fully controllable host; VS Code supports useful parallel work with different orchestration mechanics. The matrix follows `templates/client-compatibility-reference.md` and the v1.1.0 client-compatibility documentation. “Unknown” means not verified, not a promise of support.
+Squad's feature behavior depends on both the host (where the agent runs) and the Copilot client (which tools and agent runtime it exposes). The CLI is the most fully controllable host; VS Code supports useful parallel work with different orchestration mechanics. The matrix follows `templates/client-compatibility-reference.md` and the v2.0.0 client-compatibility documentation. “Unknown” means not verified, not a promise of support. This first part covers the GitHub Copilot surfaces only; the seven-host matrix for Squad 2.0, including Claude Code, follows in the second part.
 
 | Capability | Copilot CLI | VS Code Copilot | GitHub Copilot coding agent / github.com | JetBrains Copilot | SDK / embedded runtime |
 |---|---|---|---|---|---|
@@ -44,13 +44,13 @@ The compatibility reference marks JetBrains spawning, model selection, and files
 4. In VS Code, launch all parallel workers in one turn and defer Scribe to the final group.
 5. In untested clients, reduce to one inline worker and verify file access before authorizing writes.
 
-For current details and known limitations, consult the source template `templates/client-compatibility-reference.md` and the documented [client compatibility matrix](https://bradygaster.github.io/squad/docs/scenarios/client-compatibility/).
+For current details and known limitations, consult the source template `templates/client-compatibility-reference.md` and the documented [client compatibility matrix](https://github.github.com/squad/docs/scenarios/client-compatibility/).
 
-## Squad 2.0 Host Feature Matrix (Preview)
+## Squad 2.0 Host Feature Matrix
 
-> **Preview:** This summary reflects Squad `v2.0.0-preview.2` across its seven supported host slugs. The matrix is evidence-based and changes as adapters and host runtimes evolve; see the [full host feature matrix](https://bradygaster.github.io/squad/docs/reference/host-feature-matrix/) for its validation details and per-feature records.
+> **Note:** This summary reflects Squad v2.0.0 across its seven host slugs. The matrix is evidence-based and changes as adapters and host runtimes evolve; see the [full host feature matrix](https://github.github.com/squad/docs/reference/host-feature-matrix/) for its validation details and per-feature records. Chapter 20 distills the same matrix in more detail.
 
-The 2.0 adapter standardizes where the coordinator and `squad_state` MCP bridge are projected. It does not make every host's execution runtime identical. The status below summarizes the preview matrix: **✓** supported, **△** degraded/partially supported, **×** unsupported, and **—** not applicable. Validation is a separate axis; a supported claim may be based on static inspection or automated contract tests rather than a live run.
+The 2.0 adapters standardize where the coordinator and the `squad_state` MCP bridge are projected. They do not make every host's execution runtime identical. The v2.0.0 matrix has 51 feature rows, generated from `test-fixtures/spec/suite-v0.2/host-feature-matrix.json`. In the tables below, **✓** means supported, **△** degraded or partially supported, **×** unsupported, and **—** not applicable. Validation is a separate axis: a supported cell may rest on static inspection or an automated contract test rather than a live run.
 
 ### Shared baseline
 
@@ -59,33 +59,38 @@ The 2.0 adapter standardizes where the coordinator and `squad_state` MCP bridge 
 | Project initialization, casting, routing, response modes | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Parallel specialist dispatch | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Skills, shared decisions/history, directives, memory governance | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| State backends, MCP state bridge, export/import, ceremonies | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Reviewer lockout, Rai, Fact Checker, ceremonies, PRD mode | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| State backends, MCP state bridge, export/import | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Dual-root remote mode | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | 2.0 host projection and capability negotiation | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Experimental conversation backend bridge | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 
 These shared rows describe a portable contract and projected coordinator instructions, not proof that every host offers the same interface or executes every workflow the same way. All seven hosts advertise subagent dispatch; the details below show where run controls differ.
 
+> **Preview:** The conversation backend in the last row (the `squad_backend_*` tools and the execution harnesses) is experimental in v2.0.0. A supported cell means the bridge can reach the backend contract; Chapter 21 explains when a harness actually runs turns.
+
 ### Host runtime differences
 
 | Host | Entry point / projected coordinator | Subagents | Background runs | Per-spawn model selection | Important host-specific notes |
 |---|---|---:|---:|---:|---|
-| GitHub Copilot (`copilot`) | `copilot --agent squad`; canonical `.github/agents/squad.agent.md` | ✓ | ✓ | ✓ | Copilot CLI, VS Code, and app surfaces have distinct mechanics. VS Code, `squad start`/RC, and GitHub Agentic Workflows are Copilot-specific surfaces. |
-| Claude Code (`claude`) | `.claude/agents/squad.md`; use `claude --agent squad --mcp-config .mcp.json` | ✓ | ✓ | × | Claude Code does not load project-scoped `.mcp.json` servers until approved; passing the config explicitly is the documented route. |
-| Kiro (`kiro`) | `kiro-cli`; `.kiro/agents/squad.json` plus manual steering file | ✓ | × | × | Parallel work is supported, but not the background-run capability in the matrix. |
-| OpenCode (`opencode`) | `opencode`; `.opencode/agent/squad.md` | ✓ | ✓ | × | One of the two hosts with a recorded successful live CLI run in the evidence set. |
-| Cursor (`cursor`) | `cursor-agent`; `.cursor/agents/squad.md` and `.cursor/rules/squad.mdc` | ✓ | × | × | The live smoke run was blocked by a usage limit; host-independent tests and static projection evidence remain separate evidence. |
-| OpenAI Codex (`codex`) | `codex`; `.codex/agents/squad.toml` plus `AGENTS.md` pointer | ✓ | × | × | The Codex CLI was not present on the reference machine, so its matrix evidence is static and test-based rather than a live run. |
-| Google Antigravity (`antigravity`) | `agy`; `.agents/agents/squad.md` | ✓ | × | × | Subagents do not inherit the MCP connection in this preview's matrix. |
+| GitHub Copilot (`copilot`) | `copilot --agent squad`; canonical `.github/agents/squad.agent.md` | ✓ | ✓ | × | Copilot CLI, VS Code, and app surfaces have distinct mechanics. VS Code, `squad start`/RC, and GitHub Agentic Workflows are Copilot-specific surfaces. The runtime has a model parameter, but the coordinator lacks the per-agent model section, so the matrix marks the behavior unsupported. |
+| Claude Code (`claude`) | `.claude/agents/squad.md` plus a `CLAUDE.md` block; `claude --agent squad --mcp-config .mcp.json`, or the Squad plugin (`squad:squad`) | ✓ | ✓ | ✓ | Each member is a named subagent (`Agent` tool, `subagent_type`), with `run_in_background` and `isolation: "worktree"`. Interactive Claude Code does not load project `.mcp.json` servers until approved, so pass the config explicitly; the plugin needs no approval. Advisory hooks are opt-in, and Squad's permission allowlist applies only in a trusted folder. |
+| Kiro (`kiro`) | `kiro-cli`; `.kiro/agents/squad.json` plus a manual steering file | ✓ | △ | × | Parallel work is supported; non-blocking support agents are degraded. |
+| OpenCode (`opencode`) | `opencode`; `.opencode/agents/squad.md` | ✓ | ✓ | × | One of the two hosts with recorded passing live CLI runs. |
+| Cursor (`cursor`) | `cursor-agent`; `.cursor/agents/squad.md` and `.cursor/rules/squad.mdc` | ✓ | △ | × | The live smoke run was blocked by a usage limit; host-independent tests and static projection evidence remain separate evidence. |
+| OpenAI Codex (`codex`) | `codex`; `.codex/agents/squad.toml` plus an `AGENTS.md` pointer | ✓ | △ | × | The Codex CLI was not present on the reference machine, so its evidence is static and test-based rather than a live run. |
+| Google Antigravity (`antigravity`) | `agy`; `.agents/agents/squad.md` plus a `GEMINI.md` block | ✓ | △ | × | Subagents do not inherit the MCP connection, so specialist access to `squad_state` is degraded. |
 
-### Preview gaps and degraded paths
+### Gaps and degraded paths
 
 | Capability | Matrix result |
 |---|---|
 | Background agent runs | Supported on Copilot, Claude Code, and OpenCode; degraded on Kiro, Cursor, Codex, and Antigravity. Use a foreground or synchronous hand-off where the host cannot continue work in the background. |
-| Ralph CLI workflows | Supported on Copilot; degraded on the other six hosts. The command-line monitor remains distinct from coordinator-level issue triage. |
-| Per-agent model, reasoning, and context-tier selection | Unsupported across all seven projected coordinator digests in this preview. Do not infer this capability from a host's general model picker. |
-| Marketplace plugin browsing on cast; GitLab and Azure DevOps issue tracking; monorepo team-root and dual-root remote resolution | Unsupported across all seven hosts in the matrix snapshot. The host adapters do not fill these documented digest or platform gaps. |
-| Copilot RC/start and GitHub Agentic Workflows | Copilot-only; not applicable to the other six host slugs. |
-| Live validation | Recorded passing live CLI evidence exists for Claude Code and OpenCode only (2026-10-22). Other hosts rely on automated tests, static inspection, or have a blocked/untested live attempt. |
+| Ralph CLI workflows (`squad triage`/`watch`/`loop --execute`) | Supported on Copilot and Claude Code (`--agent-preset claude`); degraded on the other five hosts, which need a custom agent command. The command-line monitor remains distinct from coordinator-level issue triage. |
+| Per-agent model, reasoning, and context-tier selection | Supported on Claude Code only. The other six digests lack the section, and an expected-failure test pins the gap for each. Do not infer this capability from a host's general model picker. |
+| Marketplace plugin browsing on cast; GitLab and Azure DevOps issue tracking; monorepo team-root resolution | Unsupported on all seven hosts. These are gaps in the shared coordinator digest, each pinned by an expected-failure test per host, so a host-specific change does not close them. |
+| Copilot RC/start, VS Code, and GitHub Agentic Workflows | Copilot-only; not applicable to the other six host slugs. |
+| Fleet dispatch | Copilot-only; see Chapter 10 (Volume 1). |
+| Live validation | Recorded passing live CLI runs exist for Claude Code and OpenCode (2026-10-22), with later Claude Code runs for the plugin and ADR-003 scenarios. Copilot's one live cell is the experimental `copilot-sdk` harness (2026-11-09); the `claude-agent-sdk` harness has its own run (2026-11-10). Kiro, Cursor, and Antigravity were blocked, and Codex is untested. |
 
-The source matrix reports 45 supported, 0 degraded, and 6 unsupported feature rows for Copilot; the corresponding supported/degraded/unsupported counts are 41/1/6 for Claude, 40/2/6 for Kiro, 41/1/6 for OpenCode, 40/2/6 for Cursor, 40/2/6 for Codex, and 39/3/6 for Antigravity. These counts describe the source's full feature inventory, not the smaller grouped tables above. Chapter 20 explains how projections and capability negotiation work; Chapter 19 covers the user-facing host workflows.
+The source matrix reports supported/degraded/unsupported/not-applicable counts of 46/0/5/0 for Copilot, 44/0/4/3 for Claude Code, 41/2/5/3 for Kiro, 42/1/5/3 for OpenCode, 41/2/5/3 for Cursor, 41/2/5/3 for Codex, and 40/3/5/3 for Antigravity. These counts describe the source's full feature inventory, not the smaller grouped tables above. Chapter 20 explains how projections and capability negotiation work; Chapter 19 covers the user-facing host workflows.

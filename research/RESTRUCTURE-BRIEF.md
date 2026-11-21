@@ -1,5 +1,7 @@
 # Restructure Brief (two-volume edition) — for editorial agents
 
+> **Superseded (2026-11-20).** This brief records the one-time first-edition restructure into two volumes (old continuous chapter numbers). Its rules on prerequisites, sequencing and the dedupe principle are now in `research/STYLE-GUIDE.md`. For the second edition (Squad v2.0.0), use `research/WRITER-BRIEF.md` and `research/UPDATE-PLAN-2.0.md`. Its URL formats and version paths are obsolete. Kept as history only.
+
 Repo: ~/Projects/squad-book. Read research/CHAPTERS.md (new layout), research/STYLE-GUIDE.md (esp. the final "Two-volume structure" section).
 
 The book was reorganized from 10 parts/47 chapters into two volumes, 9 parts, 46 chapters, continuous numbering:
