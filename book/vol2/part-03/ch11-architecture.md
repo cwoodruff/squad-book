@@ -187,7 +187,7 @@ cd ~/tasktrack
 npm test
 ```
 
-Expected result: Node's test runner reports five passing subtests and no failures. Then ask your Squad:
+Expected result: Node's test runner reports no failures. Then ask your Squad:
 
 > Trace a request to add a Tasktrack task from the browser form through the API. Identify which files belong to the web client, which files implement the API, and which Squad layer would decide who works on each part. Do not edit files. Cite paths from the repository.
 

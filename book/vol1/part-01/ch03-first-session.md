@@ -30,7 +30,7 @@ flowchart TD
   H --> I["Assign first bounded task"]
 ```
 
-The sample has no runtime dependencies. Its API is TypeScript on `node:http`, its browser interface is static HTML and JavaScript, and its tests use Node’s built-in test runner. Node 22.18 or newer is the companion project’s stated minimum. In this environment the direct command `node --test api/test/` passed all five starter tests. That baseline is useful: you can tell a Squad-generated regression from a problem that was already present.
+The sample has no runtime dependencies. Its API is TypeScript on `node:http`, its browser interface is static HTML and JavaScript, and its tests use Node’s built-in test runner. Node 22.18 or newer is the companion project’s stated minimum. In this environment the direct command `node --test api/test/` passed all six starter tests. That baseline is useful: you can tell a Squad-generated regression from a problem that was already present.
 
 ## Before the First Prompt: Record a Baseline
 

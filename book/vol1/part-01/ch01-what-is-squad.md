@@ -150,7 +150,7 @@ This is an orientation exercise, not the first Squad session. You will make a lo
 node --test api/test/
 ```
 
-Expected result: five tests pass. The sample's package scripts expose the same test runner as `npm test`; the exact Node version requirement for running Tasktrack is separate from the Squad CLI's minimum Node version.
+Expected result: six tests pass. The sample's package scripts expose the same test runner as `npm test`; the exact Node version requirement for running Tasktrack is separate from the Squad CLI's minimum Node version.
 
 Do not initialize Squad in the book repository. You will prepare an isolated Tasktrack repository in Chapter 2, then initialize the team and hold your first session in Chapter 3.
 

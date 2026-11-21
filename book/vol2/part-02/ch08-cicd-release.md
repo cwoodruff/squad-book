@@ -224,7 +224,7 @@ curl --fail http://127.0.0.1:3000/health
 docker stop tasktrack-local
 ```
 
-Expected results: `npm test` reports five passing tests; `docker build` completes without an npm install step; the API logs `tasktrack api listening on :3000`; and `curl` returns `{"ok":true}`. Stop the local container after the check. The CI job does the first two checks on pull requests and pushes to `main`, but it neither runs nor pushes a cloud image. The application's in-memory tasks disappear when the container stops; that is expected for this learning sample.
+Expected results: `npm test` passes with no failures; `docker build` completes without an npm install step; the API logs `tasktrack api listening on :3000`; and `curl` returns `{"ok":true}`. Stop the local container after the check. The CI job does the first two checks on pull requests and pushes to `main`, but it neither runs nor pushes a cloud image. The application's in-memory tasks disappear when the container stops; that is expected for this learning sample.
 
 Ask your Squad to review the workflow and Dockerfile as a pull request. The reviewer should confirm the workflow has only `contents: read`, that action refs are full SHA pins, that no action runs on a privileged `pull_request_target` event, that no secrets are present, that the Dockerfile uses a non-root account, and that the API's data-loss behavior is documented. Create your own `v2-ch08-end` tag after the reviewed change; the book does not create tags for you.
 

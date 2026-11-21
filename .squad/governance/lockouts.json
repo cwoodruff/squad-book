@@ -213,6 +213,24 @@
       "overrides": [],
       "updatedAt": "2026-11-21T13:51:20.899Z",
       "successor": "trillian"
+    },
+    {
+      "subject": "vol2-tasktrack-test-counts",
+      "paths": [
+        "book/vol2/part-02/ch08-cicd-release.md",
+        "book/vol2/part-03/ch11-architecture.md",
+        "book/vol2/part-03/ch12-coordinator-internals.md",
+        "exercises/solutions/vol2/ch08.md"
+      ],
+      "state": "cleared",
+      "lockedAuthors": [
+        "ford"
+      ],
+      "reviewer": "arthur",
+      "reason": "Vol 2 Hands-On lines run on the reader's carried-over Tasktrack checkout, so they must not state a fixed test count; clear when ch08:227, ch11:190, ch12:219 and exercises/solutions/vol2/ch08.md:5 state no fixed count and Arthur re-approves",
+      "overrides": [],
+      "updatedAt": "2026-11-21T17:32:01.746Z",
+      "successor": "trillian"
     }
   ]
 }

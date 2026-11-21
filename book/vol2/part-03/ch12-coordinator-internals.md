@@ -216,7 +216,7 @@ cd ~/tasktrack
 npm test
 ```
 
-Expected result: all five existing tests still pass, along with any new test the specialist added. If no agent is spawned, determine whether the request was classified as Direct, whether the host lacks a spawn tool, or whether the active shell parsed your input differently. If an unrelated file changed, report the scope breach rather than silently accepting it. The aim is to observe a single owner and clean handoff, not to manufacture parallel work for a small test task.
+Expected result: all existing tests still pass, along with any new test the specialist added. If no agent is spawned, determine whether the request was classified as Direct, whether the host lacks a spawn tool, or whether the active shell parsed your input differently. If an unrelated file changed, report the scope breach rather than silently accepting it. The aim is to observe a single owner and clean handoff, not to manufacture parallel work for a small test task.
 
 ## Configuration Reference
 

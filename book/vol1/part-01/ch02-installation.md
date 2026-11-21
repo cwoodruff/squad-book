@@ -297,7 +297,7 @@ git status --short
 git tag --list ch02-start
 ```
 
-With Node.js 22.18 or newer, expect five passing tests, a clean working tree, and the `ch02-start` tag. The sample has no dependencies to install. If `npm test` fails because the runtime is too old, run `node --test api/test/` and check `node --version`.
+With Node.js 22.18 or newer, expect six passing tests, a clean working tree, and the `ch02-start` tag. The sample has no dependencies to install. If `npm test` fails because the runtime is too old, run `node --test api/test/` and check `node --version`.
 
 6. Run `squad doctor` here. "No squad in this directory" (and a non-zero exit) is expected before initialization; do not mistake it for an install failure.
 
@@ -381,7 +381,7 @@ Install the CLI in the way that suits your runtime and network constraints, keep
 2. Describe the difference between updating the installed CLI and running `squad upgrade` in a project. Which data is intended to stay user-owned?
 3. Your `squad --version` reports the old version after a successful package update. Give two diagnostic steps before reinstalling.
 4. Choose an interface for each situation: editing a file with diagnostics visible, diagnosing missing project files, authoring a reusable TypeScript team config, and running a multi-agent request that needs per-spawn model choices. Then say which `squad init` option a team that mixes Copilot and Claude Code users needs, and where this book covers it.
-5. Complete the Tasktrack preparation. Confirm a clean worktree, five tests, and a `ch02-start` tag, and write down what the API tests currently protect.
+5. Complete the Tasktrack preparation. Confirm a clean worktree, six tests, and a `ch02-start` tag, and write down what the API tests currently protect.
 6. In a hypothetical SDK-first repository, the generated `.squad/team.md` disagrees with `squad.config.ts`. Which file do you change and which command do you run? How could CI catch drift?
 
 ## Quiz
