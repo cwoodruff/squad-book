@@ -7,7 +7,7 @@
 - Build a pull-request CI workflow with read-only permissions, deterministic tests, and an image build that does not publish an artifact.
 - Explain how Squad's ordinary `.github/workflows/` templates differ from GitHub Agentic Workflows (`gh aw`) under the repository's `workflows/` package.
 - Install and validate the GH-AW package at an immutable Squad revision, then let a human review the bootstrap PR before activation.
-- Read the v1.1.0 release flow across `dev`, `main`, prereleases, stable tags, npm packages, standalone bundles, Homebrew, and WinGet.
+- Read the v2.0.0 release flow across `dev`, `main`, prereleases, stable tags, npm packages, standalone bundles, Homebrew, and WinGet.
 - Prevent common workflow risks: untrusted pull-request code with secrets, broad `GITHUB_TOKEN` permissions, mutable action references, and a mistaken assumption that a token-created push will trigger another workflow.
 
 ## CI and CD Are Different Trust Decisions
@@ -50,7 +50,9 @@ The repository's native GH-AW package contains eight main workflow sources: the 
 
 ## Installing GH-AW as a Reviewed Integration
 
-`gh aw` is an extension to GitHub CLI, not an ordinary `squad` subcommand. The v1.1.0 GH-AW guide specifies a compiler version and an install protocol. For the documented supported path, install the exact supported compiler version, authenticate `gh`, ensure GitHub Issues are enabled, and use one explicit 40-character Squad commit SHA. A branch name such as `dev` is mutable; a commit SHA gives reviewers a stable install identity.
+`gh aw` is an extension to GitHub CLI, not an ordinary `squad` subcommand. The v2.0.0 GH-AW guide specifies a compiler version (gh-aw v0.91.5) and an install protocol. For the documented supported path, install the exact supported compiler version, authenticate `gh`, ensure GitHub Issues are enabled, and use one explicit 40-character Squad commit SHA. A branch name such as `dev` is mutable; a commit SHA gives reviewers a stable install identity.
+
+The package identity is `github/squad/workflows`. Before `gh aw add`, the guide runs a preflight that reads `workflows/squad-workflows.manifest.json` at that SHA and stops unless its `package` field says `github/squad/workflows`. Revisions from before the organization move fail that check, and you should not work around it by installing them under the legacy `bradygaster/squad/workflows` name: their activation step downloads the Squad CLI from the separately controlled `bradygaster/squad` fork, which has no releases. Ask the maintainers for a revision whose manifest declares the new identity instead.
 
 ```bash
 # Verify the GH CLI account and use the exact compiler version in the guide.
@@ -59,7 +61,14 @@ gh aw --version
 
 # Install the native package from one reviewed immutable Squad commit.
 SQUAD_SHA="<40-character-reviewed-commit-sha>"
-gh aw add "bradygaster/squad/workflows@${SQUAD_SHA}"
+
+# Identity preflight: the manifest at that SHA must declare the new package.
+squad_package="$(gh api --hostname github.com -H 'Accept: application/vnd.github.raw+json' \
+  "repos/github/squad/contents/workflows/squad-workflows.manifest.json?ref=${SQUAD_SHA}" \
+  --jq '.package')" || squad_package=""
+test "${squad_package}" = "github/squad/workflows" || { echo "STOP: wrong package identity" >&2; exit 1; }
+
+gh aw add "github/squad/workflows@${SQUAD_SHA}"
 
 # Review the update report, then compile and verify every package-owned file.
 gh aw compile --strict
@@ -97,17 +106,19 @@ sequenceDiagram
 
 ## The Squad Release Process
 
-Squad itself has three distribution channels: insider snapshots, preview prereleases, and stable releases. They have different version forms and npm dist-tags. The branch layout is important: `dev` is the development source, `main` is the stable release source, and “preview” refers to a prerelease channel, not a required staging branch in the v1.1.0 process.
+Squad itself has three distribution channels: insider snapshots, preview prereleases, and stable releases. They have different version forms and npm dist-tags. The branch layout is important: `dev` is the development source, `main` is the stable release source, and “preview” refers to a prerelease channel, not a required staging branch in the v2.0.0 process.
 
-| Channel | Example version | npm dist-tag | Entry point |
-|---|---|---|---|
-| Insider | `X.Y.Z-insider.N` | `insider` | Manual insider workflow dispatch from `dev`. |
-| Preview | `X.Y.Z-preview.N` | `preview` | Manual release workflow dispatch from `dev`. |
-| Stable | `X.Y.Z` | `latest` | Reviewed promotion of a sanitized `dev` tree to `main`, then stable release. |
+| Channel | Example version | npm dist-tag | Homebrew cask / WinGet ID | Entry point |
+|---|---|---|---|---|
+| Insider | `X.Y.Z-insider.N` | `insider` | `squad-insider` / `bradygaster.Squad.Insider` | Manual insider workflow dispatch from `dev`. |
+| Preview | `X.Y.Z-preview.N` | `preview` (release candidates) | `squad-preview` / `bradygaster.Squad.Preview` | Manual release workflow dispatch from `dev`, pinned to an exact commit SHA. |
+| Stable | `X.Y.Z` | `latest` | `squad` / `bradygaster.Squad` | Reviewed promotion of a sanitized `dev` tree to `main`, then stable release. |
+
+Since 2.0.0 shipped, `latest` is 2.0.0 and `preview` is its own release-candidate channel. During the 2.0 previews it was only an alias of `insider`, and the release-process page in the v2.0.0 tree still shows that preview.4 arrangement (npm `insider` plus a `preview` alias, package managers held). Read that page as a record of how preview.4 shipped; the installation and insider-program pages describe the channels as they stand. The package and installer names keep the `bradygaster` prefix even though the repository moved to `github/squad`.
 
 Release preparation starts with a normal PR targeting `dev`. Keep the root, SDK, and CLI package versions in lockstep; update the CLI's SDK dependency floor and the lockfile; add the exact changelog heading; and validate build/tests before merging. Never change a published preview into a stable release in place. `1.2.0-preview.1` and `1.2.0` are distinct versions with distinct tags and npm channels.
 
-A preview release is explicitly dispatched from `dev` with a confirmation tag matching the package version. The release workflow checks SemVer, branch/channel compatibility, version consistency, tests, and the changelog before creating an immutable tag and GitHub prerelease. It then delegates to publication workflows for npm and standalone archives. The insider workflow similarly computes an insider version and publishes packages and release assets. The stable route first validates a sanitized promotion from `dev` to `main`; the release workflow on `main` publishes the stable version.
+A preview release is explicitly dispatched from `dev` with a confirmation tag matching the package version and an `expected_sha` input holding the full 40-character commit SHA of the reviewed `dev` tip. The release workflow refuses to run unless the dispatch SHA, the workflow definition, the checkout and the live `dev` tip all equal that SHA. It then runs the release verification bundle (`squad-release-verify.yml`: lockfile gate, clean install, build, lint, full tests, docs build, pack evidence with a privacy scan) before creating an immutable tag and a draft GitHub prerelease. Publication treats the SDK and CLI as a pair: both are staged under a per-run dist-tag, verified together, then promoted, and the run fails as `PARTIAL_PUBLISH` or `UNKNOWN` if either package cannot be confirmed. The prerelease is published only after npm and every selected standalone, Homebrew and WinGet channel complete. Inputs such as `npm_dist_tag`, `publish_standalone` and `publish_package_managers` choose which channels a run touches. The insider workflow similarly computes an insider version and publishes packages and release assets. The stable route first validates a sanitized promotion from `dev` to `main`; the release workflow on `main` publishes the stable version.
 
 Stable promotion is especially sensitive because it writes the release branch and may publish packages. The documented process runs the promotion validator in dry-run mode first, then a human triggers the live promotion. The promotion workflow strips internal paths such as `.squad/`, `.ai-team/`, internal templates, and proposals from the release tree, validates package/changelog versions, builds and tests the result, and pushes `main`. A GitHub Actions-token push does not automatically start another workflow, so the promotion explicitly dispatches `squad-release.yml` after the push. Review both the sanitized tree and the dispatch inputs; do not treat “dry run passed” as the live publication approval.
 
@@ -228,14 +239,14 @@ Ask your Squad to review the workflow and Dockerfile as a pull request. The revi
 | `docker build --tag` | Local/CI image creation | Build only; do not add `docker push` until a separate reviewed publishing workflow exists. |
 | `actions/checkout` and `actions/setup-node` | Workflow actions | Full-length SHA pin plus version comment; verify pins before changing them. |
 | GH-AW compiler | `gh aw compile --strict` | Use the exact version supported by the selected GH-AW package revision. |
-| Squad package ref | `bradygaster/squad/workflows@<SHA>` | Full 40-character commit SHA, one coherent package revision. |
+| Squad package ref | `github/squad/workflows@<SHA>` | Full 40-character commit SHA, one coherent package revision. |
 | Release confirmation | `confirm_tag` | Must exactly match the version-derived tag; release workflow validates branch and version. |
 | Promotion dry run | `dry_run=true` | Validation only; a human approval is still required for live promotion. |
 | Optional GH-AW CI trigger | `GH_AW_CI_TRIGGER_TOKEN` | Only if workflow-created PRs must trigger CI and a narrowly scoped token is approved. |
 
 ## Under the Hood
 
-`templates/workflows/squad-ci.yml` is a starter template, not the complete maintainer pipeline. In v1.1.0 it uses SHA-pinned checkout and setup-node actions, limits repository contents permission to read, and runs Node tests. `packages/squad-cli/src/cli/core/workflows.ts` installs built-in workflow templates when the user initializes Squad. The set copied by `squad init` should not be confused with every workflow in the Squad repository's `.github/workflows/` folder.
+`templates/workflows/squad-ci.yml` is a starter template, not the complete maintainer pipeline. In v2.0.0 it uses SHA-pinned checkout and setup-node actions, limits repository contents permission to read, and runs Node tests. `packages/squad-cli/src/cli/core/workflows.ts` installs built-in workflow templates when the user initializes Squad. The set copied by `squad init` should not be confused with every workflow in the Squad repository's `.github/workflows/` folder.
 
 The maintainer `.github/workflows/squad-ci.yml` is more extensive: it runs build and test work, validates documentation and package integrity, and has targeted jobs for the repository's SDK, workflows, and samples. The `workflows/aw.yml` manifest registers GH-AW sources; `workflows/squad-workflows.manifest.json` records the package's complete workflow/resource inventory and content hashes. The GH-AW verifier is designed to reject stale locks, mixed revisions, missing runtime assets, and changed package-owned bytes. Treat these generated artifacts as release inputs, not disposable caches. The starter CI's low-privilege intent is explicit in the template:
 
@@ -296,13 +307,13 @@ Use CI to prove changes and build artifacts with read-only authority; use a sepa
 
 ## Further Reading
 
-- [Squad in CI/CD Pipelines](https://bradygaster.github.io/squad/docs/scenarios/ci-cd-integration/)
-- [Release Process for Squad Maintainers](https://bradygaster.github.io/squad/docs/scenarios/release-process/)
-- [GitHub Agentic Workflows integration](https://bradygaster.github.io/squad/docs/guide/gh-aw/)
-- [Squad GH-AW package manifest](https://github.com/bradygaster/squad/blob/v1.1.0/workflows/aw.yml)
-- [GH-AW integrity manifest](https://github.com/bradygaster/squad/blob/v1.1.0/workflows/squad-workflows.manifest.json)
-- [Squad CI workflow template](https://github.com/bradygaster/squad/blob/v1.1.0/templates/workflows/squad-ci.yml)
-- [Maintainer CI workflow](https://github.com/bradygaster/squad/blob/v1.1.0/.github/workflows/squad-ci.yml)
-- [Release workflow](https://github.com/bradygaster/squad/blob/v1.1.0/.github/workflows/squad-release.yml)
-- [Promotion workflow](https://github.com/bradygaster/squad/blob/v1.1.0/.github/workflows/squad-promote.yml)
-- [npm publication workflow](https://github.com/bradygaster/squad/blob/v1.1.0/.github/workflows/squad-npm-publish.yml)
+- [Squad in CI/CD Pipelines](https://github.github.com/squad/docs/scenarios/ci-cd-integration/)
+- [Release Process for Squad Maintainers](https://github.github.com/squad/docs/scenarios/release-process/)
+- [GitHub Agentic Workflows integration](https://github.github.com/squad/docs/guide/gh-aw/)
+- [Squad GH-AW package manifest](https://github.com/github/squad/blob/v2.0.0/workflows/aw.yml)
+- [GH-AW integrity manifest](https://github.com/github/squad/blob/v2.0.0/workflows/squad-workflows.manifest.json)
+- [Squad CI workflow template](https://github.com/github/squad/blob/v2.0.0/templates/workflows/squad-ci.yml)
+- [Maintainer CI workflow](https://github.com/github/squad/blob/v2.0.0/.github/workflows/squad-ci.yml)
+- [Release workflow](https://github.com/github/squad/blob/v2.0.0/.github/workflows/squad-release.yml)
+- [Promotion workflow](https://github.com/github/squad/blob/v2.0.0/.github/workflows/squad-promote.yml)
+- [npm publication workflow](https://github.com/github/squad/blob/v2.0.0/.github/workflows/squad-npm-publish.yml)

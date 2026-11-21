@@ -12,11 +12,11 @@ Now that you have used Squad to coordinate work and operated it across real work
 - Recognize which behavior is implemented in TypeScript and which is expressed as instructions in `squad.agent.md`.
 - Read the available architecture evidence accurately without turning a proposal or missing document into a shipped feature.
 
-> **Preview (Squad 2.0):** The architecture separates host-specific client projections from the shared team and backend contract. A repository can generate one coordinator artifact per selected host; each uses the same `.squad/` team and charters rather than creating seven independent Squads. Chapters 18 and 20 explain the three-plane model and host adapters; see the [2.0 architecture](https://bradygaster.github.io/squad/docs/concepts/squad-2-0-architecture/).
+Squad 2.0 separates host-specific client projections from the shared team and backend contract. A repository can generate one coordinator artifact per selected host, and each uses the same `.squad/` team and charters rather than creating seven independent squads. This chapter maps the packages and boundaries inside that design; Chapters 18 and 20 explain the three-plane model and the host adapters, and the [2.0 architecture](https://github.github.com/squad/docs/concepts/squad-2-0-architecture/) page summarizes them.
 
 ## Start with the layers, not the command
 
-When you operate Squad, `squad` is the visible entry point; the behavior you experience also comes from distinct packages and integration seams in the v1.1.0 monorepo. The CLI provides commands, initialization, and an interactive shell. The SDK provides reusable types and services for sessions, configuration, state, routing, platforms, and coordination. The coordinator prompt describes how an AI host should behave when it acts as Squad. Copilot is the model-and-tools environment in which that prompt executes.
+When you operate Squad, `squad` is the visible entry point; the behavior you experience also comes from distinct packages and integration seams in the v2.0.0 monorepo. The CLI provides commands, initialization, and an interactive shell. The SDK provides reusable types and services for sessions, configuration, state, routing, platforms, and coordination. The coordinator prompt describes how an AI host should behave when it acts as Squad. Copilot is the model-and-tools environment in which that prompt executes.
 
 These are related, but they are not interchangeable. The SDK does not magically turn every application that imports it into the exact behavior of the installed Copilot agent. Conversely, an agent prompt is not a replacement for the SDK's session adapter or a GitHub issues client. A useful first question is therefore not “Where is Squad's coordinator?” but “Which coordinator path am I looking at?”
 
@@ -40,7 +40,7 @@ The diagram shows logical relationships, not a guarantee that every install uses
 
 ## CLI and SDK: two packages, two jobs
 
-The `@bradygaster/squad-cli` package installs the `squad` executable (and aliases such as `squad-cli`). It owns user-facing command parsing and terminal interaction: for example, `squad init`, `squad consult`, `squad extract`, and the default shell. The CLI also packages some shell-specific components, such as input parsing, display, sessions, and a coordinator prompt builder. Its package manifest depends on the SDK, so common operations can be implemented once and reused.
+The `@bradygaster/squad-cli` package installs the `squad` executable (and aliases such as `squad-cli`). It owns user-facing command parsing and terminal interaction: for example, `squad init`, `squad client`, `squad watch`, and the default shell. The CLI also packages some shell-specific components, such as input parsing, display, sessions, and a coordinator prompt builder. Its package manifest depends on the SDK, so common operations can be implemented once and reused.
 
 The `@bradygaster/squad-sdk` package is a programmable library. It exposes public entry points such as `@bradygaster/squad-sdk/client`, `/coordinator`, `/platform`, `/storage`, `/sharing`, and `/state`. Its root entry point explicitly avoids CLI startup side effects; importing it is intended to be safe inside another program. A consumer can create a `SquadClient`, create a session, listen for session events, or use higher-level services without running the interactive `squad` shell.
 
@@ -51,7 +51,7 @@ The `@bradygaster/squad-sdk` package is a programmable library. It exposes publi
 | Copilot SDK, behind Squad's adapter | Launching and communicating with Copilot CLI sessions | Squad SDK | Squad's work tracking or team governance model |
 | Platform adapter | Normalizing external issue/PR operations | SDK service or Ralph workflow | A substitute for the Copilot client |
 
-A quick way to verify this separation in a checkout is to compare `packages/squad-cli/package.json` with `packages/squad-sdk/package.json`. The CLI's `bin` field points at its command entry point; the SDK publishes typed subpath exports. Both are versioned together in the v1.1.0 workspace, but their public contracts differ.
+A quick way to verify this separation in a checkout is to compare `packages/squad-cli/package.json` with `packages/squad-sdk/package.json`. The CLI's `bin` field points at its command entry point; the SDK publishes typed subpath exports. Both are versioned together in the v2.0.0 workspace, but their public contracts differ.
 
 > **Note:** “SDK” here means the Squad SDK. It wraps or composes upstream Copilot SDK facilities; it is not the upstream SDK itself.
 
@@ -61,7 +61,7 @@ The **runtime** is the part that gives reusable behavior a stable shape: configu
 
 The Copilot-facing adapter is a boundary around upstream client and session types. `SquadSessionConfig` names Squad-level options such as model, tools, hooks, MCP servers, skills, working directory, and streaming. `SquadSession` offers a stable interface for sending messages, listening for events, optionally waiting or aborting, and closing. `SquadClient` manages the connection to Copilot CLI, including connection state and reconnection behavior. The adapter translates event names and tool names where wire formats differ. That is why code elsewhere in Squad can use its own types rather than depending directly on Copilot SDK types at every call site.
 
-A **platform adapter** is a separate boundary. It models business work systems, not model sessions. `PlatformAdapter` normalizes work-item and pull-request operations, such as listing issues, getting an item, tagging, assigning, commenting, creating branches, opening a pull request, and merging. v1.1.0 exports GitHub and Azure DevOps adapters (and a Planner mapping); communication adapters are another interface for posting updates and polling replies. A repository can therefore use one boundary to talk to a model host and another to talk to an issue tracker.
+A **platform adapter** is a separate boundary. It models business work systems, not model sessions. `PlatformAdapter` normalizes work-item and pull-request operations, such as listing issues, getting an item, tagging, assigning, commenting, creating branches, opening a pull request, and merging. v2.0.0 exports GitHub and Azure DevOps adapters (and a Planner mapping), and still no GitLab adapter; communication adapters are another interface for posting updates and polling replies. A repository can therefore use one boundary to talk to a model host and another to talk to an issue tracker.
 
 ```mermaid
 sequenceDiagram
@@ -116,11 +116,11 @@ Consider the difference between three records:
 
 The first can be ephemeral or diagnostic; the second is scoped to an owner; the third changes shared policy. Treating them as one generic “log” creates unclear ownership and makes later handoffs less reliable.
 
-## Two coordinator paths in v1.1.0
+## Two coordinator paths in v2.0.0
 
 The phrase “the coordinator” refers to at least two related mechanisms in this release.
 
-1. **Prompt coordinator.** `.github/agents/squad.agent.md` is an instruction document for an AI agent host. It lays out the role, state resolution, routing, spawn protocol, modes, governance, and related workflows. The installed file can be version-stamped and customized by lifecycle commands; its content is not simply a TypeScript function.
+1. **Prompt coordinator.** `.github/agents/squad.agent.md` is an instruction document for the Copilot host. It lays out the role, state resolution, routing, spawn protocol, modes, governance, and related workflows. The installed file can be version-stamped and customized by lifecycle commands; its content is not simply a TypeScript function. The other six hosts get their own self-contained coordinator files rendered from the same canonical source (ADR-003; see Chapter 12), so “the prompt coordinator” means a different file on each host.
 2. **SDK coordinator.** `packages/squad-sdk/src/coordinator/` contains TypeScript classes and helpers. `SquadCoordinator.handleMessage()` checks a direct-response handler, matches routing rules, chooses a spawn strategy from the number of matched agents, and can call an injected fan-out service. `response-tiers.ts` separately exports a tier-selection helper.
 3. **CLI shell coordinator.** The CLI shell has its own parser and prompt builder. It reads team and routing files, builds a compact coordinator prompt, and parses structured responses such as `DIRECT:`, `ROUTE:`, and `MULTI:`. The shell's parser recognizes slash commands and direct-agent addressing before handing ordinary text to the coordinator.
 
@@ -150,9 +150,9 @@ This matrix keeps a failure in the layer that owns its contract. It also suggest
 
 A practical control boundary separates **policy**—who may do what and when—from **mechanism**—how sessions, files, events, or API calls are physically performed. In Squad, the coordinator prompt is a policy surface for the host. SDK interfaces and host tools provide mechanisms. Project state files supply local policy inputs such as a roster and routing table. Platform adapters provide external-system mechanisms.
 
-That separation is real as an architectural reading, but be careful not to attribute a formal versioned design decision to it without a document. The v1.1.0 checkout contains `docs/specification/` working-draft profiles, but the requested `docs/specification/adr-001*` files are absent, and a repository-wide search found no ADR-001 or explicit “Squad 2.0” statement. No concrete Squad 2.0 migration contract can therefore be verified from this tag. The remaining chapters describe observable v1.1.0 boundaries; they do not claim that a future 2.0 architecture has been adopted.
+That separation is real as an architectural reading, and in v2.0.0 it is also written down. `docs/specification/adr-001-client-control-execution-boundary.md` (status: accepted draft baseline) splits Squad 2.0 into three planes: the client plane (local UX, auth bootstrap, host event parsing, transport adaptation), the control and broker plane (conversation identity, sequencing, capabilities, approvals, routing, durable event history), and the execution plane (task workers, tool execution, checkpoints, retries). It treats MCP as a tool bridge rather than the conversation wire contract, and it names `packages/squad-sdk/src/backend/types.ts` as the source of truth when the documents and code disagree. Chapter 18 discusses ADR-001, Chapter 20 the host-neutral coordinator decision (ADR-003), and Chapter 17 the specification suite and ADR-002.
 
-> **Warning:** The absence of an ADR is not evidence that a specific redesign is planned. Do not infer a future API, client/control split, or compatibility guarantee from a directory name or a conversation about “2.0.”
+> **Warning:** An accepted ADR records a design decision; it is not proof that every part is shipped. ADR-001's own text still says the backend bridge bundles no execution harness, while v2.0.0 ships experimental Claude Agent SDK and Copilot SDK harnesses (Chapter 21). Check the code before treating an ADR sentence as current behavior.
 
 ## A request's path through the system
 
@@ -197,7 +197,7 @@ A useful answer names `web/index.html`, `api/src/app.ts`, and `api/src/tasks.ts`
 
 | Surface | Relevant setting or path | Meaning / default |
 |---|---|---|
-| CLI package | `squad` executable | Starts the interactive shell with no command; commands such as `init`, `consult`, and `extract` have separate handlers. |
+| CLI package | `squad` executable | Starts the interactive shell with no command; commands such as `init`, `client`, and `watch` have separate handlers. |
 | SDK package | `@bradygaster/squad-sdk` subpath exports | Lets applications import client, coordinator, platform, state, or sharing APIs without the CLI entry point. |
 | Session adapter | `SquadSessionConfig.model` | Optional model identifier; platform default applies when not set. |
 | Session adapter | `workingDirectory` | Directory used as the session's tool-operation context. |
@@ -235,12 +235,12 @@ Relevant source paths for this chapter include `packages/squad-cli/package.json`
 - **Confusing Copilot session adapters with GitHub/ADO adapters.** One communicates with the model host; the other communicates with the work system.
 - **Assuming every component is active in every session.** A platform adapter is optional for purely local work, and the coordinator receives optional dependencies.
 - **Treating an informative or working-draft specification as a shipping guarantee.** The specification README calls the suite an unpublished working draft and identifies only limited claimable evidence. Check maturity and implementation status.
-- **Looking for an ADR that is not in this tag.** `docs/specification/adr-001*` is not present at v1.1.0. Use only verifiable architecture evidence, and record this as an open research gap rather than manufacturing a design decision.
+- **Reading an ADR as a shipping guarantee.** `adr-001`, `adr-002` and `adr-003` are present at v2.0.0, but an ADR can lag or lead the code. Confirm the claim in source (for ADR-001, `backend/types.ts`) before relying on it.
 - **Assuming more architecture is always better.** Tasktrack is small on purpose. The right outcome is a short map of responsibilities, not a distributed-services diagram for a six-file application.
 
 ## Summary
 
-Squad v1.1.0 combines a command-line product, a reusable SDK, host-specific coordinator instructions, and adapters for model sessions and work platforms. The SDK makes boundaries explicit through stable interfaces; the CLI adds command and shell behavior; the prompt directs an AI host. Their overlap is useful, but it makes path-specific reasoning essential. A control boundary can be described from what the code does, while future-facing Squad 2.0 plans must remain unclaimed when the referenced ADRs are missing.
+Squad v2.0.0 combines a command-line product, a reusable SDK, host-specific coordinator instructions, and adapters for model sessions and work platforms. The SDK makes boundaries explicit through stable interfaces; the CLI adds command and shell behavior; the prompt directs an AI host. Their overlap is useful, but it makes path-specific reasoning essential. A control boundary can be described from what the code does, and ADR-001's three planes give that description a written baseline, as long as you check each ADR sentence against the code.
 
 ## Exercises
 
@@ -255,11 +255,11 @@ Squad v1.1.0 combines a command-line product, a reusable SDK, host-specific coor
 2. What is the principal purpose of Squad's Copilot client adapter?
 3. What kinds of operations belong to a `PlatformAdapter`?
 4. Is the SDK's `selectResponseTier()` function automatically invoked by every coordinator path? Explain.
-5. What can the v1.1.0 source establish about a planned Squad 2.0 design based on `docs/specification/adr-001*`?
+5. What three planes does ADR-001 define, and why should you still check the code before relying on one of its sentences?
 6. Why can a plugin or embedding application import the SDK without launching the CLI shell?
 
 ## Further Reading
 
-- [Squad Docs project README](https://github.com/bradygaster/squad/blob/v1.1.0/docs/README.md)
-- [Architecture](https://bradygaster.github.io/squad/docs/concepts/architecture/)
-- [Specification registry and maturity notes](https://github.com/bradygaster/squad/blob/v1.1.0/docs/specification/README.md)
+- [Squad Docs project README](https://github.com/github/squad/blob/v2.0.0/docs/README.md)
+- [Architecture](https://github.github.com/squad/docs/concepts/architecture/)
+- [Specification registry and maturity notes](https://github.com/github/squad/blob/v2.0.0/docs/specification/README.md)

@@ -77,6 +77,8 @@ The backend and frontend directories now have separate checked-out files and bra
 
 Worktrees do not automatically share every file's live contents. If `.squad/` is tracked, its working copy in each branch starts from that branch's commit and can diverge with branch changes. If `.squad/` is ignored runtime state, each worktree may have independent local state unless you explicitly share it. This choice affects team context, logs, and decisions—not the Git branch mechanism itself.
 
+This chapter follows the Copilot host. If your team also runs Squad in Claude Code, its coordinator can spawn an implementer with `isolation: "worktree"`, which gives that member its own Git worktree under `.claude/worktrees/` (Squad adds that folder to `.gitignore` when Claude Code is a configured host); Chapter 19 (Volume 2) covers it.
+
 ### Choosing a Squad state strategy
 
 Squad recognizes two patterns:
@@ -312,7 +314,7 @@ Parallel work is a dependency-management decision, and worktrees are a source-co
 
 ## Further Reading
 
-- [Parallel Work & Models](https://bradygaster.github.io/squad/docs/concepts/parallel-work/)
-- [Parallel Execution](https://bradygaster.github.io/squad/docs/features/parallel-execution/)
-- [Scratch Directory](https://bradygaster.github.io/squad/docs/features/scratch-dir/)
-- [Git Worktree Awareness](https://bradygaster.github.io/squad/docs/features/worktrees/)
+- [Parallel Work & Models](https://github.github.com/squad/docs/concepts/parallel-work/)
+- [Parallel Execution](https://github.github.com/squad/docs/features/parallel-execution/)
+- [Scratch Directory](https://github.github.com/squad/docs/features/scratch-dir/)
+- [Git Worktree Awareness](https://github.github.com/squad/docs/features/worktrees/)

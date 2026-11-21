@@ -8,13 +8,13 @@
 - Turn an ambiguous feature idea into acceptance criteria, dependencies, and a reviewable issue plan.
 - Understand how SubSquads partition an issue queue, how local activation is resolved, and why folder scope is advisory.
 - Configure a Fleet Dispatch watch round for parallel, read-only analysis while keeping implementation work on the safer task path.
-- Recognize which parts of the streams and fleet documentation are fully wired in v1.1.0 and which are only partially integrated.
+- Recognize which parts of the streams and fleet documentation are fully wired in v2.0.0 and which are only partially integrated.
 
 ## Start with the PRD as a Contract
 
 A product requirements document (PRD) is a working agreement about a product outcome. It should make clear what problem is being solved, for whom, what behavior counts as success, and which constraints matter. It is not necessarily a design document: implementation details belong in the plan unless a technical constraint is itself a requirement.
 
-Squad's PRD workflow begins with a document that already exists or with requirements you provide in chat. You can ask the coordinator to read a file, summarize it, identify gaps, or propose implementation slices. This is useful even if your team has not adopted a formal PRD template. The key distinction is between **PRD ingestion** and **PRD authoring**: v1.1.0 does not provide a special command that writes a PRD, persists work-item IDs, maintains a dependency graph, or gives you a PRD board. A prompt asking for a PRD is still a conversation; review and save the result as an ordinary repo file.
+Squad's PRD workflow begins with a document that already exists or with requirements you provide in chat. You can ask the coordinator to read a file, summarize it, identify gaps, or propose implementation slices. This is useful even if your team has not adopted a formal PRD template. The key distinction is between **PRD ingestion** and **PRD authoring**: v2.0.0 does not provide a special command that writes a PRD, persists work-item IDs, maintains a dependency graph, or gives you a PRD board. A prompt asking for a PRD is still a conversation; review and save the result as an ordinary repo file.
 
 The `templates/prd-intake.md` document is an on-demand instruction template for agents. It suggests noting the source path, ingestion date, and content hash in `.squad/team.md`, then asking the Lead to split the input into small, ordered work items. Treat that as a prompt pattern, not as a guarantee that every install has an automated PRD parser, hash watcher, backlog writer, or approval gate. If those behaviors matter, ask for them explicitly and inspect the artifacts before proceeding.
 
@@ -107,7 +107,7 @@ Likewise, a dependency table is a planning aid, not a dependency scheduler. Befo
 
 ## Streams: Partition Work, Not Repositories
 
-The stream feature is referred to in the v1.1.0 docs and SDK as **SubSquads**. A SubSquad is a named work partition selected by a label such as `team:ui` or `team:backend`; it can also carry a directory scope and a preferred workflow. The design is for teams that want separate Squads to work in separate Codespaces, or one operator to switch between partitions serially. It is not a new repository, a second team roster, or a central orchestrator coordinating child Squads.
+The stream feature is referred to in the v2.0.0 docs and SDK as **SubSquads**. A SubSquad is a named work partition selected by a label such as `team:ui` or `team:backend`; it can also carry a directory scope and a preferred workflow. The design is for teams that want separate Squads to work in separate Codespaces, or one operator to switch between partitions serially. It is not a new repository, a second team roster, or a central orchestrator coordinating child Squads.
 
 The conceptual configuration is an array of definitions:
 
@@ -156,9 +156,9 @@ flowchart LR
   E -->|No| G[Classic single-Squad mode]
 ```
 
-There is an implementation detail worth checking before copying sample JSON: the v1.1.0 SDK resolver reads `.squad/workstreams.json`, while the docs, type comment, and CLI's guidance text mention `.squad/streams.json`. `squad init`'s config writer also creates `workstreams.json` when SubSquad definitions are provided. For code-level behavior in this release, place the definitions in `.squad/workstreams.json`; treat the differently named documentation path as a doc/source mismatch. `squad subsquads list`, `status`, and `activate <name>` are the management verbs. `squad workstreams` and `squad streams` are deprecated aliases in the docs.
+There is an implementation detail worth checking before copying sample JSON: the v2.0.0 SDK resolver reads `.squad/workstreams.json`, while the docs, type comment, and CLI's guidance text mention `.squad/streams.json`. `squad init`'s config writer also creates `workstreams.json` when SubSquad definitions are provided. For code-level behavior in this release, place the definitions in `.squad/workstreams.json`; treat the differently named documentation path as a doc/source mismatch. `squad subsquads list`, `status`, and `activate <name>` are the management verbs. `squad workstreams` and `squad streams` are deprecated aliases in the docs.
 
-> **Warning:** The SDK exports a label-filter helper and the CLI can resolve and display a selected SubSquad, but a source search in v1.1.0 shows no caller of `filterIssuesBySubSquad()` in the CLI/Ralph path. Do not assume that merely activating a SubSquad enforces issue triage scoping in every watch workflow. Verify the watch behavior in your installed build and rely on explicit issue labels and filters until the end-to-end integration is confirmed.
+> **Warning:** The SDK exports a label-filter helper and the CLI can resolve and display a selected SubSquad, but a source search in v2.0.0 shows no caller of `filterIssuesBySubSquad()` in the CLI/Ralph path. Do not assume that merely activating a SubSquad enforces issue triage scoping in every watch workflow. Verify the watch behavior in your installed build and rely on explicit issue labels and filters until the end-to-end integration is confirmed.
 
 The streams PRD explains the motivation: independent teams can reduce context pressure and isolate parallel work, but separate Codespaces cost more and still need pull-request coordination. A single machine can switch between streams at lower infrastructure cost, at the price of serialized execution. Its ideas for round-robin scheduling, conflict warnings, a meta-coordinator, dependency tracking, and metrics are future-work proposals, not capabilities to promise from this release.
 
@@ -174,7 +174,7 @@ Before creating streams, agree on ownership labels and who adds them. Labels are
 
 Fleet Dispatch is a watch capability for sending multiple issue-analysis tracks through one Copilot CLI `/fleet` invocation. Avoid confusing it with SubSquads: streams divide ownership over a longer period, while fleet dispatch batches a set of read-focused analyses within one watch round. Nor is it the same as ordinary parallel coding in worktrees. Fleet's safe case is triage, review, research, or audit that reads issue context and writes findings back as issue comments; it explicitly should not edit source files, create branches, or commit.
 
-The three modes in the feature documentation are `sequential`, `fleet`, and `hybrid`; the v1.1.0 watch implementation names the baseline `task` rather than `sequential`. `fleet` sends the executable issue set to fleet analysis. `hybrid` selects issues classified as read-heavy for fleet and leaves other work to task execution. Classification uses title keywords (for example “review,” “audit,” “investigate,” “why does,” and “how does”) plus labels; uncertain classification should remain on the safer task path. The exact candidates depend on the watch capability filter and current issue set, not just the text in the example.
+The three modes in the feature documentation are `sequential`, `fleet`, and `hybrid`; the v2.0.0 watch implementation names the baseline `task` rather than `sequential`. `fleet` sends the executable issue set to fleet analysis. `hybrid` selects issues classified as read-heavy for fleet and leaves other work to task execution. Classification uses title keywords (for example “review,” “audit,” “investigate,” “why does,” and “how does”) plus labels; uncertain classification should remain on the safer task path. The exact candidates depend on the watch capability filter and current issue set, not just the text in the example.
 
 For a deliberate setup, first ensure Copilot CLI and GitHub CLI are available and authenticated. In `.squad/config.json`, opt into the capability and set the mode:
 
@@ -191,7 +191,7 @@ For a deliberate setup, first ensure Copilot CLI and GitHub CLI are available an
 }
 ```
 
-The equivalent flag `squad watch --execute --dispatch-mode hybrid` sets the dispatch mode, but a warning is emitted if `fleet-dispatch` is not enabled. Use `--dispatch-mode fleet` for an explicitly read-only triage round and `--dispatch-mode task` for ordinary per-task execution. The feature page's sample JSON uses an `interval` of 300, whereas the CLI's interval is expressed in minutes; follow the installed CLI help and your actual scheduling intent rather than copying ambiguous units.
+The equivalent flag `squad watch --execute --dispatch-mode hybrid` sets the dispatch mode, but a warning is emitted if `fleet-dispatch` is not enabled. Use `--dispatch-mode fleet` for an explicitly read-only triage round and `--dispatch-mode task` for ordinary per-task execution. The feature page's sample JSON uses an `interval` of 300, whereas the CLI's interval is expressed in minutes; follow the installed CLI help and your actual scheduling intent rather than copying ambiguous units. Fleet dispatch is a Copilot CLI feature, and it stays Copilot-only in Squad 2.0: the `claude` watch preset from Chapter 9 does not run fleet rounds.
 
 The implementation builds one track per issue, includes the issue title and number, requests urgency assessment and a next-step recommendation, and tells the agent to write a comment without modifying files. It invokes `copilot` with a prompt and non-interactive/autopilot flags, then reports a summary. This is not a promise that every fleet track succeeds, that comments are posted, or that API access is configured correctly; inspect the run output and issue comments. The documented 2.9× figure is a reported comparison of six read-only issues and chiefly reflects one cold start instead of six. Treat it as an illustrative workload result, not a guaranteed throughput benchmark.
 
@@ -211,7 +211,7 @@ For each candidate issue, check its labels before dispatch, then check the assig
 |---|---|---|
 | PRD input | pasted text or file path | No dedicated PRD CLI mode; ask for analysis explicitly. |
 | PRD intake template | `templates/prd-intake.md` | Prompting guidance; does not itself persist tracker state. |
-| SubSquad JSON (v1.1.0 resolver) | `.squad/workstreams.json` | `workstreams` array and optional `defaultWorkflow`; docs also say `streams.json`. |
+| SubSquad JSON (v2.0.0 resolver) | `.squad/workstreams.json` | `workstreams` array and optional `defaultWorkflow`; docs also say `streams.json`. |
 | `name`, `labelFilter` | Each SubSquad entry | Required string values; label match is case-insensitive in the SDK helper. |
 | `folderScope` | Each entry | Optional string array; advisory, not enforced access control. |
 | `workflow` | Each entry | `branch-per-issue` or `direct`; default resolves to `branch-per-issue`. |
@@ -233,7 +233,7 @@ Fleet is a registered `WatchCapability` in `packages/squad-cli/src/cli/commands/
 
 - **Squad says the PRD is missing:** give the exact repository-relative path or paste the approved contents. Do not expect a magic `/prd` command.
 - **A decomposition invents behavior:** compare each acceptance criterion against the product decision; add an explicit clarification rather than letting an agent turn an assumption into scope.
-- **SubSquads list as empty:** check that the JSON is valid and stored at `.squad/workstreams.json` for the v1.1.0 resolver. `streams.json` is the documented path but is not the path the resolver opens.
+- **SubSquads list as empty:** check that the JSON is valid and stored at `.squad/workstreams.json` for the v2.0.0 resolver. `streams.json` is the documented path but is not the path the resolver opens.
 - **No issues match:** confirm the selected `SQUAD_TEAM` value and exact label spelling. The helper is case-insensitive, but the issue must actually have the configured label.
 - **Folder boundaries are crossed:** they are advisory. Review the diff, route more narrowly, and use isolated issue branches; do not treat them as sandbox controls.
 - **Fleet mode does not batch:** enable `watch.fleet-dispatch` as well as `dispatchMode`, install the Copilot CLI, and check preflight/watch logs. Check `copilot --version` separately.
@@ -248,26 +248,26 @@ PRD work with Squad is an ingestion-and-reasoning workflow: have the team read a
 
 1. Revise the Tasktrack due-date/tag PRD so it says exactly how invalid dates, duplicate tags, omitted PATCH fields, `null`, and empty arrays behave. Mark any policy choice that requires a product owner.
 2. Decompose the PRD into four or more issue-sized work items. Add dependency edges only where one task truly blocks another and include one verification task.
-3. Create two SubSquad definitions for `api` and `web`. Explain which file v1.1.0's resolver reads, how you would activate each partition, and why `folderScope` is not security enforcement.
+3. Create two SubSquad definitions for `api` and `web`. Explain which file the v2.0.0 resolver reads, how you would activate each partition, and why `folderScope` is not security enforcement.
 4. Classify these issues for fleet vs task execution: “Why does task creation return 400?”, “Add dueDate validation,” and “Review test coverage for tag normalization.” Justify each choice and name one risk of sending a write-heavy issue to `/fleet`.
 5. Configure a hybrid watch that enables the Fleet Dispatch capability. Explain how you would validate it without trusting the mode setting alone.
 
 ## Quiz
 
-1. Does v1.1.0 have a dedicated PRD-authoring command and persistent PRD backlog?
+1. Does v2.0.0 have a dedicated PRD-authoring command and persistent PRD backlog?
 2. Which SubSquad activation source has highest precedence?
 3. Is `folderScope` a hard filesystem boundary?
-4. What is the v1.1.0 resolver's configuration filename, and how does that compare with the feature page?
+4. What is the v2.0.0 resolver's configuration filename, and how does that compare with the feature page?
 5. What work is Fleet Dispatch intended to parallelize?
 6. What additional setting must be enabled beyond `dispatchMode` for watch to batch fleet work?
 7. Why is the published 2.9× speedup not a universal performance guarantee?
 
 ## Further Reading
 
-- [PRD Mode](https://bradygaster.github.io/squad/docs/features/prd-mode/)
-- [Streams / SubSquads](https://bradygaster.github.io/squad/docs/features/streams/)
-- [Fleet Dispatch](https://bradygaster.github.io/squad/docs/features/fleet-dispatch/)
-- [Streams PRD](https://github.com/bradygaster/squad/blob/v1.1.0/docs/_internal/specs/streams-prd.md)
-- [PRD intake template](https://github.com/bradygaster/squad/blob/v1.1.0/templates/prd-intake.md)
-- [Streams SDK resolver](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-sdk/src/streams/resolver.ts)
-- [Fleet Dispatch implementation](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-cli/src/cli/commands/watch/capabilities/fleet-dispatch.ts)
+- [PRD Mode](https://github.github.com/squad/docs/features/prd-mode/)
+- [Streams / SubSquads](https://github.github.com/squad/docs/features/streams/)
+- [Fleet Dispatch](https://github.github.com/squad/docs/features/fleet-dispatch/)
+- [Streams PRD](https://github.com/github/squad/blob/v2.0.0/docs/_internal/specs/streams-prd.md)
+- [PRD intake template](https://github.com/github/squad/blob/v2.0.0/templates/prd-intake.md)
+- [Streams SDK resolver](https://github.com/github/squad/blob/v2.0.0/packages/squad-sdk/src/streams/resolver.ts)
+- [Fleet Dispatch implementation](https://github.com/github/squad/blob/v2.0.0/packages/squad-cli/src/cli/commands/watch/capabilities/fleet-dispatch.ts)

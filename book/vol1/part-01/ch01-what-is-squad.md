@@ -11,8 +11,6 @@
 - Relate Squad to GitHub Copilot CLI, VS Code, and the separate `squad` command-line tool.
 - Preview the Tasktrack project that we will develop throughout this book.
 
-> **Preview (Squad 2.0):** The team model expands beyond GitHub Copilot: 2.0 supports seven hosts total—Copilot plus Claude Code, Kiro, OpenCode, Cursor, OpenAI Codex, and Google Antigravity. The shared-team idea stays; host projections vary. See Chapters 18 and 19 (Volume 2) and the [2.0 client scenario](https://bradygaster.github.io/squad/docs/scenarios/using-squad-across-clients/).
-
 ## A team, not a collection of chat personas
 
 A capable coding assistant can explain a bug, suggest a design, and write a patch. But a long-running project asks it to do those things repeatedly, across different specialties, while staying consistent with decisions made last week. Squad addresses that continuity and coordination problem. It is an open-source framework for defining and running a team of agents through GitHub Copilot. The team lives with the repository rather than in a separate hosted workspace.
@@ -20,6 +18,8 @@ A capable coding assistant can explain a bug, suggest a design, and write a patc
 The central idea is modest: give each agent a defined role, boundaries, and durable project context, then let a coordinator decide which agent—or agents—should handle a request. One agent might focus on API behavior, another on user interface work, and another on tests. They are still AI agents running through Copilot; Squad does not create independent human-like employees. Its contribution is the shared structure around those agents: identity, routing, context, memory, and coordination.
 
 This distinction matters. A prompt such as “act like a tester” asks one assistant to role-play a specialty for this turn. A Squad agent has a persistent charter and history associated with its role. The coordinator can route testing work to that agent, and the result can be reviewed and refined in the same repository as the code. These files do not guarantee correctness; they make the team's instructions inspectable and repeatable.
+
+GitHub Copilot is the default host, and it is the one this volume teaches. Squad 2.0 supports seven hosts in all: Copilot plus Claude Code, Kiro, OpenCode, Cursor, OpenAI Codex and Google Antigravity. The team files are the same for every host; what changes is how Squad projects them into each tool. Volume 2, Part IV covers the other hosts, and the upstream [using Squad across clients](https://github.github.com/squad/docs/scenarios/using-squad-across-clients/) scenario is a good overview.
 
 ### The three moving parts
 
@@ -213,5 +213,5 @@ Squad gives Copilot work a durable team structure. A coordinator receives reques
 
 ## Further Reading
 
-- [What Is Squad?](https://bradygaster.github.io/squad/docs/concepts/what-is-squad/)
-- [Squad Architecture](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-cli/src/cli/core/init.ts)
+- [What Is Squad?](https://github.github.com/squad/docs/concepts/what-is-squad/)
+- [Squad Architecture](https://github.com/github/squad/blob/v2.0.0/packages/squad-cli/src/cli/core/init.ts)

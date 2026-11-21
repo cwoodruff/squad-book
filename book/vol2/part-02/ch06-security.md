@@ -45,7 +45,7 @@ Prompt injection is not solved by adding a sentence such as “ignore malicious 
 
 Security controls work best in layers. Start with the narrowest GitHub identity that can do the job; restrict workflow permissions at the job level; use a clean branch or worktree; review the final diff; and keep branch protection and human approval independent from the agent's own review. For a human-run CLI session, permissions still derive from your local shell and credentials. For Actions, use explicit workflow permissions and avoid granting write scopes to jobs that only read code.
 
-The `squad watch` command has a meaningful human-approval distinction: by default it proposes work for human approval; `--execute` allows the process to act unattended within its available authority. In the CLI v1.1.0 help, `triage` supports `--execute`, `--max-concurrent`, `--timeout`, and optional capabilities such as `--self-pull`, `--board`, `--monitor-teams`, `--monitor-email`, `--two-pass`, `--wave-dispatch`, `--retro`, and `--decision-hygiene`. Each extra integration increases its access surface. Do not turn on a capability merely because the flag exists; document the data it reads and the token permissions it needs.
+The `squad watch` command has a meaningful human-approval distinction: by default it proposes work for human approval; `--execute` allows the process to act unattended within its available authority. In the CLI v2.0.0 help, `triage` supports `--execute`, `--max-concurrent`, `--timeout`, and optional capabilities such as `--self-pull`, `--board`, `--monitor-teams`, `--monitor-email`, `--two-pass`, `--wave-dispatch`, `--retro`, and `--decision-hygiene`. Each extra integration increases its access surface. Do not turn on a capability merely because the flag exists; document the data it reads and the token permissions it needs.
 
 Use the smallest authority set that still supports the workflow:
 
@@ -60,6 +60,15 @@ Use the smallest authority set that still supports the workflow:
 For PATs, prefer a fine-grained token restricted to the intended repository and permissions. Classic OAuth scopes such as `repo`, `read:org`, and `workflow` describe a different token model than fine-grained repository permissions. Check the credential's actual permissions with GitHub, not merely its label. `delete_repo` and org-administration access are especially high impact; they are not routine prerequisites for everyday Squad work.
 
 For GitHub Actions, `permissions:` controls the workflow token and should be stated explicitly. A job that builds and tests Tasktrack can use only `contents: read`. Jobs that publish, create issues, push tags, or update releases need write permission, but that is a different job and should not inherit publishing authority unnecessarily. Never use `pull_request_target` as a shortcut to get secrets into code from a contributor's PR; a privileged workflow must not execute untrusted head code.
+
+### Defaults Squad 2.0 sets for you
+
+A few 2.0.0 behaviors narrow the boundary without any configuration. Know them, because each one has an off switch or an exception.
+
+- **The `squad_state` launcher does not download code by default.** The committed `.squad/squad.mjs` looks for an installed CLI and fails with install instructions if it finds none. It falls back to `npx` (which downloads and runs a package) only when you set `SQUAD_ALLOW_NPX=1`. Leave that unset in CI and on shared machines.
+- **Claude Code gets a scoped allowlist, not blanket permission.** When `claude` is a configured host, `squad init` and `squad upgrade` add allow rules to `.claude/settings.json` for the `squad_state` tools the coordinator uses (by name, never the experimental backend's approval tools) and for a handful of commands: `squad cast`, `squad client sync`, `squad lockout reject` and `squad lockout status`. The lockout steps that release a member (`assign`, `submit`, `approve`, `override`) still ask. Squad records the rules it added in `.claude/.squad-permissions.json` so rollback removes only those, and your own rules are never touched. Set `"claudePermissions": "off"` in `.squad/config.json` to skip the allowlist. Claude Code applies project rules only after you trust the folder. Chapter 19 covers the rest of the Claude Code setup.
+- **The dashboard is local only.** `squad dashboard` listens on `127.0.0.1` (from port 4280), rejects requests whose `Host` header names anything else (a DNS-rebinding guard), sends a Content Security Policy that allows no inline script and no other origin, and renders transcript text as text. Do not put it behind a proxy to share it; it shows tool calls and results from your sessions.
+- **npm installs run on your Node.** Standalone archives of Squad 2.0.0 vendor a patched Node.js (22.23.4), but npm packages do not embed Node. If you install `@bradygaster/squad-cli` from npm, keep the host Node on a patched release; the `engines` floor (`>=22.5.0`) is a compatibility minimum, not a security guarantee.
 
 ## GitHub Authentication for Private Repositories
 
@@ -120,11 +129,11 @@ If a GitHub App is an appropriate choice, it can limit installations to selected
 
 ## Plugins, Skills, and the Extension Supply Chain
 
-Squad plugins are not equivalent to arbitrary executable add-ons. In the v1.1.0 marketplace model, manifests and installed files describe reusable configuration and knowledge. They can still carry malicious instructions, so “not executable” does not mean “safe to trust.” Read the diff, identify every destination under `.squad/`, and check which agents will consume each artifact.
+Squad plugins are not equivalent to arbitrary executable add-ons. In the v2.0.0 marketplace model, manifests and installed files describe reusable configuration and knowledge. They can still carry malicious instructions, so “not executable” does not mean “safe to trust.” Read the diff, identify every destination under `.squad/`, and check which agents will consume each artifact.
 
 The manifest validator rejects executable fields such as `command`, `exec`, `run`, and `scripts`, including nested keys; rejects script extensions such as `.js`, `.ts`, `.sh`, and `.ps1`; and requires relative source and target paths. Plugin targets must begin under supported roots such as `agents`, `knowledge`, `prompts`, `routing`, or `workflows`. Install planning rejects symlinked source files, computes file hashes, and persists manifest and file lock information. `squad plugin verify` can detect a changed installed file by comparing it with the recorded hash. Installation and state updates have rollback behavior if copying or persistence fails.
 
-Metadata such as `copilot.requires`, upstream package hints, MCP server descriptions, and provider contracts should be read as information for a human—not as permission for `squad plugin install` to install software, start an MCP server, or call a provider. The guarded runtime is a narrow exception, not an unrestricted hook system: v1.1.0 validates provider names and lifecycle events, and the runtime registry permits only the built-in `graphify` artifact provider. It does not let a plugin provide an executable callback. The generated artifact destination is still a sensitive write, so review the requested paths and the result.
+Metadata such as `copilot.requires`, upstream package hints, MCP server descriptions, and provider contracts should be read as information for a human—not as permission for `squad plugin install` to install software, start an MCP server, or call a provider. The guarded runtime is a narrow exception, not an unrestricted hook system: v2.0.0 validates provider names and lifecycle events, and the runtime registry permits only the built-in `graphify` artifact provider. It does not let a plugin provide an executable callback. The generated artifact destination is still a sensitive write, so review the requested paths and the result.
 
 Skills are prompt material, so they can influence the model even if the CLI never executes them. Read skill changes like code changes. Check for instructions to reveal secrets, broaden permissions, download and execute scripts, or rewrite `.squad` governance. A security scanner can find known patterns, but a clean scan cannot prove a prompt safe. In this repository, `scripts/security-review.mjs` is an informational diff scanner; its documented exit code is always zero. It checks selected patterns such as `eval`, some command-injection forms, workflow secrets, broad permissions, and `pull_request_target` plus checkout of a PR head. It is not a blocker by itself and does not replace human review, dependency auditing, a secret scanner, or branch protection.
 
@@ -161,7 +170,10 @@ Expected result: a reviewable security checklist and, if needed, a small `.gitig
 | Local CLI | `gh auth status` | Verify host, account, and token scopes without exposing a token value. |
 | Local CLI | `gh auth switch --hostname HOST --user USER` | Select among accounts for that host; verify after switching. |
 | Local CLI | `gh auth refresh -s repo,read:org,workflow` | Add requested OAuth scopes only where needed; interactive authorization is expected. |
-| Squad execution | `squad watch` | Default review-oriented polling workflow; check the installed v1.1.0 help for exact behavior. |
+| Squad execution | `squad watch` | Default review-oriented polling workflow; check the installed v2.0.0 help for exact behavior. |
+| Squad launcher | `SQUAD_ALLOW_NPX` | Unset by default: the committed `.squad/squad.mjs` never falls back to downloading the CLI with `npx`. Set to `1` only where that download is acceptable. |
+| Claude Code host | `"claudePermissions": "off"` in `.squad/config.json` | Turns off Squad's scoped allowlist in `.claude/settings.json`. On by default; added rules are tracked in `.claude/.squad-permissions.json`. |
+| Dashboard | `squad dashboard [--port N]` | Binds `127.0.0.1` only, from port 4280, with a strict CSP and `Host` check. |
 | Squad execution | `squad watch --execute` | Unattended execution; enable only with least-privilege credentials, explicit policy, and an audit/recovery plan. |
 | `.gitignore` | `.env` and `.env.*` | Keep actual environment secrets out of Git; allow reviewed `.env.example` explicitly if using broad patterns. |
 | Plugin state | `.squad/plugins/lock.json` | Records source, manifest hash, and installed-file hashes. Review changes like dependency lock changes. |
@@ -229,13 +241,13 @@ Secure Squad by controlling the process that hosts it, not by assuming an agent 
 
 ## Further Reading
 
-- [Production Security Hardening](https://bradygaster.github.io/squad/docs/features/security-hardening/)
-- [Plugin Security](https://bradygaster.github.io/squad/docs/reference/plugin-security/)
-- [Squad on Private Repositories](https://bradygaster.github.io/squad/docs/scenarios/private-repos/)
-- [Cross-organization authentication](https://bradygaster.github.io/squad/docs/scenarios/cross-org-auth/)
-- [GitHub auth setup](https://bradygaster.github.io/squad/docs/guide/github-auth-setup/)
-- [Plugin manifest validation](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-sdk/src/marketplace/plugin-manifest.ts)
-- [Plugin runtime](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-sdk/src/marketplace/plugin-runtime.ts)
-- [Plugin state and locks](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-sdk/src/marketplace/plugin-state.ts)
-- [Secret-handling skill](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-cli/templates/skills/secret-handling/SKILL.md)
-- [Security review scanner](https://github.com/bradygaster/squad/blob/v1.1.0/scripts/security-review.mjs)
+- [Production Security Hardening](https://github.github.com/squad/docs/features/security-hardening/)
+- [Plugin Security](https://github.github.com/squad/docs/reference/plugin-security/)
+- [Squad on Private Repositories](https://github.github.com/squad/docs/scenarios/private-repos/)
+- [Cross-organization authentication](https://github.github.com/squad/docs/scenarios/cross-org-auth/)
+- [GitHub auth setup](https://github.github.com/squad/docs/guide/github-auth-setup/)
+- [Plugin manifest validation](https://github.com/github/squad/blob/v2.0.0/packages/squad-sdk/src/marketplace/plugin-manifest.ts)
+- [Plugin runtime](https://github.com/github/squad/blob/v2.0.0/packages/squad-sdk/src/marketplace/plugin-runtime.ts)
+- [Plugin state and locks](https://github.com/github/squad/blob/v2.0.0/packages/squad-sdk/src/marketplace/plugin-state.ts)
+- [Secret-handling skill](https://github.com/github/squad/blob/v2.0.0/packages/squad-cli/templates/skills/secret-handling/SKILL.md)
+- [Security review scanner](https://github.com/github/squad/blob/v2.0.0/scripts/security-review.mjs)

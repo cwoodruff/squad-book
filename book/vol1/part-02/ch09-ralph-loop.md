@@ -8,7 +8,8 @@
 - Write a bounded, repeatable `loop.md` prompt and understand how frontmatter and CLI overrides interact.
 - Start `squad watch` in triage-only mode before opting into agent execution.
 - Configure the schedule manifest's trigger, task, provider, retry, and state fields while recognizing what the current CLI actually runs.
-- Separate the persistent-Ralph documentation vision from the concrete v1.1.0 monitor state and lifecycle.
+- Separate the persistent-Ralph documentation vision from the concrete v2.0.0 monitor state and lifecycle.
+- Bound unattended watch runs and coordinate several watchers with opt-in work claims.
 - Use safe observation, permissions, stop signals, and review gates when running recurring automation.
 
 ## Ralph Is a Role; Watch and Loop Are Different Runtimes
@@ -57,7 +58,7 @@ Start with the command's current help output:
 squad watch --help
 ```
 
-The v1.1.0 command reports a default interval of ten minutes and supports `--interval <minutes>`, `--health`, `--log-file`, `--execute`, `--copilot-flags`, `--max-concurrent`, `--timeout`, and opt-in capabilities such as `--self-pull`, `--board`, `--board-project`, `--monitor-teams`, `--monitor-email`, `--two-pass`, `--wave-dispatch`, `--retro`, and `--decision-hygiene`. Capabilities can also be configured under the `watch` object in `.squad/config.json`; CLI options override file settings. The public CLI help is the right reference for the flags available in the installed binary.
+The v2.0.0 command reports a default interval of ten minutes and supports `--interval <minutes>`, `--health`, `--log-file`, `--execute`, `--copilot-flags`, `--max-concurrent`, `--timeout`, the run bounds `--max-rounds` and `--max-duration`, `--claims`, the runner options `--agent-preset` and `--claude-flags`, and opt-in capabilities such as `--self-pull`, `--board`, `--board-project`, `--monitor-teams`, `--monitor-email`, `--two-pass`, `--wave-dispatch`, `--retro`, and `--decision-hygiene`. Capabilities can also be configured under the `watch` object in `.squad/config.json`; CLI options override file settings. The public CLI help is the right reference for the flags available in the installed binary.
 
 The basic cycle is approximately:
 
@@ -93,13 +94,81 @@ Use a separate terminal and begin in observation mode:
 squad watch --interval 10
 ```
 
-Stop it with Ctrl+C when you have enough information. If the running process has a health/status view, invoke the documented `squad watch --health` operation to inspect it. Write diagnostics to a project-controlled path only when required; `--log-file ./watch.log` is more reviewable than sending long-running logs to an unexpected location. Do not copy sample flags from the separate next-generation watch page without confirming they are accepted by the v1.1.0 binary.
+Stop it with Ctrl+C when you have enough information. If the running process has a health/status view, invoke the documented `squad watch --health` operation to inspect it. Write diagnostics to a project-controlled path only when required; `--log-file ./watch.log` is more reviewable than sending long-running logs to an unexpected location. Do not copy sample flags from the separate next-generation watch page without confirming they are accepted by the v2.0.0 binary.
 
 ### Watch boundaries and opt-in automation
 
 The watcher is a local process, not a cloud service. It polls while running and needs the machine and credentials to remain available. A GitHub Actions workflow may offer a different event-driven or scheduled arrangement, but the lifecycle of that workflow is distinct from your local watch process. Never assume that closing a terminal starts a cloud heartbeat or that a schedule manifest is automatically installed as a daemon.
 
 The board capability's behavior is narrower than a general Kanban synchronization service. It uses `gh project` calls and attempts to add issues and update project status during execution; it can also reconcile some Done/open mismatches. It does not create a complete organization-wide board, provide arbitrary custom-field mappings, or convert every drag-and-drop event into labels. Check Chapter 7 for the details and limitations.
+
+Two more boundaries changed in Squad 2.0, and they apply to every watch run. First, `.squad/config.json` must be valid. A malformed, empty or unreadable file now stops `squad watch` with an error instead of silently falling back to defaults; only a missing file selects the defaults. Second, `--execute` now applies the `needs:*` machine-capability filter from Chapter 5 before it dispatches an issue (with no capability manifest, every issue still passes), and a single round never dispatches the same issue twice, even when `execute` and `fleet-dispatch` both see it.
+
+## Bounded and Coordinated Watch Runs
+
+By default a watcher runs until you press Ctrl+C. That is fine at your desk and risky overnight. Squad 2.0 adds two stop conditions and an opt-in way for several watchers to share one repository without working the same issue twice.
+
+### Stop after a number of rounds or a length of time
+
+```bash
+squad watch --execute --max-rounds 20
+squad watch --execute --max-duration 8h
+squad watch --execute --max-rounds 20 --max-duration 8h
+```
+
+`--max-rounds N` stops after N completed rounds. `--max-duration` takes a number with a unit (`ms`, `s`, `m`, `h` or `d`). You can combine them; whichever limit is reached first ends the run, and an active round finishes before the watcher exits. The same settings live under `watch` in `.squad/config.json` as `maxRounds` (a positive integer) and `maxDuration` (a duration string), and the CLI flags win. A bounded run is the simplest stop mechanism you can give an unattended watcher, and I'd treat it as the default for anything that runs while you are away.
+
+### Work claims: one issue, one watcher
+
+Without claims, every watcher fetches the same open issues and hands them to its own agent. Run `squad watch --execute` on two machines (or in several KEDA pods) against one repository and the same issue gets worked twice. Assigning the issue does not help: `gh issue edit --add-assignee` is additive, and pods that share an account all "win".
+
+Work claims fix the cross-machine case. They are off by default (`--claims none`). Turn them on with the flag, or once in `.squad/config.json` so every machine that shares the team picks it up:
+
+```bash
+squad watch --execute --claims git-ref
+```
+
+```json
+{
+  "watch": {
+    "claims": "git-ref"
+  }
+}
+```
+
+Before it dispatches an issue, a watcher with claims enabled writes a claim: one Git ref under `refs/squad/claims/` on a shared remote (by default `origin`), created with an atomic compare-and-swap push. The Git server settles every race, so at most one watcher wins. The claim is a lease: 15 minutes by default, renewed every 5 minutes while the agent runs, and deleted when the agent session ends. A claim left by a crashed watcher expires, and another watcher takes it over.
+
+For each eligible issue in a round, the watcher gets one of three answers. **Won** means it dispatches the issue, and the agent prompt lists the issue as claimed for this session. **Held** means another watcher has an unexpired claim, so the issue is skipped. **Unavailable** means the remote could not be read or written, so the issue is skipped with a warning; a watcher never dispatches work it could not claim. If a renewal shows that another watcher took the claim over (`fenced`), or renewals keep failing until the lease is about to run out (`lost`), the watcher kills the agent's whole process tree.
+
+```mermaid
+sequenceDiagram
+    participant A as "Watcher on machine A"
+    participant G as "Shared Git remote"
+    participant B as "Watcher on machine B"
+    A->>G: Push claim ref for issue 42 (compare-and-swap)
+    G-->>A: Accepted, A holds the lease
+    B->>G: Push claim ref for issue 42
+    G-->>B: Rejected, A already holds it
+    B->>B: Skip issue 42 this round (contended)
+    loop "Every 5 minutes while the agent runs"
+        A->>G: Renew lease
+    end
+    A->>G: Delete claim ref when the session ends
+```
+
+A few rules keep claims honest:
+
+- Every watcher that may compete must use the same claims remote and the same `refPrefix`. A watcher without claims, or one writing to a different namespace, is invisible to the others.
+- The object form of `watch.claims` accepts `provider`, `ttlMs` (default 900000), `skewMarginMs` (default 120000), `remote` (default `origin`) and `refPrefix` (default `refs/squad/claims/`). `--claims` overrides only the provider. Lease timing must stay between 30 seconds and 24 hours, with `ttlMs` more than twice `skewMarginMs`, or watch refuses to start.
+- `watch.claims` is a reserved key. An invalid value stops watch instead of running without claims.
+- Watchers need push rights to the claims remote. A dedicated, claims-only repository limits what a leaked claim credential can do.
+- Set `SQUAD_MACHINE_ID` to a readable name (a pseudonym on public repositories) so you can tell holders apart.
+
+When claims are on, the startup banner prints the provider and its timing, and each round report adds a line when something happened, for example `🔒 Claims (git-ref): won 2 · contended 1 · released 2 (completed 2)`. `squad watch --health` shows the same counters since startup. Claims give at-least-once delivery, not exactly-once: clock skew, a hung holder or a crash after a push can still produce a duplicate, and killing an agent does not undo a push or a comment it already made. Keep agent effects repeat-safe. The [Multi-Machine Watch with Work Claims](https://github.github.com/squad/docs/scenarios/multi-machine-watch/) scenario covers credentials, troubleshooting a stuck claim and hosts that reject custom refs, and ADR-002 in Chapter 17 (Volume 2) records the design.
+
+### Running rounds through Claude Code
+
+Watch runs each round through the Copilot CLI by default. If your team has also projected Squad into Claude Code (`squad upgrade --client claude`), `--agent-preset claude` (or `watch.agentPreset` in `.squad/config.json`) runs each round through `claude` with the projected Squad coordinator instead. In execute mode that preset adds `--permission-mode bypassPermissions` by default, the counterpart of Copilot's `--yolo`; `--claude-flags "..."` replaces it, and `watch.claudeFlags` in the repository config may set only the permission mode, model, fallback model, effort and maximum turns. `--dispatch-mode fleet` stays Copilot-only. This volume keeps Watch on Copilot; Chapter 19 (Volume 2) covers the Claude runner.
 
 ## `squad loop`: Repeat a Prompt, Not an Issue Query
 
@@ -114,11 +183,11 @@ A safe loop prompt has four qualities:
 
 For example, “Review at most three Tasktrack API issues labeled `squad`, report missing acceptance criteria, and do not edit code or issue labels” is a good observation-only first loop. It has a clear queue, a scope cap, and an explicit prohibition. After several successful cycles, you could deliberately widen the scope.
 
-The starter template's `configured: false` is an onboarding signal, not an execution lock in the v1.1.0 implementation. When `configured` is false or missing, `squad loop` prints an onboarding-mode banner and still runs the prompt. When true, it follows the normal loop flow. Therefore, do not rely on that field as your only safety mechanism. Set it to true once you have intentionally prepared the prompt, but also use explicit scope limits and permissions.
+The starter template's `configured: false` is an onboarding signal, not an execution lock in the v2.0.0 implementation. When `configured` is false or missing, `squad loop` prints an onboarding-mode banner and still runs the prompt. When true, it follows the normal loop flow. Therefore, do not rely on that field as your only safety mechanism. Set it to true once you have intentionally prepared the prompt, but also use explicit scope limits and permissions.
 
 The loop parser accepts simple `key: value` pairs between the first two `---` lines; it is not a full YAML parser. Numeric values are parsed as integers. Missing or invalid values fall back to defaults—ten minutes for interval and thirty for timeout—but the runtime rejects intervals or timeouts below one minute. A quoted description has its outer quotes stripped. Keep frontmatter simple and test the resulting output rather than adding nested YAML or complex values.
 
-CLI values override values in frontmatter. For example, `squad loop --interval 3 --timeout 15` runs at three-minute intervals with a fifteen-minute maximum cycle time even when the file has different values. The first cycle begins immediately; the process then waits the configured interval between later runs. Each cycle invokes an agent command in the project's worktree and enforces a timeout. By default it checks for a Copilot CLI and injects the configured MCP context; `--agent-cmd` replaces the default agent command, so the caller owns its policy and tool configuration.
+CLI values override values in frontmatter. For example, `squad loop --interval 3 --timeout 15` runs at three-minute intervals with a fifteen-minute maximum cycle time even when the file has different values. The first cycle begins immediately; the process then waits the configured interval between later runs. Each cycle invokes an agent command in the project's worktree and enforces a timeout. By default it checks for a Copilot CLI and injects the configured MCP context, and since Squad 2.0 it passes `--yolo` to Copilot when you supply no `--copilot-flags` (the same default Watch uses in execute mode); `--agent-cmd` replaces the default agent command, so the caller owns its policy and tool configuration.
 
 An optional `--self-pull` capability fetches and pulls before the prompt cycle. Avoid enabling that in a checkout with uncommitted changes or where an automatic update could change the code being worked on. `--monitor-email` and `--monitor-teams` add external inputs and depend on the appropriate integration. If your prompt can send messages, update issues, or edit code, make those actions explicit and reviewable. The ability to repeat an instruction does not make its side effects idempotent.
 
@@ -135,7 +204,7 @@ squad schedule status
 squad schedule run ralph-heartbeat
 ```
 
-`init` creates the default manifest if it does not already exist. `list` validates and displays configured entries; `status` reads the saved run state and reports whether an entry is due now; `run <id>` executes one entry immediately using the local provider and updates the state file. These commands do not make a background scheduler appear. There is no `squad schedule watch` subcommand in v1.1.0 CLI help.
+`init` creates the default manifest if it does not already exist. `list` validates and displays configured entries; `status` reads the saved run state and reports whether an entry is due now; `run <id>` executes one entry immediately using the local provider and updates the state file. These commands do not make a background scheduler appear. There is no `squad schedule watch` subcommand in v2.0.0 CLI help.
 
 The core manifest shape is:
 
@@ -173,13 +242,13 @@ Task types are `script`, `workflow`, `copilot`, and `webhook`, each with a requi
 
 A provider chooses how tasks are handled. The `LocalPollingProvider` runs script tasks locally and can POST webhooks. In the current CLI, local `workflow` and `copilot` task implementations return stub messages rather than triggering a real GitHub Actions workflow or Copilot session. The SDK also contains a `GitHubActionsProvider` that can generate workflow files, but its generated workflow is an illustrative placeholder (`echo`) rather than a complete task executor. The CLI's `schedule run` path always constructs the local provider; it does not create or dispatch generated workflows.
 
-> **Note:** The assigned scheduler feature page describes richer local polling and `init-ci` behavior than the stable v1.1.0 CLI exposes. Use `squad schedule --help` and inspect the actual generated files before relying on an automation path. A manifest entry with `providers: ["github-actions"]` does not mean that `squad schedule run` has configured GitHub Actions for you.
+> **Note:** The assigned scheduler feature page describes richer local polling and `init-ci` behavior than the v2.0.0 CLI exposes. Use `squad schedule --help` and inspect the actual generated files before relying on an automation path. A manifest entry with `providers: ["github-actions"]` does not mean that `squad schedule run` has configured GitHub Actions for you.
 
 When a retry policy exists, `executeTask` performs the initial attempt plus up to `maxRetries` additional attempts. Delay doubles after each failure: `backoffSeconds`, then twice that, then four times, and so on. No retry setting means zero retries. The saved schedule state is `.squad/.schedule-state.json`, containing run timestamps and status. `squad schedule status` reports past status and whether an entry is due; it does not calculate the formatted “next run” time promised by some feature-page examples.
 
 ## Persistent Ralph: What the Code Actually Persists
 
-The “Persistent Ralph” feature page describes continuous monitoring, history, stale-session alerts, productivity trends, and a 24/7 heartbeat. This is a useful product vision to compare with the current source, but it is broader than what the v1.1.0 SDK monitor implements.
+The “Persistent Ralph” feature page describes continuous monitoring, history, stale-session alerts, productivity trends, and a 24/7 heartbeat. This is a useful product vision to compare with the current source, but it is broader than what the v2.0.0 SDK monitor implements.
 
 `RalphMonitor` tracks a `Map` of agents keyed by name, each with a session ID, status, last activity time, optional current task, and milestones. It subscribes to `session:created`, `session:destroyed`, `session:error`, and `agent:milestone` events. A timer calls `healthCheck()` at a configurable interval; the default is 30 seconds. A session exceeding the default five-minute stale threshold is marked stale. On a later health check, the code can move an already-stale agent to idle. The monitor exposes `getStatus()` and stops its timer and event subscriptions in `stop()`.
 
@@ -239,7 +308,7 @@ This lab advances the companion project without immediately granting an agent pe
 
 | Option | Type | Default | Description |
 |---|---|---:|---|
-| `configured` | boolean-like text | `false` | Selects onboarding banner versus normal flow; false does not prevent execution in v1.1.0 |
+| `configured` | boolean-like text | `false` | Selects onboarding banner versus normal flow; false does not prevent execution in v2.0.0 |
 | `interval` | integer minutes | `10` | Delay between loop cycles; must be at least one |
 | `timeout` | integer minutes | `30` | Maximum time per cycle; must be at least one |
 | `description` | string | `Squad Loop` or onboarding label | Human-readable loop title |
@@ -247,7 +316,7 @@ This lab advances the companion project without immediately granting an agent pe
 | `--file <path>` | path | `loop.md` | Select a different prompt file |
 | `--interval <N>` | minutes | from frontmatter | Override the file interval |
 | `--timeout <N>` | minutes | from frontmatter | Override the file timeout |
-| `--copilot-flags "..."` | string | none | Add flags to the default Copilot command |
+| `--copilot-flags "..."` | string | `--yolo` | Replace the default Copilot permission flags |
 | `--agent-cmd <cmd>` | string | default Copilot CLI | Replace the agent command; the caller owns its policy |
 | `--self-pull`, `--monitor-email`, `--monitor-teams` | flags | off | Opt into pre-scan or monitoring capabilities when available |
 
@@ -263,11 +332,21 @@ This lab advances the companion project without immediately granting an agent pe
 | `squad watch --execute` | Agent execution capability | Enables changes; observe first |
 | `squad watch --max-concurrent N` | Parallel issue limit | Default one |
 | `squad watch --timeout N` | Per-issue timeout | Default thirty minutes |
+| `squad watch --max-rounds N` / `watch.maxRounds` | Stop after N completed rounds | Unset (run until Ctrl+C); flag wins |
+| `squad watch --max-duration D` / `watch.maxDuration` | Stop after elapsed time (`ms`, `s`, `m`, `h`, `d`) | Unset; an active round finishes first |
+| `squad watch --claims <none\|git-ref>` / `watch.claims` | Cross-watcher work claims | `none`; an invalid value stops watch |
+| `watch.claims` object | `provider`, `ttlMs`, `skewMarginMs`, `remote`, `refPrefix` | `none`, `900000`, `120000`, `origin`, `refs/squad/claims/` |
+| `SQUAD_MACHINE_ID` | Claim holder name | Otherwise capabilities `machine`, `SQUAD_POD_ID`, or a hashed hostname |
+| `squad watch --agent-preset <copilot\|claude>` / `watch.agentPreset` | Runner for each round | `copilot` |
+| `squad watch --claude-flags "..."` / `watch.claudeFlags` | Flags for the `claude` preset | Execute mode defaults to `--permission-mode bypassPermissions` |
+| `.squad/config.json` validity | Watch configuration source | Malformed, empty or unreadable file stops watch; a missing file selects defaults |
 | `squad schedule run <id>` | Run one manifest task now | Uses the local provider in the CLI |
 
 ## Under the Hood
 
-The conversational guidance is supplied by the Ralph references and team instructions, while the actual polling behavior lives in `packages/squad-cli/src/cli/commands/watch/index.ts`. Watch obtains an adapter from the platform factory, verifies the relevant CLI, parses the team roster and routing file, ensures member labels where possible, sets up the event monitor, and then executes scan and capability phases. Its default interval is ten minutes, `execute` is false, and `maxConcurrent` is one. The watcher constructs a `RalphMonitor` with a state path under `.squad` and an interval derived from the polling interval.
+The conversational guidance is supplied by the Ralph references and team instructions, while the actual polling behavior lives in `packages/squad-cli/src/cli/commands/watch/index.ts`. Watch obtains an adapter from the platform factory, verifies the relevant CLI, parses the team roster and routing file, ensures member labels where possible, sets up the event monitor, and then executes scan and capability phases. Its default interval is ten minutes, `execute` is false, and `maxConcurrent` is one. The watcher constructs a `RalphMonitor` with a state path under `.squad` and an interval derived from the polling interval. Run bounds live in `packages/squad-cli/src/cli/commands/watch/bounds.ts`, and the claim lifecycle (acquire before dispatch, renew, fence, release) in `packages/squad-cli/src/cli/commands/watch/claims.ts`.
+
+The claim contract itself is in the SDK, in `packages/squad-sdk/src/ralph/claims.ts`, which implements the `WorkClaimProvider` interface from ADR-002. It defines a `WorkKey` (platform, repository and issue ID) and an `ExecutorIdentity` (a machine ID plus a random per-process `instanceId`, so two watchers on one machine are distinct holders), and three providers that report how strong their exclusion is: `NoopClaimProvider` (none, the default), `InMemoryClaimProvider` (local, with leases and fencing) and `GitRefClaimProvider` (distributed, in `claims-git.ts`). The platform adapter is deliberately untouched; claims are a separate seam.
 
 The SDK monitor is `packages/squad-sdk/src/ralph/index.ts`. Its `start()` method subscribes to the four event types and starts a periodic timer. `handleEvent()` creates, removes, or updates a per-agent entry; `healthCheck()` compares activity age with the stale threshold; `stop()` unsubscribes, clears the timer, and serializes state only when `statePath` exists. This narrow event-oriented class is why trend-analysis claims should not be attributed to it without another source.
 
@@ -275,26 +354,28 @@ The prompt loop is `packages/squad-cli/src/cli/commands/loop.ts`. `parseLoopFile
 
 The generic scheduler lives in `packages/squad-sdk/src/runtime/scheduler.ts`; the command wrapper is `packages/squad-cli/src/cli/commands/schedule.ts`. The scheduler validates manifests, evaluates limited due logic, executes tasks through a provider, saves run state, and exposes `LocalPollingProvider` and `GitHubActionsProvider`. The CLI's `schedule run` explicitly constructs the local provider. In that provider, workflow and Copilot tasks are stubs; scripts and webhooks are the actual local execution paths. The GitHub Actions provider's generated YAML currently echoes a task reference rather than invoking a real agent, so don't promote the feature page's production scheduler example without additional implementation.
 
-The `templates/ralph-*` files provide prompt references, charters, and examples, not proof that each described behavior is wired into the v1.1.0 binary. For example, the circuit-breaker template describes a model fallback design; Watch's CLI options and SDK rate-limiting modules determine what is live in a given execution path. Likewise, `templates/ralph-instructions.md` controls the spawned prompt when used, while its own comments explain that user-owned instructions influence a privileged agent and must be treated like code.
+The `templates/ralph-*` files provide prompt references, charters, and examples, not proof that each described behavior is wired into the v2.0.0 binary. For example, the circuit-breaker template describes a model fallback design; Watch's CLI options and SDK rate-limiting modules determine what is live in a given execution path. Likewise, `templates/ralph-instructions.md` controls the spawned prompt when used, while its own comments explain that user-owned instructions influence a privileged agent and must be treated like code.
 
 ## Pitfalls and Troubleshooting
 
 - **Watch says there is no Squad.** Initialize the intended project and confirm `.squad/team.md` exists. Run commands from the correct checkout.
 - **No issue is found.** Confirm the active platform adapter, CLI authentication, open state, and `squad` label. The watcher is not a general all-issues scanner.
 - **A routing result is surprising.** Check module ownership and routing rules; ambiguous or missing matches fall back only when a Lead/Architect is present.
+- **Watch exits at startup with a configuration error.** Squad 2.0 stops watch when `.squad/config.json` is malformed, empty or unreadable, or when `watch.claims` does not parse. Fix the JSON rather than deleting the file.
+- **An issue is skipped as `contended` or `unavailable` every round.** Another watcher holds its claim, or the claims remote rejects the push. List the claim refs with `git ls-remote origin 'refs/squad/claims/*'` and check credentials and ref rules.
 - **Watch changes code unexpectedly.** Confirm whether `--execute` was set by CLI or `.squad/config.json`. Execute mode is not a read-only monitor.
 - **Loop runs even though `configured` is false.** That is current implementation behavior: false selects onboarding mode but does not stop the cycle. Do not rely on it as a safety lock.
 - **Loop runs the wrong prompt.** Check `--file`, the first two frontmatter delimiters, and the body after the closing `---`. The parser only handles simple key/value fields.
 - **Loop repeats or overlaps unexpectedly.** Keep cycles shorter than the interval and the prompt repeat-safe. Use Ctrl+C to stop; don't depend on a chat session ending to stop a separate process.
-- **`schedule status` doesn't show a future timestamp.** It reports last status and whether a schedule is due now; it does not expose a computed next-run value in v1.1.0.
+- **`schedule status` doesn't show a future timestamp.** It reports last status and whether a schedule is due now; it does not expose a computed next-run value in v2.0.0.
 - **A schedule says it ran but did not dispatch Copilot or Actions.** The current local provider returns stub results for those task types. Inspect task type and provider code before treating a successful status as completed work.
 - **A GitHub Actions workflow is only an echo.** The SDK generator is placeholder scaffolding. It is not proof of an unattended production execution path.
 - **A persistent-Ralph report promises archives or trend data.** The SDK monitor tracks runtime status and can write one snapshot on stop when configured; it does not implement the documented weekly archive and analytics in this module.
-- **A docs flag is rejected by the installed command.** Check `squad watch --help` and `squad loop --help` for the installed v1.1.0 surface. Feature notes can describe a future or alternate implementation.
+- **A docs flag is rejected by the installed command.** Check `squad watch --help` and `squad loop --help` for the installed v2.0.0 surface. Feature notes can describe a future or alternate implementation.
 
 ## Summary
 
-Ralph, Watch, Loop, the SDK monitor, and the scheduler solve related but distinct problems. Use conversational Ralph to keep an interactive queue moving. Use `squad watch` to poll platform work, beginning without execution; opt in to `--execute` only after validating identity, scope, and permissions. Use `squad loop` when a carefully written prompt—not an issue selector—should repeat. Use the schedule manifest as structured task metadata, while remembering that `squad schedule run` executes locally and several provider task types remain stubs. The SDK monitor observes session events and can persist a shutdown snapshot, not an entire 24/7 analytics service. For every recurring process, decide what it can change, how it stops, and who reviews the result.
+Ralph, Watch, Loop, the SDK monitor, and the scheduler solve related but distinct problems. Use conversational Ralph to keep an interactive queue moving. Use `squad watch` to poll platform work, beginning without execution; opt in to `--execute` only after validating identity, scope, and permissions, bound unattended runs with `--max-rounds` or `--max-duration`, and turn on `--claims git-ref` when more than one watcher shares a repository. Use `squad loop` when a carefully written prompt—not an issue selector—should repeat. Use the schedule manifest as structured task metadata, while remembering that `squad schedule run` executes locally and several provider task types remain stubs. The SDK monitor observes session events and can persist a shutdown snapshot, not an entire 24/7 analytics service. For every recurring process, decide what it can change, how it stops, and who reviews the result.
 
 ## Exercises
 
@@ -303,12 +384,12 @@ Ralph, Watch, Loop, the SDK monitor, and the scheduler solve related but distinc
 3. Given an interval schedule with `intervalSeconds: 300` and one retry, calculate the number of attempts and the retry delay. Why is `event` not automatically due in the polling evaluator?
 4. Explain what data `RalphMonitor` tracks, what event types update it, and under what condition it writes a snapshot. Identify two claims from the persistent-Ralph feature page that this module alone does not substantiate.
 5. A team wants GitHub Actions to run the default schedule every five minutes. Explain why `providers: ["github-actions"]` and `squad schedule run` are not sufficient proof that an agent task is being dispatched. What source or output would you inspect?
-6. Design a gradual rollout for a recurring watcher: observation, low-risk execution, then broader execution. State the stop mechanism, concurrency limit, timeout, and human review check at each stage.
+6. Design a gradual rollout for a recurring watcher: observation, low-risk execution, then broader execution. State the stop mechanism (including `--max-rounds` or `--max-duration`), concurrency limit, timeout, claims setting when a second machine joins, and human review check at each stage.
 
 ## Quiz
 
 1. Which input drives `squad loop` task selection?
-2. What is the default polling interval for `squad watch` in v1.1.0?
+2. What is the default polling interval for `squad watch` in v2.0.0?
 3. Does `--execute` make Watch more or less read-only?
 4. What does `configured: false` do in the current Loop implementation?
 5. Which four trigger types appear in the generic scheduler schema?
@@ -318,8 +399,9 @@ Ralph, Watch, Loop, the SDK monitor, and the scheduler solve related but distinc
 
 ## Further Reading
 
-- [Ralph — Work Monitor](https://bradygaster.github.io/squad/docs/features/ralph/)
-- [Prompt-driven Loop](https://bradygaster.github.io/squad/docs/features/loop/)
-- [Persistent Ralph](https://github.com/bradygaster/squad/blob/v1.1.0/docs/features/persistent-ralph.md)
-- [Generic Scheduler](https://github.com/bradygaster/squad/blob/v1.1.0/docs/features/generic-scheduler.md)
-- [Watch — Next Generation](https://github.com/bradygaster/squad/blob/v1.1.0/docs/features/watch-next-gen.md)
+- [Ralph — Work Monitor](https://github.github.com/squad/docs/features/ralph/)
+- [Prompt-driven Loop](https://github.github.com/squad/docs/features/loop/)
+- [Multi-Machine Watch with Work Claims](https://github.github.com/squad/docs/scenarios/multi-machine-watch/)
+- [Persistent Ralph](https://github.com/github/squad/blob/v2.0.0/docs/features/persistent-ralph.md)
+- [Generic Scheduler](https://github.com/github/squad/blob/v2.0.0/docs/features/generic-scheduler.md)
+- [Watch — Next Generation](https://github.com/github/squad/blob/v2.0.0/docs/features/watch-next-gen.md)

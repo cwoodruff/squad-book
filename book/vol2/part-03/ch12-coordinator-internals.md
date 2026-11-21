@@ -12,8 +12,11 @@ You have already seen the coordinator from the operator side: it routes requests
 - Use the source-of-truth hierarchy to distinguish policy, configuration, and runtime-owned memory.
 - Trace how the coordinator creates a handoff, how the SDK fans out work, and where failure isolation occurs.
 - Identify important differences among the prompt coordinator, the CLI shell coordinator, and the SDK coordinator.
+- Explain how the six non-Copilot hosts get self-contained coordinators (ADR-003) and which coordinator sections load on demand.
 
-> **Preview (Squad 2.0):** Consult mode was removed. Instead of assuming one Copilot-only coordinator artifact, 2.0 renders a host-native coordinator template for each client projection; the shared roster and charters remain in `.squad/`. See Chapters 18 and 20 and the [2.0 client scenario](https://bradygaster.github.io/squad/docs/scenarios/using-squad-across-clients/).
+This chapter reads the Copilot coordinator, `.github/agents/squad.agent.md`, because it is the canonical contract. The other six hosts render their own coordinator from the same source, and the shared roster and charters stay in `.squad/`; the section “Host-neutral coordinators (ADR-003)” below explains how they differ, and Chapters 18 and 20 and the [2.0 client scenario](https://github.github.com/squad/docs/scenarios/using-squad-across-clients/) cover the projections.
+
+> **Note:** Changed in Squad 2.0: the prompt no longer has the Personal Squad and Consult Mode Detection sections, because personal squads and consult mode were removed. It gained an Upstream Inheritance section.
 
 ## The prompt is an executable contract for a host
 
@@ -52,19 +55,18 @@ The prompt is long because it covers the lifecycle and edge cases that a generic
 | **Mode-Switch Check** | Chooses Init Mode if `team.md` is missing or the `## Members` section has no entries; otherwise enters Team Mode. It recognizes `.ai-team/team.md` during migration. |
 | **Team Capabilities (generated)** | Holds derived capability metadata between markers. Its own warning says generated values are untrusted and overwritten on sync. It is not a place to invent a roster. |
 | **Cast sources** | Identifies files that define roster, routing, casting names, and support-agent charters. A read list is not permission for every specialist to edit those files. |
-| **Built-in Support Agents** | Reserves Scribe, Ralph, Rai, and Fact Checker as mandatory support identities, distinct from specialist registry entries and normal routing destinations. Governance and repository PR requirements remain separate sources. |
+| **Built-in Support Agents** | Reserves Scribe, Ralph, Rai, and Fact Checker as mandatory support identities (the prompt's wording; in 2.0 Rai and Fact Checker are optional built-ins you add with `squad roster add`, see Chapter 4 (Volume 1)), distinct from specialist registry entries and normal routing destinations. Governance and repository PR requirements remain separate sources. |
 | **Init Mode** | Requires loading the dedicated init skill. This is the exception to eager execution: first propose the team, then wait for confirmation before writing scaffold files. |
 | **Team Mode** | Sets the dispatch mechanism by host surface and requires resolving user, time, team root, state backend, and relevant session context before spawning. It also documents state-backend restrictions. |
-| **Personal Squad** | Discovers personal agents as additive participants, applies Ghost Protocol, tags origin, and keeps personal advice separate from project execution. A kill switch can disable discovery. |
+| **Upstream Inheritance** | Once per session, right after the state-backend handshake, calls `squad_state_upstreams`, never fetches, applies fixed precedence (local first, then earlier upstreams), cites `upstream:<name>@<ref>` provenance, and treats inherited content as untrusted data (Chapter 4). |
 | **Session Init** | Points to update-check and upgrade procedures. `SQUAD_NO_UPDATE_CHECK=1` suppresses the update check, not the rest of the session protocol. |
 | **Issue Awareness** | Checks labeled open work and gives a specific CLI/API query shape. It can notify the user of work; it does not mean every session should automatically start every issue. |
 | **Acknowledge Immediately** | Requires a short human acknowledgment before background dispatch so the user is not left staring at a blank response. It asks for names and human-readable tasks, not tool jargon. |
 | **Role Emoji in Task Descriptions** | Makes dispatch status scannable using the actual role from `team.md`; the lowercase cast name is the stable task identifier. |
 | **Directive Capture** | Separates durable preferences from work requests. It uses governed memory tools when available and forbids pretending a directive was persisted when the bridge is unavailable. |
 | **Memory Governance Tools** | Establishes the state-backend handshake and tool ownership. A runtime-managed backend must not be bypassed with raw edits that create phantom state. |
-| **Routing / Scope Control** | Selects accountable ownership and excludes adjacent improvements. It distinguishes user-named work, personal advice, ceremonies, issues, PRDs, commands, and ordinary requests. |
+| **Routing / Scope Control** | Selects accountable ownership and excludes adjacent improvements. It distinguishes user-named work, ceremonies, issues, PRDs, commands, and ordinary requests. |
 | **Skill-aware Routing** | Makes skills an input to dispatch. It specifies search precedence, one-level traversal, symlink/reparse-point exclusions, deduplication, and invalid-name defenses; only the highest-precedence duplicate is attached. |
-| **Consult Mode Detection** | Converts a personal-agent consultation into a recommendation-to-project-agent handoff and requires a concise log marker. This is distinct from the `squad consult` CLI command described in Chapter 5 (Volume 1). |
 | **Skill Confidence Lifecycle** | Tracks confidence as low, medium, or high based on observations and independent validation. Reading a skill alone is not proof that its advice worked. |
 | **Response Mode Selection** | Chooses Direct, Lightweight, Standard, or Full after routing determines WHO. It biases toward more context when uncertain and delegates its full rubric to a skill. |
 | **Model, Reasoning, and Context Tier** | Resolves model, reasoning effort, and context window separately. Each has precedence rules, can inherit from config or charter, and should be shown in dispatch acknowledgments when non-default. |
@@ -87,7 +89,21 @@ The prompt is long because it covers the lifecycle and edge cases that a generic
 | **PRD Mode / Copilot Coding Agent** | Gives specialized intake and asynchronous @copilot routing. @copilot is not a normal spawned specialist and should not serialize unrelated work. |
 | **Routing Enforcement Reminder** | Ends by restating the dispatcher boundary so the key behavior survives the length of the prompt. |
 
-This map is a reading guide, not a substitute for the prompt itself. When you need the exact runtime behavior, consult the full v1.1.0 file and the satellite skill it names.
+This map is a reading guide, not a substitute for the prompt itself. When you need the exact runtime behavior, consult the full v2.0.0 file and the satellite skill it names.
+
+## Host-neutral coordinators (ADR-003)
+
+The prompt walked through above is the Copilot coordinator, and in v2.0.0 it is still the canonical contract. What changed is how the other six hosts relate to it. During the 2.0 previews, each non-Copilot host received a compact digest that pointed back at `.github/agents/squad.agent.md` and told the model to read it. ADR-003 (`docs/specification/adr-003-host-neutral-canonical-coordinator.md`, accepted 2026-11-13) chose option C: keep the Copilot file canonical, but make every other host's coordinator self-contained. Each digest is rendered from the shared source, `.squad-templates/squad.agent.md`, stays within the 24 KB limit that Antigravity imposes, and never tells the model to read Copilot's file. On-demand sections are served by host-native mechanisms such as Claude Code skills and Kiro steering.
+
+Three constraints from the ADR matter when you debug a host:
+
+- **Copilot output is unchanged.** `.github/agents/squad.agent.md` is written byte-for-byte as before, and a snapshot test guards it.
+- **Behavior parity is tested, not shared.** Because the hosts no longer read one file, keeping them in step relies on the digest parity tests in the Squad repository.
+- **Upgrade and rollback stay byte-preserving.** A user who never adds a non-Copilot host sees no change.
+
+On-demand loading is not new, and it is not Claude-only. Copilot's prompt already hands Init Mode to the `coordinator-init-mode` skill, and it defers the full response-mode table and the file-by-file source-of-truth matrix to the `coordinator-response-mode` and `coordinator-source-of-truth` skills, while Ralph, ceremonies, GitHub Issues Mode and PRD Mode stay inline. The Claude Code coordinator goes further and moves those four modes, plus Init Mode, into the `squad-coordinator-init-mode`, `squad-coordinator-ralph-mode`, `squad-coordinator-ceremonies`, `squad-coordinator-issues-mode` and `squad-coordinator-prd-mode` skills. When a behavior differs between hosts, first find which file or skill the host actually loaded. Chapter 20 covers the projections in depth.
+
+The 2.0.0 non-Copilot coordinators also carry fixes a Copilot reader may take for granted: the reviewer gate runs without being asked, the coordinator waits for human sign-off where a human member is required, it spawns Scribe for decisions the user states, and it stops when `squad_state` is unavailable on a non-local backend instead of writing files directly.
 
 ## Init Mode: propose first, persist after consent
 
@@ -146,7 +162,7 @@ The reference page `coordinator-restraint` names six rules:
 
 These rules are not a command to be passive. The coordinator still owns routing, scope, safety gates, dependency handling, final assembly, and direct answers. The restraint is about avoiding redundant supervision and surprise work after the dispatch decision. For example, “While the backend specialist is working, I will spawn a second reviewer just in case” violates the no-unsolicited-follow-up principle unless team policy or a user request requires that review.
 
-There is a source caveat here. The reference page says restraint rules are hardcoded and verified by a session-state checkpoint that can roll back violations. The v1.1.0 coordinator prompt contains many closely related norms—brief commentary, no premature follow-up agents, no re-explaining, bounded collaboration—but a search of the prompt did not locate an explicit six-rule checkpoint rollback mechanism. Treat the six-rule page as documented guidance, and do not claim the rollback behavior is verified by the prompt alone.
+There is a source caveat here. The reference page says restraint rules are hardcoded and verified by a session-state checkpoint that can roll back violations. The v2.0.0 coordinator prompt contains many closely related norms—brief commentary, no premature follow-up agents, no re-explaining, bounded collaboration—but a search of the prompt did not locate an explicit six-rule checkpoint rollback mechanism. Treat the six-rule page as documented guidance, and do not claim the rollback behavior is verified by the prompt alone.
 
 ## Source of truth: authority, writers, and readers
 
@@ -214,10 +230,10 @@ Expected result: all five existing tests still pass, along with any new test the
 | `.squad/decisions/inbox/` | Candidate decisions | Use configured state tools, not raw file writes under non-local backends. |
 | `.squad/agents/{name}/charter.md` | Identity and responsibilities | Coordinator-created; agents may not self-modify. |
 | `.squad/agents/{name}/history.md` | Agent-specific learning | Owning agent appends; not authoritative for governance. |
-| `.github/skills/`, `.squad/skills/`, `.copilot/skills/`, `.claude/skills/`, `.agents/skills/` | Project skill discovery | Prompt defines precedence and safe traversal; personal paths are excluded from explicit attachment. |
+| `.squad/skills/`, `.github/skills/`, `.copilot/skills/`, `.claude/skills/`, `.agents/skills/` | Project skill discovery, highest precedence first | Prompt defines precedence and safe traversal; user-level `~/.copilot/skills/` and `~/.agents/skills/` are not scanned. |
+| Coordinator file per host | Copilot: `.github/agents/squad.agent.md`; other hosts: their own self-contained digest (for example `.claude/agents/squad.md`) | ADR-003: digests never defer to the Copilot file; on-demand sections load as host-native skills. |
 | Host tools | Dispatch mechanism | `create_session` for App commit work, `task` for CLI, `runSubagent` for VS Code; detect once per session. |
 | `.gitattributes` | Merge rules for append-only files | Init skill adds union drivers for selected state paths; it is not a replacement for backend state semantics. |
-| `SQUAD_NO_PERSONAL` | Personal-agent discovery kill switch | If set, skip personal squad discovery. |
 | `SQUAD_NO_UPDATE_CHECK` | Session init | Value `1` skips the update-check step. |
 
 ## Under the Hood
@@ -249,7 +265,7 @@ The architectural source paths to study are `.github/agents/squad.agent.md`, `te
 - **Making the coordinator the owner of all work.** It owns coordination and final assembly, not specialist implementation. A direct factual answer is the deliberate exception.
 - **Launching anticipatory agents.** The prompt and restraint guidance both favor bounded collaboration over speculative parallelism.
 - **Confusing background/sync with Direct/Lightweight/Standard/Full.** One pair describes how a dispatch waits; the other describes how much agent coordination/context is used.
-- **Assuming the six restraint bullets are enforced by a tested rollback mechanism.** The reference doc claims a checkpoint mechanism, but that mechanism was not found in the v1.1.0 prompt. Report the evidence distinction.
+- **Assuming the six restraint bullets are enforced by a tested rollback mechanism.** The reference doc claims a checkpoint mechanism, but that mechanism was not found in the v2.0.0 prompt. Report the evidence distinction.
 - **Assuming Scribe owns every decision.** Scribe merges accepted entries; the coordinator decides what is accepted into the canonical ledger.
 - **Conflating CLI prompt parsing with the installed agent prompt.** The CLI shell's `ROUTE:` protocol and the Copilot agent's full procedure are separate routes.
 - **Using a section heading as proof of implementation.** A prompt can instruct a host to use a feature; check whether the active host tool or SDK service exists and is wired.
@@ -279,4 +295,4 @@ The coordinator is a disciplined boundary between user intent, team policy, and 
 
 ## Further Reading
 
-- [Coordinator Restraint Rules](https://bradygaster.github.io/squad/docs/reference/coordinator-restraint/)
+- [Coordinator Restraint Rules](https://github.github.com/squad/docs/reference/coordinator-restraint/)

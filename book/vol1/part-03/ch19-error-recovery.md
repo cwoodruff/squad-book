@@ -153,9 +153,9 @@ This avoids a common false choice between resilient behavior and quality control
 
 ## Ralph, Rate Limits, and the Circuit-Breaker Analogy
 
-Ralph is Squad's work monitor/issue-processing capability, not a magic retry policy for every agent error. The CLI offers `squad triage`, which can scan for work and optionally execute it; in v1.1.0 its help describes opt-in capabilities such as `--two-pass`, `--wave-dispatch`, and `--retro`, plus `--max-concurrent` and `--timeout`. Ralph's normal operational loop should skip blocked work and surface blockers rather than repeatedly attempting the same impossible task. Chapter 9 covers the work loop in detail.
+Ralph is Squad's work monitor/issue-processing capability, not a magic retry policy for every agent error. The CLI offers `squad triage`, which can scan for work and optionally execute it; in v2.0.0 its help describes opt-in capabilities such as `--two-pass`, `--wave-dispatch`, and `--retro`, plus `--max-concurrent` and `--timeout`, and the bounded-run flags `--max-rounds` and `--max-duration`. Its `--claims git-ref` option, off by default, keeps two watchers from taking the same issue; Chapter 9 covers it. Ralph's normal operational loop should skip blocked work and surface blockers rather than repeatedly attempting the same impossible task. Chapter 9 covers the work loop in detail.
 
-The repository contains a `templates/ralph-circuit-breaker.md` describing model-rate-limit fallback: CLOSED, OPEN, and HALF-OPEN states; a preferred model; a fallback chain; and a cooldown. It includes a PowerShell integration example and a suggested `.squad/ralph-circuit-breaker.json` state file. This is a template document, not evidence that the v1.1.0 CLI automatically runs that model-selection workflow. No corresponding model-fallback implementation or state file schema was found in the stable runtime.
+The repository contains a `templates/ralph-circuit-breaker.md` describing model-rate-limit fallback: CLOSED, OPEN, and HALF-OPEN states; a preferred model; a fallback chain; and a cooldown. It includes a PowerShell integration example and a suggested `.squad/ralph-circuit-breaker.json` state file. This is a template document, not evidence that the v2.0.0 CLI automatically runs that model-selection workflow. No corresponding model-fallback implementation or state file schema was found in the stable runtime.
 
 There is, however, an actual SDK rate-limiting module at `packages/squad-sdk/src/ralph/rate-limiting.ts`. It offers a different design: `getTrafficLight` marks more than 20% quota remaining green, more than 5% amber, and 5% or less red (a zero limit is red); `shouldProceed` permits every priority in green, only priority 0 in amber, and none in red. `getRetryDelay` calculates an exponential delay with jitter inside priority-specific windows. `PredictiveCircuitBreaker` stores a bounded series of samples and predicts time to exhaustion, opening preemptively when the predicted time is below its warning threshold. The module also exposes a cooperative rate pool: known agents may proceed while `used < allocated`, consuming quota increments their usage, and an expired lease from another agent can have its unused allocation reclaimed. An unknown agent is permitted by `canUseQuota` and has no allocation incremented by `consumeQuota`, a permissive behavior worth considering when wiring the API. These are SDK APIs for consumers to wire into a system; they do not imply that Ralph automatically switches between named models.
 
@@ -218,6 +218,7 @@ Expected result: a verified API contract change only if the existing implementat
 | Issue duplicate check | `gh issue list --search "<keywords>" --state open` | Search before creating a new issue |
 | Ralph issue triage | `squad triage [--execute]` | `--execute` enables work execution; scanning alone is not the same as coding |
 | Triage concurrency/timeout | `--max-concurrent N`, `--timeout N` | Help documents defaults as 1 concurrent issue and 30 minutes per issue |
+| Triage bounded and coordinated runs | `--max-rounds N`, `--max-duration 8h`, `--claims <none\|git-ref>` | Stop after N rounds or elapsed time; `git-ref` claims stop two watchers taking one issue (default `none`); see Chapter 9 |
 | Triage optional recovery-related capability | `--retro` | Retrospective enforcement capability; separate from coordinator ceremonies |
 | SDK retry delay | Priority-specific windows in `rate-limiting.ts` | P0: 500 ms–5 s; P1: 2–30 s; P2: 5–60 s, plus up to 50% jitter |
 | SDK quota traffic light | Green above 20%; amber above 5%; red at 5% or below; zero limit is red | Amber only permits priority 0; red pauses all priorities |
@@ -245,7 +246,7 @@ export function getRetryDelay(priority: AgentPriority, attempt: number): number 
 
 The predictive breaker keeps at most a configured number of recent samples. It needs at least three, returns `null` when elapsed time is zero or the first-to-last sample shows no positive consumption, and compares its predicted exhaustion time to a threshold. Its source comment mentions regression, but the implementation calculates a first-to-last consumption delta, not a least-squares regression. That implementation detail is a doc/code mismatch worth preserving accurately. The rate-pool loader checks the supplied team root's `.squad/rate-pool.json` before the user's `~/.squad/rate-pool.json`; it returns `null` if neither contains parseable state. This is cooperative quota accounting, distinct from the template's `.squad/ralph-circuit-breaker.json` model-fallback state. The module's traffic-light gates and rate pool provide quota controls; orchestration decides how they are wired into real work.
 
-The PowerShell model fallback template proposes a separate stateful pattern. Its open/closed/half-open transitions describe a common resilience design, but v1.1.0's checked-in SDK implementation is predictive rate protection rather than automatic model fallback. If you adopt the template operationally, own the script, verify the model IDs and billing behavior for your environment, and test state transitions. Do not describe that workflow as a built-in Squad CLI feature.
+The PowerShell model fallback template proposes a separate stateful pattern. Its open/closed/half-open transitions describe a common resilience design, but v2.0.0's checked-in SDK implementation is predictive rate protection rather than automatic model fallback. If you adopt the template operationally, own the script, verify the model IDs and billing behavior for your environment, and test state transitions. Do not describe that workflow as a built-in Squad CLI feature.
 
 Ralph itself is wired through CLI capabilities and work-monitor instructions. The triage executor's behavior around blocked issues and escalation is related to resilience: it avoids repeatedly selecting work explicitly marked blocked, and moves on while preserving the blocker. That is a work-queue policy, not iterative retrieval's three attempts and not the SDK circuit breaker's predictive quota analysis.
 
@@ -275,7 +276,7 @@ Reliable recovery begins with classification, not repetition. Use bounded backof
 2. Rewrite this weak delegation prompt into the four-section format: “Make the Tasktrack API work and tell me when it's done.”
 3. Cycle 1 adds a test for invalid status but misses unknown task IDs. Write a cycle-two prompt that carries forward the objective delta. Then state what cycle three should contain if the second attempt still omits validation.
 4. A reviewer rejects a patch authored by Nova. The tests then fail again while a different agent revises it. Explain how recovery proceeds without violating lockout.
-5. Compare the circuit-breaker template's model fallback with the SDK's `PredictiveCircuitBreaker`. Identify two claims you must not make about v1.1.0's built-in runtime.
+5. Compare the circuit-breaker template's model fallback with the SDK's `PredictiveCircuitBreaker`. Identify two claims you must not make about v2.0.0's built-in runtime.
 
 ## Quiz
 
@@ -290,11 +291,11 @@ Reliable recovery begins with classification, not repetition. Use bounded backof
 
 ## Further Reading
 
-- [Error Recovery — Standard Failure Patterns](https://bradygaster.github.io/squad/docs/features/error-recovery/)
-- [Error recovery skill](https://github.com/bradygaster/squad/blob/v1.1.0/templates/skills/error-recovery/SKILL.md)
-- [Iterative retrieval skill](https://github.com/bradygaster/squad/blob/v1.1.0/templates/skills/iterative-retrieval/SKILL.md)
-- [Reviewer protocol skill](https://github.com/bradygaster/squad/blob/v1.1.0/templates/skills/reviewer-protocol/SKILL.md)
-- [Ralph circuit-breaker template](https://github.com/bradygaster/squad/blob/v1.1.0/templates/ralph-circuit-breaker.md)
-- [SDK rate-limiting module](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-sdk/src/ralph/rate-limiting.ts)
-- [CLI triage command help/source](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-cli/src/cli/commands/watch/index.ts)
-- [Coordinator prompt](https://github.com/bradygaster/squad/blob/v1.1.0/.github/agents/squad.agent.md)
+- [Error Recovery — Standard Failure Patterns](https://github.github.com/squad/docs/features/error-recovery/)
+- [Error recovery skill](https://github.com/github/squad/blob/v2.0.0/templates/skills/error-recovery/SKILL.md)
+- [Iterative retrieval skill](https://github.com/github/squad/blob/v2.0.0/templates/skills/iterative-retrieval/SKILL.md)
+- [Reviewer protocol skill](https://github.com/github/squad/blob/v2.0.0/templates/skills/reviewer-protocol/SKILL.md)
+- [Ralph circuit-breaker template](https://github.com/github/squad/blob/v2.0.0/templates/ralph-circuit-breaker.md)
+- [SDK rate-limiting module](https://github.com/github/squad/blob/v2.0.0/packages/squad-sdk/src/ralph/rate-limiting.ts)
+- [CLI triage command help/source](https://github.com/github/squad/blob/v2.0.0/packages/squad-cli/src/cli/commands/watch/index.ts)
+- [Coordinator prompt](https://github.com/github/squad/blob/v2.0.0/.github/agents/squad.agent.md)

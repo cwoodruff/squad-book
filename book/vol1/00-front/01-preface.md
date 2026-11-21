@@ -4,6 +4,8 @@ Most of us met AI coding assistants as a single, helpful voice: a pair programme
 
 That's what Squad is. It's a coordination system built on GitHub Copilot that turns a repository into the home of a persistent, specialized group of AI agents. The team's charters, routing rules, decisions, histories, and skills are plain files in a `.squad/` directory. You can read them, edit them, review them in pull requests, and carry them from project to project.
 
+GitHub Copilot is Squad's default host, and this volume teaches the Copilot path. Squad 2.0 can also project the same team into Claude Code and five other AI coding tools; Volume 2, Part IV covers them.
+
 *Mastering Squad* is a two-volume series that teaches Squad from first principles to production operations. It's deliberately deep. Beyond showing you which command to type, it explains *why* Squad behaves the way it does. It takes you under the hood into the coordinator prompt, the SDK, and the formal specification, so that when something surprising happens you can reason about it instead of guessing.
 
 ## Who This Book Is For {.unnumbered}
@@ -19,7 +21,7 @@ You don't need prior experience with multi-agent systems, MCP, Kubernetes, or Op
 
 ## The Two Volumes {.unnumbered}
 
-The series is split by what you are doing with Squad. **Volume 1: Using Squad** (this book) takes you from installation to confident daily use, teaches your team to learn, and shows how to adopt Squad in your own situation. **Volume 2: Operating and Extending Squad** covers advanced coordination, production operations, internals and extension, the Squad 2.0 preview, and mastery.
+The series is split by what you are doing with Squad. **Volume 1: Using Squad** (this book) takes you from installation to confident daily use, teaches your team to learn, and shows how to adopt Squad in your own situation. **Volume 2: Operating and Extending Squad** covers advanced coordination, production operations, internals and extension, using one team across many hosts, and mastery.
 
 | Part | Title | Chapters | Volume |
 |---|---|---|---|
@@ -30,14 +32,14 @@ The series is split by what you are doing with Squad. **Volume 1: Using Squad** 
 | I | Advanced Coordination | 1–5 | 2 |
 | II | Production Operations | 6–10 | 2 |
 | III | Internals and Extension | 11–17 | 2 |
-| IV | Looking Ahead: Squad 2.0 (Preview) | 18–22 | 2 |
+| IV | Squad 2.0: One Team, Many Hosts | 18–22 | 2 |
 | V | Mastery | 23–25 | 2 |
 
 Each volume numbers its parts and chapters from 1: Volume 1 holds Parts I–IV (Chapters 1–21) and Volume 2 holds Parts I–V (Chapters 1–25). A part or chapter reference without a volume means one in the same volume; when a reference points into the other volume, it says so, for example "Chapter 12 (Volume 2)" or "Volume 2, Part IV". Appendices A–D and F appear in both volumes; Appendix E (Quiz Answers) is generated per volume; Appendices G–J (SDK API, Feature Matrix, Specification Cheat Sheet, Version History) appear only in Volume 2.
 
 ## Which Squad Should I Use? {.unnumbered}
 
-Short version: install **Squad v1.1.0** (npm tag `latest`) for everything except Volume 2, Part IV. Use **v2.0.0-preview.2** (the `insider` tag, with `preview` as an alias) only for Volume 2, Part IV, which covers the multi-client preview and may change before a stable release. Chapter 2 has the full explanation of channels, install methods, and how to switch between them.
+Short version: install **Squad v2.0.0** (npm tag `latest`) and use it for the whole book. Chapter 2 explains the release channels, the install methods, and how to switch between them.
 
 ## Reading Paths {.unnumbered}
 
@@ -47,7 +49,7 @@ You do not have to read straight through. Pick the path that matches your goal.
 - **Daily user.** If you already have a squad running, skim Chapters 1–4, then work through Part II and Part III, and keep Chapters 20–21 handy for your situation.
 - **Operator.** Finish Volume 1 Parts I–II, then move to Volume 2, Parts I and II (Chapters 1–10): state, cross-squad coordination, security, containers, CI/CD, observability, and disaster recovery.
 - **Builder or extender.** After Part II, read Volume 2, Part III (Chapters 11–17) together with Appendix G (Volume 2), the SDK API quick reference.
-- **Squad 2.0 evaluator.** Read Chapters 1–3, then jump to Volume 2, Part IV (Chapters 18–22).
+- **Coming from Squad 1.x.** Read Chapter 2 and Chapter 14, then Chapter 22 (Volume 2), which walks through migrating an existing 1.x squad.
 
 ## Tasktrack Progress Map {.unnumbered}
 
@@ -73,7 +75,7 @@ Every chapter opens with a **Prerequisites** callout naming the chapters you gen
 2. **Concepts**: an in-depth explanation with diagrams.
 3. **Hands-On**: a step you take with the companion project.
 4. **Configuration Reference**: the files, keys, and flags involved.
-5. **Under the Hood**: how the chapter's pinned Squad version implements the feature (v1.1.0, except Volume 2, Part IV, which uses v2.0.0-preview.2).
+5. **Under the Hood**: how Squad v2.0.0 implements the feature.
 6. **Pitfalls and Troubleshooting**
 7. **Summary**, **Exercises**, and a **Quiz** (answers in Appendix E)
 8. **Further Reading**: links to the official documentation pages the chapter covers.
@@ -103,11 +105,17 @@ Each Hands-On section moves Tasktrack forward. Tag your own repository `chNN-sta
 
 > **Warning:** Something that can lose work, leak secrets, or cost money.
 
-> **Preview:** A feature that wasn't in the stable v1.1.0 release when this book was written.
+> **Preview:** A feature that is still experimental in Squad v2.0.0.
+
+> **Note:** Changed in Squad 2.0: a behavior that differs from Squad 1.x, for readers who are upgrading.
 
 ## Versions {.unnumbered}
 
-All parts except Volume 2, Part IV target **Squad v1.1.0** (`latest`). Volume 2, Part IV targets **Squad v2.0.0-preview.2** (`insider`, with `preview` as an alias) and focuses on multi-client support. The 2.0 material is preview-only and may change before a stable release. When you see a difference between the book and your installed version, check `squad --version`, the official docs at <https://bradygaster.github.io/squad/>, and Appendix J (Volume 2), Version History.
+The whole book targets **Squad v2.0.0** (`latest`, released 2026-11-18). When you see a difference between the book and your installed version, check `squad --version`, the official docs at <https://github.github.com/squad/>, and Appendix J (Volume 2), Version History.
+
+## What's New in the Second Edition {.unnumbered}
+
+The first edition was written against Squad v1.1.0, with a preview part on 2.0. This edition moves every chapter to Squad v2.0.0. Removed features (personal squads, consult mode and the `--global` flags) are gone from the teaching text and listed in Chapter 2. Routine upgrades now live in Chapter 14, and Ralph gains bounded and coordinated watch runs in Chapter 9. Volume 2, Part IV is rewritten for the stable release as "Squad 2.0: One Team, Many Hosts". If you still run Squad 1.1, the first edition remains available; it is tagged `book-squad-v1.1.0` in the book's repository.
 
 ## Acknowledgments {.unnumbered}
 

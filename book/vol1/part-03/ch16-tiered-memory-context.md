@@ -4,9 +4,9 @@
 
 ## What You'll Learn
 
-- Use hot, cold, and wiki as a design model for deciding how much history a task should load, while recognizing that the model is advisory in Squad v1.1.0.
+- Use hot, cold, and wiki as a design model for deciding how much history a task should load, while recognizing that the model is advisory in Squad v2.0.0.
 - Capture corrections, successes, and edge cases through `reflect` without turning every exchange into permanent policy.
-- Run `squad nap` safely: preview changes, understand what is compacted or pruned, and inspect the results before committing.
+- Run `squad nap` safely: preview changes, understand what it moves, merges, or deletes (it never summarizes), and inspect the results before committing.
 - Distinguish compaction of persisted team files from loss of conversation context, and separate documented recovery intent from shipped behavior.
 - Build a practical context-hygiene routine that protects important knowledge while keeping each new task focused.
 
@@ -39,7 +39,7 @@ For example, during a Tasktrack feature, hot context could state: “Add due dat
 
 Cold memory is a concise summary of prior sessions: decisions already tried, recurring bugs, abandoned approaches, and unresolved items. It should be loaded when the current request depends on prior work—resuming an interrupted task, debugging a recurrence, or asking “what did we try before?”—not by default for unrelated changes.
 
-The tiered-memory skill proposes a rolling time window (30 days in its example) and approximate size targets, but those are design guidance, not enforced v1.1.0 limits. Your team should make summaries useful before adding a timer. A short, accurate summary beats a rigid token target.
+The tiered-memory skill proposes a rolling time window (30 days in its example) and approximate size targets, but those are design guidance, not enforced v2.0.0 limits. Your team should make summaries useful before adding a timer. A short, accurate summary beats a rigid token target.
 
 ### Wiki: durable, structured reference
 
@@ -57,9 +57,9 @@ flowchart LR
   D --> A
 ```
 
-### Status in Squad v1.1.0
+### Status in Squad v2.0.0
 
-The repository’s `templates/skills/tiered-memory/SKILL.md` labels tiered memory as a design proposal, not a shipped runtime. Its status note says the tier directories, Scribe promotion process, and tier-aware spawn flags are not implemented. In v1.1.0, agents still read the existing history and decision artifacts according to their normal instructions. There is no supported `--include-cold` or `--include-wiki` flag in the CLI help, and no `squad wiki list` command. The sample directory names and size targets in that skill are examples of a possible system—not a promise that `squad init` creates them.
+The repository’s `templates/skills/tiered-memory/SKILL.md` labels tiered memory as a design proposal, not a shipped runtime. Its status note says the tier directories, Scribe promotion process, and tier-aware spawn flags are not implemented. In v2.0.0, agents still read the existing history and decision artifacts according to their normal instructions. There is no supported `--include-cold` or `--include-wiki` flag in the CLI help, and no `squad wiki list` command. The sample directory names and size targets in that skill are examples of a possible system—not a promise that `squad init` creates them.
 
 This boundary is important: a design can be useful today without being a feature you can execute. You can manually organize notes into current files, but do not write automation that depends on tier switches until the runtime contract exists. If Squad later ships the feature, verify the paths and flags for that release and migrate intentionally.
 
@@ -106,7 +106,7 @@ A useful context audit asks three questions about each paragraph: would an agent
 
 ## `squad nap`: File-Level Context Hygiene
 
-Squad v1.1.0 provides `squad nap`, a deterministic maintenance pass over selected `.squad/` artifacts. Its CLI supports:
+Squad v2.0.0 provides `squad nap`, a deterministic maintenance pass over selected `.squad/` artifacts. It moves old content into archive files, merges the decision inbox, and deletes old logs. It does not summarize anything, and it never runs on its own. Its CLI supports:
 
 ```bash
 squad nap --dry-run
@@ -120,12 +120,16 @@ The implementation’s work is specific:
 
 | Target | Trigger / rule | Action |
 |---|---|---|
-| Agent `history.md` | File exceeds 15 KiB; enough `##` sections exist | Preserve the core context section and newest 5 sections normally, newest 3 in deep mode; append older sections to `history-archive.md` |
+| Agent `history.md` | File exceeds 15 KiB; more `##` sections than the keep count | Preserve the text before the first `##`, the `## Core Context` section, and the newest 5 other sections (3 in deep mode); move older sections word for word to `history-archive.md` |
 | `.squad/orchestration-log/` and `.squad/log/` | File modification time older than 7 days | Delete old files |
 | `.squad/decisions/inbox/` | Non-hidden ordinary files are present | Append their contents to `decisions.md`, then remove the inbox file |
-| `.squad/decisions.md` | File exceeds 20 KiB | Archive dated entries older than 30 days first; if none are old, use a size-based fallback while preserving undated entries |
+| `.squad/decisions.md` | File exceeds 20 KiB | Archive dated entries older than 30 days to `decisions-archive.md` first; if none are old, move the oldest dated entries until the file fits; undated entries always stay. Skipped when git ignores the archive file and does not track it |
 
-The decision archival logic uses Markdown heading boundaries and is fence-aware, so a `###` heading inside a fenced example is not supposed to split an entry. It preserves undated entries because they may be foundational. Before deleting the active copy, the implementation checks whether the archive destination can be committed and verifies the archive entry count after appending. These are safeguards against silently losing an entry when an archive file would be ignored or an append failed.
+The decision archival logic uses Markdown heading boundaries and is fence-aware, so a `###` heading inside a fenced example is not supposed to split an entry. It preserves undated entries because they may be foundational. Before deleting the active copy, the implementation checks whether the archive destination can be committed and verifies the archive entry count after appending. These are safeguards against silently losing an entry when an archive file would be ignored or an append failed. In 2.0 history compression follows the same two rules: it refuses to trim a committed `history.md` into a `history-archive.md` that git ignores and does not track, and it counts `##` headings in the archive after the append before it rewrites the source.
+
+One structural caveat matters for how you write history. Nap splits only on `##` headings, so entries written as `###` headings under a single `## Learnings` section count as one section. That section is never moved, however large it grows. If you want nap to be able to archive old learnings, give each dated batch its own `##` heading.
+
+> **Note:** Changed in Squad 2.0: the context-hygiene docs used to say a nap "summarizes" memory and that `/compact` was the same command. Neither was true of the code, and the 2.0 docs now match it: `squad nap` archives and deletes, and `/compact` belongs to GitHub Copilot CLI.
 
 `--dry-run` is the right first step because the operation is not purely a summarizer: it can remove old logs, merge inbox content, and change which decisions remain in the active file. A dry run reports intended operations but does not invoke an LLM to judge relevance. Inspect the result, check the current files, and commit or back up your state before a production cleanup.
 
@@ -146,9 +150,11 @@ flowchart TD
 
 The CLI’s history operation divides files by `##` headings and keeps a fixed number of the newest sections. It appends older sections as text to an archive. That is not the same as a language model producing a semantic summary of all older history. Likewise, inbox cleanup appends file contents; it is not necessarily a conflict-resolution ceremony. Review content and avoid leaving ambiguous decisions for the merge pass.
 
+Summarizing is a separate job that an AI agent does. You can ask the coordinator to summarize one member's history, and the result depends on the model. Scribe does not do it: its charter limits it to merging decisions. Likewise, "team, take a nap" in a chat is just a request to the coordinator. No built-in rule maps that phrase to `squad nap`, so the coordinator decides what to do. When you want the predictable file operations described above, run `squad nap` yourself.
+
 The internal `.nap-journal` marker signals a previously interrupted nap. On a subsequent run the command warns and continues; it does not claim a transactional rollback. A `finally` block removes the journal after the current attempt, but interrupted writes may still need inspection. Check both the source and archive if a nap process was terminated unexpectedly.
 
-The v1.1.0 interactive shell exposes `/nap` with `--deep` and `--dry-run`. The context-hygiene feature page refers to `/compact` as equivalent to `squad nap`; that alias is not present in the v1.1.0 shell command list. Use the actual installed command surface rather than relying on that page’s wording. There is also no `squad reskill` CLI command in the stable help. A `reskill` skill/template can describe a review practice, but it is not the same as a built-in command that automatically validates every skill.
+The Squad interactive shell (`squad` with no arguments) exposes `/nap` with `--deep` and `--dry-run`. There is no `/compact` alias in that shell. GitHub Copilot CLI has its own `/compact`, which shortens the current chat session and does not touch `.squad/` files; in Copilot CLI (`copilot --agent squad`), run `squad nap` from a terminal instead. There is also no `squad reskill` CLI command in the stable help. A `reskill` skill/template can describe a review practice, but it is not the same as a built-in command that automatically validates every skill.
 
 ### Record enough recovery context to be useful
 
@@ -160,7 +166,7 @@ Keep recovery notes consistent with the system of record. A checkpoint may point
 
 Conversation compaction can remove or summarize earlier turns. The compaction-recovery reference page describes a coordinator checkpoint at `.squad/sessions/{session-id}.json` with information such as the last completed step, next action, workflow phase, and brief context. Its intent is sound: after context loss, resume from a durable breadcrumb, verify completed work against the orchestration log, and do not replay steps that already ran.
 
-However, the recovery reference is not corroborated by the v1.1.0 implementation. A repository search finds the described checkpoint behavior in the documentation, not a coordinator writer/reader that persists the specified file after every agent batch. The page also labels the path `.json` but shows a Markdown-shaped example, which means the representation is illustrative rather than a usable schema. Treat it as a recovery design, not as a guaranteed automatic capability of the stable release.
+However, the recovery reference is not corroborated by the v2.0.0 implementation. A repository search finds the described checkpoint behavior in the documentation, not a coordinator writer/reader that persists the specified file after every agent batch. The page also labels the path `.json` but shows a Markdown-shaped example, which means the representation is illustrative rather than a usable schema. Treat it as a recovery design, not as a guaranteed automatic capability of the stable release.
 
 This distinction does not mean recovery is impossible. It means you must rely on the state that actually exists: the current task prompt, tracked files and diffs, team history/decisions, and any orchestration log or host-provided session history that is available. If you create a manual checkpoint, make it unambiguous and consistent with your project’s own contract. Do not fabricate a session id, claim a checkpoint was written, or blindly repeat issue creation, merges, deployments, or other non-idempotent operations just because the prior context is missing.
 
@@ -218,40 +224,42 @@ Use your Tasktrack copy from Chapter 15. This exercise practices low-risk hygien
 | `squad nap` | Default maintenance pass | Applies history compression, old-log pruning, inbox merge, and decision archival as applicable |
 | `squad nap --dry-run` | Preview only | Reported after-metrics are estimates |
 | `squad nap --deep` | Keep 3 newest history sections instead of 5 | Does not mean “perform semantic deep learning” |
-| `/nap` | Interactive-shell equivalent | `/compact` is not listed as a v1.1.0 shell command |
-| History threshold | 15 KiB | Based on file size; compression only proceeds if there are sections beyond the keep count |
-| Decision threshold | 20 KiB | Archive dated entries older than 30 days, then use count/size fallback if necessary |
+| `/nap` | Squad interactive-shell equivalent | Copilot CLI's `/compact` shortens the chat session; it is not a nap |
+| History threshold | 15 KiB | Based on file size; compression only proceeds if there are `##` sections beyond the keep count; `###` entries under one `##` count as one section |
+| Decision threshold | 20 KiB | Archive dated entries older than 30 days, then use count/size fallback if necessary; skipped when the archive is git-ignored and untracked |
 | Log age | 7 days | Applies to files under orchestration-log and log directories |
 | `.nap-journal` | Interrupted-run marker | A later run warns and continues; inspect the state after interruption |
 | Hot / cold / wiki | Design model only | No stable tier-aware directory/flag contract |
 | `reflect` | Installed skill guidance | Not a dedicated CLI command or automatic policy editor |
-| `.squad/sessions/{session-id}.json` | Documentation-described checkpoint | Not verified as an automatic v1.1.0 write/read path |
+| `.squad/sessions/{session-id}.json` | Documentation-described checkpoint | Not verified as an automatic v2.0.0 write/read path |
 
 ## Under the Hood
 
 `packages/squad-cli/src/cli/core/nap.ts` implements the file operations. It gathers byte metrics, scans agent history sections, prunes files by modification time, merges inbox entries, and archives old decisions. `runNap()` and `runNapSync()` share the behavior for CLI and interactive use. The nap journal warns about interruption but is not a transaction log containing enough information to roll back every partially completed action.
 
-An important history safeguard is the preservation of the top-level core context section and the newest configured count of Markdown sections. The behavior is structural, not semantic. The decision archiver uses a heading scanner from the SDK and checks that archive output is committable and contains the expected number of entries before trimming the active source. That is a valuable file-integrity pattern: never remove the source first and hope the archive write succeeded.
+An important history safeguard is the preservation of the top-level core context section and the newest configured count of Markdown sections. The behavior is structural, not semantic. The decision archiver uses a heading scanner from the SDK and checks that archive output is committable and contains the expected number of entries before trimming the active source. In 2.0 `compressHistory()` applies the same checks to `history-archive.md`, and it skips a history whose archive would receive no content. That is a valuable file-integrity pattern: never remove the source first and hope the archive write succeeded.
 
-The tiered-memory and reflect templates live under `templates/skills/`. In v1.1.0, their presence makes guidance available; it does not establish that the coordinator automatically creates tier files, promotes cold entries, captures reflections, or alters source behavior without approval. The compaction-recovery reference similarly describes a checkpoint flow but has no matching checkpoint implementation found in the tag. When reading docs and source together, describe the implementation the reader can use and label proposal or documentation-only behavior honestly.
+The tiered-memory and reflect templates live under `templates/skills/`. In v2.0.0, their presence makes guidance available; it does not establish that the coordinator automatically creates tier files, promotes cold entries, captures reflections, or alters source behavior without approval. The compaction-recovery reference similarly describes a checkpoint flow but has no matching checkpoint implementation found in the tag. When reading docs and source together, describe the implementation the reader can use and label proposal or documentation-only behavior honestly.
 
 ## Pitfalls and Troubleshooting
 
 - **Treating all old material as useless:** age is a proxy, not a quality score. Keep important architecture and safety facts accessible in active files or deliberate references.
-- **Assuming the wiki folders exist:** the tiered-memory skill proposes paths; `squad init` v1.1.0 does not guarantee them.
+- **Assuming the wiki folders exist:** the tiered-memory skill proposes paths; `squad init` in v2.0.0 does not create them.
 - **Loading every tier on every task:** that defeats the model’s purpose. Use cold history and reference docs selectively.
 - **Overwriting recent history with a short summary:** ordinary `nap` keeps five `##` sections, but manually review that the retained sections carry enough meaning.
 - **Running `--deep` by default:** the option is more aggressive; choose it only after reviewing the preview and active history.
 - **Thinking `--dry-run` changes files:** it should estimate actions only. Check status and diff to verify.
 - **Losing decisions when inbox items are merged:** nap appends inbox contents; it is not necessarily a full semantic conflict resolver. Review duplicate or contradictory entries.
-- **Assuming context compaction triggers `nap`:** model-level conversation compaction and filesystem cleanup are separate.
-- **Trusting a missing checkpoint path:** the documented session checkpoint is not verified in the v1.1.0 writer/reader code. Recover from observable state, not from an assumed file.
+- **Assuming context compaction triggers `nap`:** model-level conversation compaction (including Copilot CLI's `/compact`) and filesystem cleanup are separate.
+- **Expecting a chat request to run nap:** "team, take a nap" asks the coordinator, which may do something different. Run `squad nap` when you want its exact behavior.
+- **Writing every learning under one `## Learnings` heading:** nap treats the whole block as one section and never archives it. Use a `##` heading per dated batch.
+- **Trusting a missing checkpoint path:** the documented session checkpoint is not verified in the v2.0.0 writer/reader code. Recover from observable state, not from an assumed file.
 - **Making reflections binding too early:** proposals need evidence and approval. A single preference observation should not rewrite shared rules.
 - **Using `reskill` as a command:** a skill or prompt may guide a reskill review; stable CLI help contains no `squad reskill` subcommand.
 
 ## Summary
 
-Tiered memory teaches a valuable loading discipline: hot context for the current task, cold history when the past matters, and wiki-style reference when stable domain knowledge is needed. In v1.1.0, this remains a design-level model rather than a runtime-enforced storage system. `reflect` is a skill for noticing and proposing evidence-backed learning, not an automatic policy writer. `squad nap` is the implemented file-level hygiene tool; preview it, understand its structural rules, and inspect its output. Compaction recovery should be treated as a deliberate verification process because the cited automatic checkpoint flow is documented but not implemented in the stable source.
+Tiered memory teaches a valuable loading discipline: hot context for the current task, cold history when the past matters, and wiki-style reference when stable domain knowledge is needed. In v2.0.0, this remains a design-level model rather than a runtime-enforced storage system. `reflect` is a skill for noticing and proposing evidence-backed learning, not an automatic policy writer. `squad nap` is the implemented file-level hygiene tool; it archives and deletes but never summarizes. Preview it, understand its structural rules, and inspect its output. Compaction recovery should be treated as a deliberate verification process because the cited automatic checkpoint flow is documented but not implemented in the stable source.
 
 ## Exercises
 
@@ -265,15 +273,15 @@ Tiered memory teaches a valuable loading discipline: hot context for the current
 
 1. What is the difference between conversation-context compaction and `squad nap`?
 2. What are hot, cold, and wiki memory intended to represent?
-3. Does Squad v1.1.0 automatically implement tier-aware flags such as `--include-cold`?
+3. Does Squad v2.0.0 automatically implement tier-aware flags such as `--include-cold`?
 4. When is a reflection HIGH confidence, and why should you avoid capturing every message?
 5. What does `squad nap --dry-run` do?
 6. How many history sections does ordinary nap retain, and how does `--deep` differ?
-7. Is the automatic session checkpoint at `.squad/sessions/{session-id}.json` verified as shipped in v1.1.0?
+7. Is the automatic session checkpoint at `.squad/sessions/{session-id}.json` verified as shipped in v2.0.0?
 
 ## Further Reading
 
-- [Context hygiene](https://bradygaster.github.io/squad/docs/features/context-hygiene/)
-- [Reflect](https://bradygaster.github.io/squad/docs/features/reflect/)
-- [Tiered memory](https://bradygaster.github.io/squad/docs/features/tiered-memory/)
-- [Compaction recovery](https://bradygaster.github.io/squad/docs/reference/compaction-recovery/)
+- [Context hygiene](https://github.github.com/squad/docs/features/context-hygiene/)
+- [Reflect](https://github.github.com/squad/docs/features/reflect/)
+- [Tiered memory](https://github.github.com/squad/docs/features/tiered-memory/)
+- [Compaction recovery](https://github.github.com/squad/docs/reference/compaction-recovery/)

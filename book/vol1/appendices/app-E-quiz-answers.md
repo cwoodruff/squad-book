@@ -16,27 +16,27 @@ This appendix collects the answers to the chapter quizzes in this volume (Chapte
 
 1. The install script, Homebrew cask, WinGet package, and direct release bundle vendor Node.js. An npm install does not; it needs Node 22.5+.
 2. It pins the release tag to install; the default is the latest stable release.
-3. `insider` carries the 2.0 preview (with `preview` as an alias); `latest` is stable (v1.1.0).
+3. `latest` is stable (v2.0.0), `preview` carries release candidates, and `insider` carries development snapshots.
 4. False. `squad upgrade` refreshes project-managed files; `squad upgrade --self` updates the CLI package itself.
 5. GitHub Copilot CLI and VS Code with GitHub Copilot.
 6. VS Code uses the session model selected in the model picker; the per-spawn model selection documented for the CLI is not available there.
-7. No. The implementation documents doctor as diagnostic and exits 0 even when checks fail, so a human should read the report.
+7. Yes. Since Squad 2.0, `squad doctor` returns a failing exit status when a check fails (and when no squad exists in the directory), so CI can rely on it. Still read the report to see which check failed.
 8. `squad.config.ts` (or `squad/index.ts`). `squad build --check` validates that the generated files match what is on disk without writing anything, which makes it suitable for CI drift checks.
 
 ## Chapter 3: Your First Session, Annotated
 
-1. **False.** In the observed v1.1.0 flow, `squad init` scaffolds local files; the coordinator proposes a roster when Copilot starts Squad.
+1. **False.** In the observed v2.0.0 flow with the default Copilot host, `squad init` scaffolds local files; the coordinator proposes a roster when Copilot starts Squad.
 2. `.github/agents/squad.agent.md` defines the coordinator instructions. `team.md` is roster/context state.
 3. There are no specialist provenance records yet. This is expected in a fresh scaffold before the first roster cast.
 4. No. `squad init` does not install Tasktrack API dependencies or rewrite its feature code.
 5. `npm test` invokes Node’s test runner through the sample package script (`node --test api/test/`).
-6. Examples include `--no-workflows`, `--no-vscode-default`, `--global`, `--sdk`, `--roles`, `--preset <name>`, and `--state-backend <type>`.
+6. Examples include `--no-workflows`, `--no-vscode-default`, `--client <list>`, `--sdk`, `--roles`, `--preset <name>`, and `--state-backend <type>`.
 
 ## Chapter 4: Meet the Team: Casting, Charters, and Roles
 
 1. The charter defines an agent’s role, expertise, ownership, methods, voice, and boundaries. History is that agent’s accumulated cross-session context and learnings.
-2. The v1.1.0 CLI reported 21.
-3. **Scribe** merges durable decisions/logs; **Ralph** monitors work queues; **Rai** reviews Responsible AI concerns; **Fact Checker** verifies claims and challenges assumptions.
+2. The v2.0.0 CLI reported 21.
+3. **Scribe** merges durable decisions/logs; **Ralph** monitors work queues; **Rai** reviews Responsible AI concerns; **Fact Checker** verifies claims and challenges assumptions. Scribe and Ralph are always present; Rai and Fact Checker are optional built-ins in Squad 2.0, added to an existing roster with `squad roster add <rai|fact-checker|all>`.
 4. Squad pauses and tells the user a human needs to act. The user relays the request externally and later reports the response to Squad; stale reminders may prompt follow-up.
 5. No. Presets capture reusable agent charters and roster composition, not the project’s decisions or skills.
 6. `usual-suspects`, `oceans-eleven`, and `custom`.
@@ -49,9 +49,9 @@ This appendix collects the answers to the chapter quizzes in this volume (Chapte
 3. Every `needs:*` value on the issue must be present in the manifest's `capabilities` array.
 4. The issue passes through the opt-in capability filter; an absent manifest does not block it.
 5. Direct is no-spawn. Lightweight still spawns one agent with reduced context.
-6. Personal-agent consultation (personal expert advises, project agent executes) and the CLI `squad consult` workflow (isolated copy of a personal squad in an external project, with optional extraction).
+6. False. All hosts read the same `.squad/routing.md`; host projections change how the coordinator is delivered, not where routing comes from.
 7. No. The inspected `SquadCoordinator.handleMessage()` does not call `selectResponseTier()`.
-8. `--clean` deletes the project `.squad/` directory. Since consult also adds the agent prompt to `.git/info/exclude` and creates `.github/agents/squad.agent.md`, verify those separate local artifacts rather than assuming a total uninstall.
+8. It fails with "Unknown command: consult". Consult mode and `squad extract` were removed in Squad 2.0, along with personal squads.
 
 ## Chapter 6: The Parallel Work Model
 
@@ -69,7 +69,7 @@ This appendix collects the answers to the chapter quizzes in this volume (Chapte
 2. GitHub interprets and renders the issue-form YAML. Squad later reads the created issue through its platform adapter.
 3. Acceptance criteria should name observable behavior and a way to verify it, such as a test case or expected API response. They should distinguish required outcomes from non-goals.
 4. No. Namespaced labels are ordinary GitHub labels. Exclusivity requires a workflow or another enforcing process.
-5. The v1.1.0 `--board` capability makes best-effort `gh project` calls for lifecycle status and certain closed/open mismatches. It does not create a complete board, implement arbitrary label/custom-field mappings, or provide general two-way drag-and-drop synchronization.
+5. The v2.0.0 `--board` capability makes best-effort `gh project` calls for lifecycle status and certain closed/open mismatches. It does not create a complete board, implement arbitrary label/custom-field mappings, or provide general two-way drag-and-drop synchronization.
 6. It assumes GitHub Agentic Workflows (`gh-aw`) and its dispatcher, implementation-worker, and advisory-reviewer workflows, plus the associated structured artifact conventions.
 7. No. Issues do not isolate working directories. Use worktrees or serialize overlapping changes.
 
@@ -78,11 +78,11 @@ This appendix collects the answers to the chapter quizzes in this volume (Chapte
 1. The `GitHubAdapter` and `AzureDevOpsAdapter`.
 2. `User Story`.
 3. The Azure CLI (`az`), including its Azure DevOps extension and authenticated session.
-4. They label GitLab Issues Mode experimental and warn that behavior may change.
-5. No. `squad init --help` in v1.1.0 does not list `--introspect`.
+4. They label GitLab Issues Mode "planned, not shipped": Squad 2.0 has no GitLab adapter, and the flow works only if the coordinator improvises with `glab` ad hoc.
+5. No. `squad init --help` in v2.0.0 does not list `--introspect`.
 6. `ado.areaPath`.
-7. No. GitLab is not recognized as a distinct supported platform in the v1.1.0 detector/factory; an unrecognized remote can default to GitHub.
-8. The `PlatformAdapter` abstraction normalizes work items and pull requests. No: the PRD records design intent; verify the v1.1.0 adapter implementation and its CLI/auth behavior before depending on a proposed operation.
+7. No. GitLab is not recognized as a distinct supported platform in the v2.0.0 detector/factory; an unrecognized remote can default to GitHub.
+8. The `PlatformAdapter` abstraction normalizes work items and pull requests. No: the PRD records design intent; verify the v2.0.0 adapter implementation and its CLI/auth behavior before depending on a proposed operation.
 
 ## Chapter 9: Ralph, the Loop, and Scheduling
 
@@ -97,10 +97,10 @@ This appendix collects the answers to the chapter quizzes in this volume (Chapte
 
 ## Chapter 10: PRD Mode, Streams, and Fleet Dispatch
 
-1. No. v1.1.0 offers PRD ingestion, analysis, and decomposition by conversation; it does not provide a dedicated PRD authoring command or first-class persistent PRD backlog.
+1. No. v2.0.0 offers PRD ingestion, analysis, and decomposition by conversation; it does not provide a dedicated PRD authoring command or first-class persistent PRD backlog.
 2. `SQUAD_TEAM` has highest precedence, followed by `.squad-workstream`, single-entry automatic selection, then no active SubSquad.
 3. No. It is advisory; it does not enforce filesystem access.
-4. The v1.1.0 resolver reads `.squad/workstreams.json`; the feature page and some comments say `.squad/streams.json`.
+4. The v2.0.0 resolver reads `.squad/workstreams.json`; the feature page and some comments say `.squad/streams.json`.
 5. Read-heavy analysis such as triage, review, audit, research, and investigation, with explicit no-file-write/no-branch behavior.
 6. Enable the `fleet-dispatch` watch capability in addition to selecting `fleet` or `hybrid` as the dispatch mode.
 7. The published result came from a particular six-issue read-only measurement and is dominated by avoiding multiple cold starts. Workload, model startup, and issue complexity vary; write-heavy work is not safely parallelized the same way.
@@ -141,11 +141,11 @@ This appendix collects the answers to the chapter quizzes in this volume (Chapte
 1. No. Cleanup is opt-in as a watch capability.
 2. No. The implementation deletes matching old entries rather than archiving them.
 3. The date prefix in the filename, compared to `maxAgeDays`; the filename must begin with `YYYY-MM-DD`.
-4. No. The v1.1.0 self-upgrade path installs the CLI and returns; run the project upgrade separately.
+4. No. The v2.0.0 self-upgrade path installs the CLI and returns; run the project upgrade separately.
 5. Manifest-listed Squad-owned templates are refreshed. Team state such as histories and decisions is preserved.
-6. No. The CLI warns and overwrites; keep an independent backup.
+6. Yes, in Squad 2.0. A customized built-in skill is copied to a verified `.local-backup` before it is overwritten. Keep version control as well, because a later upgrade can replace that backup.
 7. It refuses if `.ai-team/` does not exist or if `.squad/` already exists.
-8. The dispatcher performs migration and self-install actions before the project dry-run logic. Those options are mutating and are not simulated by `--dry-run`.
+8. The dispatcher performs `--migrate-directory` before the project dry-run logic, so the rename is real and not simulated. `squad upgrade --self --dry-run` is safe: it prints the package manager, target version and install command, and installs nothing.
 
 ## Chapter 15: Memory and Knowledge
 
@@ -155,17 +155,17 @@ This appendix collects the answers to the chapter quizzes in this volume (Chapte
 4. No. SEM is an internal draft; `LocalMemoryStore` writes a YAML-frontmatter file with a different schema.
 5. The entry is retrieved when relevant rather than automatically loaded into every prompt. It does not mean the entry is unavailable or deleted.
 6. No. Local search performs case-insensitive substring matching over the title and file content.
-7. No. The stable SDK marks native `provider=copilot` as unavailable. A separate host-injected adapter requires an actual host-supplied client and opt-in configuration.
+7. No. The v2.0.0 SDK marks native `provider=copilot` as unavailable. A separate host-injected adapter requires an actual host-supplied client and opt-in configuration.
 
 ## Chapter 16: Tiered Memory, Reflect, and Context Hygiene
 
 1. Model context compaction shortens the active conversation; `squad nap` changes persisted `.squad/` files.
 2. Hot is current task context, cold is summarized prior-session history, and wiki is durable structured reference knowledge loaded selectively.
-3. No. Tier-aware flags and paths are design guidance, not an enforced v1.1.0 runtime contract.
+3. No. Tier-aware flags and paths are design guidance, not an enforced v2.0.0 runtime contract.
 4. HIGH confidence commonly comes from a clear correction, directive, important architectural insight, or root-cause fix. Capturing every message creates noise and can turn one-off details into misleading rules.
 5. It previews intended cleanup actions and estimates before/after metrics without modifying state files.
 6. Ordinary nap keeps the newest five sections; `--deep` keeps the newest three, in addition to the core context section.
-7. No. The reference page describes the checkpoint flow, but the v1.1.0 source does not verify an automatic writer/reader for that path and schema.
+7. No. The reference page describes the checkpoint flow, but the v2.0.0 source does not verify an automatic writer/reader for that path and schema.
 
 ## Chapter 17: Skills
 
@@ -173,7 +173,7 @@ This appendix collects the answers to the chapter quizzes in this volume (Chapte
 2. Each trigger substring match adds 0.5 points, with the trigger contribution capped at 0.7. A matching role adds 0.3; total score is capped at 1.0.
 3. No. Confidence is frontmatter metadata and does not affect the registry’s score or ordering.
 4. The APM-oriented CLI reads lowercase `skill.md`. The SDK loader reads uppercase `SKILL.md`.
-5. No. The v1.1.0 browser obtains package bytes through its fetcher and returns an install result; it does not unpack or write them to the target directory.
+5. No. The v2.0.0 browser obtains package bytes through its fetcher and returns an install result; it does not unpack or write them to the target directory.
 6. The marketplace security module validates remote agent definitions, including charter injection patterns, requested tools, possible PII, permission language, source, and charter presence. It is not a scanner for arbitrary skill Markdown or scripts.
 7. No. Parsing only checks format and constructs metadata/content. It does not establish safety or trustworthiness of executable code.
 

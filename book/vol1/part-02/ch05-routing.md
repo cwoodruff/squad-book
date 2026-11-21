@@ -8,16 +8,16 @@
 - Configure routing rules for Tasktrack's API and web areas without confusing examples with filesystem enforcement.
 - Understand explicit agent addressing, work-type matches, skill-aware routing, and fallback behavior.
 - Use machine capability requirements to keep Ralph from claiming issues on an unsuitable machine.
-- Distinguish personal-agent consult behavior from the CLI's project-level consult mode.
+- Know that routing comes from the same `.squad/routing.md` whatever host runs the coordinator.
 - Choose among Direct, Lightweight, Standard, and Full without assuming response-time promises.
 
-> **Preview (Squad 2.0):** The personal-squad consult behavior and the `squad consult` mode described here were removed. The coordinator template is rendered for the selected host, while routing still assigns work from the shared project team. See Chapters 18 (Volume 2) and 41 (Volume 2) for the changed coordinator and host boundaries; the [release notes](https://github.com/bradygaster/squad/blob/v2.0.0-preview.2/docs/src/content/docs/whatsnew.md) list the removed 1.x profile features.
+> **Note:** Changed in Squad 2.0: consult mode (`squad consult`, `squad extract`) and the personal agents it relied on were removed. Routing still assigns work from the shared project team; see the [release notes](https://github.com/github/squad/blob/v2.0.0/docs/src/content/docs/whatsnew.md).
 
 ## Routing answers WHO; mode answers HOW
 
 Routing begins by deciding who should take responsibility for a request. Response mode comes after that: it determines how much context and parallelism to spend. This ordering avoids a common category error. “Send this to Backend” names an owner; “use Lightweight” asks for a smaller dispatch. Neither replaces the other.
 
-In the coordinator instructions, the default is one accountable specialist selected using `.squad/routing.md`. Additional participants are appropriate when the outcomes can be separated or the task has a bounded dependency. The prompt explicitly warns against launching a crowd merely because the user said “Team.” It also specifies that a personal agent can advise while a project agent carries out changes. Later sections in this chapter unpack these distinctions.
+In the coordinator instructions, the default is one accountable specialist selected using `.squad/routing.md`. Additional participants are appropriate when the outcomes can be separated or the task has a bounded dependency. The prompt explicitly warns against launching a crowd merely because the user said “Team.” Later sections in this chapter unpack these distinctions.
 
 ```mermaid
 flowchart TD
@@ -40,7 +40,7 @@ This is the prompt's decision model, not a universal hard-coded algorithm. In a 
 
 ### Explicit names
 
-A direct instruction such as “Backend, fix the API validation” is a strong routing signal. The v1.1.0 coordinator prompt says to route a named specialist directly. The CLI shell parser recognizes `/command` input, `@AgentName message`, and `AgentName, message` syntax when the name matches the known roster. Unknown names do not become valid agents automatically; the parser passes the text onward to the coordinator. A known `@Agent` without a message is also treated as coordinator input rather than a blank task.
+A direct instruction such as “Backend, fix the API validation” is a strong routing signal. The v2.0.0 coordinator prompt says to route a named specialist directly. The CLI shell parser recognizes `/command` input, `@AgentName message`, and `AgentName, message` syntax when the name matches the known roster. Unknown names do not become valid agents automatically; the parser passes the text onward to the coordinator. A known `@Agent` without a message is also treated as coordinator input rather than a blank task.
 
 The SDK router has its own explicit-mention behavior: an `@name` is only honored if it occurs among agents appearing in the compiled routing rules, and `@coordinator` is deliberately not treated as an agent. That has an important operational implication: an agent can exist in the roster while a given SDK router does not recognize it as a valid destination unless the compiled router has it. Do not equate the prompt's roster lookup with the SDK's own known-name calculation.
 
@@ -67,11 +67,11 @@ The SDK's `config/routing.ts` compiler is more literal. It accepts typed work-ty
 
 A **skill** is reusable task knowledge—for example, a Tasktrack API conventions guide. The coordinator prompt asks the host to scan designated skill directories and attach the highest-precedence matching skill before spawning. A **machine capability** describes what an execution environment can do: browser automation, GPU access, a particular account, or an installed tool. Skills help choose or inform a person-like agent; machine capabilities qualify whether a machine should claim a work item.
 
-The docs article on capability routing describes Ralph's label filter. An issue may have `needs:gpu` or `needs:docker`; each required capability must be present on the current machine. Requirements combine conjunctively: if an issue has `needs:gpu` and `needs:windows`, a worker with only one of them must skip it. The system is opt-in: no `needs:*` labels means any machine passes; in v1.1.0 code, no manifest also passes issues through. Filtering does not provision the missing hardware or send the issue to a central scheduler. It lets workers self-select when Ralph evaluates work.
+The docs article on capability routing describes Ralph's label filter. An issue may have `needs:gpu` or `needs:docker`; each required capability must be present on the current machine. Requirements combine conjunctively: if an issue has `needs:gpu` and `needs:windows`, a worker with only one of them must skip it. The system is opt-in: no `needs:*` labels means any machine passes; in v2.0.0 code, no manifest also passes issues through. Filtering does not provision the missing hardware or send the issue to a central scheduler. It lets workers self-select when Ralph evaluates work.
 
 The SDK declares common identifiers such as `browser`, `gpu`, `personal-gh`, `emu-gh`, `azure-cli`, `docker`, `onedrive`, and `teams-mcp`, but the code allows custom `needs:X` values. At runtime, requirements are compared to the `capabilities` array in a manifest. The supported lookup locations in code are `.squad/machine-capabilities.json` in the team root, then the Squad home directory (`~/.squad/` by default, respecting `SQUAD_HOME`). In `squad-per-pod` deployment mode, a pod-specific manifest is tried first when both `SQUAD_DEPLOYMENT_MODE=squad-per-pod` and `SQUAD_POD_ID` are set.
 
-The capability-routing docs show a bare JSON array at the project root, but the SDK implementation reads a manifest object with a `capabilities` property. The template's object example is the compatible shape. This is a material docs/code discrepancy: use the object form, not a root-level array, with v1.1.0. `SQUAD_DEPLOYMENT_MODE` defaults to `agent-per-node`; unknown or absent mode values do not enable pod-specific behavior.
+The capability-routing docs show a bare JSON array at the project root, but the SDK implementation reads a manifest object with a `capabilities` property. The template's object example is the compatible shape. This is a material docs/code discrepancy: use the object form, not a root-level array, with v2.0.0. `SQUAD_DEPLOYMENT_MODE` defaults to `agent-per-node`; unknown or absent mode values do not enable pod-specific behavior.
 
 ```mermaid
 flowchart LR
@@ -110,31 +110,15 @@ The docs page supplies approximate times, but actual latency depends on the clie
 
 The SDK's exported `selectResponseTier()` is a separate implementation that uses `direct`, `lightweight`, `standard`, and `full` tier names. It checks a configured tier override first, then full-task keywords, direct patterns, lightweight patterns, a history hint, and a standard default. It describes suggested model tier, maximum agent count, and timeout: Direct = 0 agents/0 seconds; Lightweight = 1/30 seconds; Standard = 1/120 seconds; Full = up to 5/300 seconds. A current load of at least four caps Full at Standard; at least six caps Standard at Lightweight. These values are returned as policy data; they are not proof that the surrounding client enforces a wall-clock timeout or that the coordinator will spawn exactly that many agents.
 
-An important v1.1.0 boundary: the module exports `selectResponseTier()`, but `SquadCoordinator.handleMessage()` does not call it. The SDK coordinator's shown dispatch pipeline checks a direct-response handler and otherwise derives `single`, `multi`, or `fallback` from the matched agent list. The prompt's response-mode selection and the SDK helper should therefore not be conflated. The helper is an SDK capability; a host must wire it into a path before it determines that path's behavior.
+An important boundary, still true in v2.0.0: the module exports `selectResponseTier()`, but `SquadCoordinator.handleMessage()` does not call it. The SDK coordinator's shown dispatch pipeline checks a direct-response handler and otherwise derives `single`, `multi`, or `fallback` from the matched agent list. The prompt's response-mode selection and the SDK helper should therefore not be conflated. The helper is an SDK capability; a host must wire it into a path before it determines that path's behavior.
 
 The helper's heuristic order makes edge cases predictable. A matching configured tier wins first. Full-pattern checks then happen before Direct checks, so a complex-looking request is not reduced to Direct just because it ends in a question mark. The Full examples include broad rewrites, feature/module builds, explicit multi-agent or multi-file wording, security-audit language, and “full review/analysis/sweep.” Direct patterns include greetings, selected questions about name/version/status, help or usage requests, and text ending in a question mark. Lightweight patterns include retrieval verbs such as list/show/find/search, status/info/check, and simple rename/move/delete/remove actions. Anything unmatched defaults to Standard. The recent-history condition returns Standard, which is already the default; its comment says “standard+,” but this helper does not upgrade it above Standard.
 
 Load adjustment runs only for tiers passed through the helper's adjustment function. At four active sessions, Full becomes Standard; at six, Standard becomes Lightweight. Explicit configured tier overrides return immediately and bypass that adjustment. These are selection-function details, not necessarily the behavior of the prompt coordinator. This illustrates why “mode selection” needs a code path and context source: an absent `currentLoad` means no load-based change, and the SDK coordinator pipeline shown here supplies neither this context nor a call to the selector.
 
-## Consult is two related workflows
+## One team, any host
 
-“Consult” is used for two related but distinct behaviors in the v1.1.0 prompt and CLI.
-
-### A personal agent advising a project squad
-
-When the user addresses a personal agent by name, the coordinator prompt labels that interaction as consult mode: the personal specialist advises; if its recommendation calls for changes, the appropriate project agent executes them. The prompt's Ghost Protocol says personal agents are read-only with respect to project state and should be transparently identified. This protects the project owner's control of its own work while still allowing you to reuse personal expertise.
-
-### `squad consult` on a project without its own Squad
-
-The CLI command is a separate setup workflow for using your personal squad in an external project. `squad consult --check` previews preconditions, and `squad consult --status` checks whether a project already has consult configuration. Normal `squad consult` requires a personal squad and a Git repository; it refuses a project that already has `.squad/`. It also refuses linked worktrees and directories within an outer repository when `.git/info/exclude` would resolve outside the named project. That protects sibling worktrees from an unintended local ignore rule.
-
-On success, the SDK copies the personal squad into project `.squad/`, writes `config.json` with `consult: true` and its source path, creates staging/session directories, patches the Scribe charter, writes a local `squad.agent.md`, and adds `.squad/` plus that agent file to `.git/info/exclude`. The personal squad remains separate while work happens. The copied project state is the session's workspace.
-
-When finished, `squad extract` is an explicit path back to the personal squad. The CLI reads staged learnings, detects the project's license, lets you select which items to merge, records a consultation, and removes extracted items from the staging folder. Copyleft licenses block extraction by default; `--accept-risks` overrides that gate. Unknown licenses warn rather than prove safety. `--dry-run` previews; `--clean` asks before deleting the project `.squad/` unless `--yes` is supplied. `--force` can override an extraction-disabled setting. The project `.git/info/exclude` is local Git metadata, not a committed `.gitignore` rule.
-
-There is a cleanup nuance worth understanding: the v1.1.0 `extract` command's `--clean` path deletes `.squad/`; the consult-created `.github/agents/squad.agent.md` and the lines appended to `.git/info/exclude` are separate setup artifacts. Do not assume `--clean` removes every trace of the consult setup. Inspect status and local excludes before reusing a checkout, especially if you need to restore a clean environment.
-
-> **Warning:** Consult mode is isolation, not a promise that every possible project change disappears. Keep the worktree clean before entering, inspect `git status` afterward, and review exactly what is being extracted. Extraction transfers selected generic learnings, not project-specific files or code.
+Everything in this chapter so far assumes the GitHub Copilot coordinator in `.github/agents/squad.agent.md`, because that is what plain `squad init` installs. Squad 2.0 can also project the team into other hosts, and the routing source stays the same: every coordinator reads the same `.squad/routing.md`, the same roster in `team.md`, and the same charters, so you edit one routing table. The non-Copilot coordinators also run the reviewer gate without being asked. Chapter 18 covers how review gates work on Copilot, and Chapter 20 (Volume 2) explains how one routing table becomes seven host coordinators.
 
 ## Capability routing in distributed workers
 
@@ -175,8 +159,6 @@ As a small mode check, ask “Who is on the team?” and then “Add task due-da
 | Pod-specific manifest | `.squad/machine-capabilities-{podId}.json` | Considered first only in `squad-per-pod` mode with `SQUAD_POD_ID`. |
 | Deployment variables | `SQUAD_DEPLOYMENT_MODE`, `SQUAD_POD_ID`, `SQUAD_HOME` | Select pod-specific lookup or user-level Squad home. Default mode: `agent-per-node`. |
 | Capability names | e.g. `browser`, `gpu`, `docker`, `azure-cli` | Built-ins are documented in the SDK; arbitrary names work as custom labels. |
-| Consult preview/status | `squad consult --check`, `squad consult --status` | Preview the setup or inspect current state; neither is a replacement for reviewing the checkout. |
-| Extraction options | `squad extract --dry-run --clean --yes --accept-risks` | Preview, optionally remove `.squad/`, skip confirmation, or acknowledge copyleft risk. `--force` overrides extraction-disabled configuration. |
 
 ## Under the Hood
 
@@ -197,32 +179,28 @@ The surrounding implementation applies keyword and load heuristics, but the arch
 
 Capability filtering lives under `packages/squad-sdk/src/ralph/capabilities.ts`, not in the ordinary chat routing table. It loads a manifest, extracts labels beginning with `needs:`, compares every requirement with the available capability set, and returns handled issues separately from skipped issues. This is why a machine capability check should not be explained as a specialist-selection rule.
 
-Consult behavior has a further distinction in implementation: `packages/squad-sdk/src/sharing/consult.ts` does file copying, `.git/info/exclude` updates, license classification, and extraction support; `packages/squad-cli/src/cli/commands/consult.ts` parses `--status` and `--check`; `extract.ts` owns CLI confirmation and cleanup. The high-level feature docs are useful orientation but should be reconciled with those versioned files.
-
 ## Pitfalls and Troubleshooting
 
 - **A named agent is not necessarily a supported route in every execution path.** Check the roster and, for the SDK router, whether the name appears in compiled rules.
 - **A route is not a file glob.** The markdown table is read by an LLM-oriented coordinator; the typed SDK compiler builds text patterns from work types and examples. Do not assume it applies Git path matching.
 - **WHO is not HOW.** A Frontend assignment does not inherently mean Lightweight, and a Full mode does not imply every roster member should spawn.
-- **Do not copy the capability article's bare-array example.** The v1.1.0 SDK expects a JSON object with a `capabilities` property, as shown in the template.
+- **Do not copy the capability article's bare-array example.** The v2.0.0 SDK expects a JSON object with a `capabilities` property, as shown in the template.
 - **No manifest is not a fail-closed hardware gate.** With no capability file, issues pass through. Configure manifests on every worker if labels are meant to be meaningful.
 - **Use `needs:` for environment requirements, not `squad:`.** Confusing the labels can direct an issue to a person while leaving it on the wrong machine.
-- **Use consult mode only when the project does not already own a squad.** The CLI refuses an existing `.squad/` rather than blending two teams.
-- **Check Git metadata and cleanup.** `.git/info/exclude` is local to the clone; `extract --clean` removes project `.squad/` but may leave consult agent metadata and ignore entries.
-- **Treat `--force` as an implementation detail in this release.** The v1.1.0 `extract` handler parses it to override extraction-disabled configuration, but `squad extract --help` does not list it. Prefer documented flags; if a workflow depends on this override, verify the installed CLI version and source.
+- **Old notes mention `squad consult` or a personal agent.** Both were removed in Squad 2.0. Route the work to a project specialist instead, or add a specialist to the roster.
 - **Do not overfit on approximate times.** Mode labels communicate context depth and dispatch shape; network, model, and platform latency vary.
 
 ## Summary
 
-Routing assigns ownership; response mode sizes the effort. The coordinator can use explicit names, work-type policy, and relevant skills to find an owner, while capability labels qualify which worker environment may take an issue. Personal agents can advise a project team, and the CLI's consult setup can isolate a personal squad in an external Git repository with an explicit extraction path. Those mechanisms overlap in vocabulary but have different code paths. Use the existing roster, prefer a single accountable owner, and verify versioned source where docs and implementation disagree.
+Routing assigns ownership; response mode sizes the effort. The coordinator can use explicit names, work-type policy, and relevant skills to find an owner, while capability labels qualify which worker environment may take an issue. Whatever host runs the coordinator, the routing comes from the same `.squad/routing.md`. Use the existing roster, prefer a single accountable owner, and verify versioned source where docs and implementation disagree.
 
 ## Exercises
 
 1. **Resolve a collision.** Add a general `tasktrack-api` row and a more specific row for validation. Explain which should win for an invalid-title change and why; consider what an LLM-based prompt router can and cannot guarantee about specificity.
 2. **Design a capability manifest.** Create a sample manifest object for a machine with browser and Docker support. Add an issue with `needs:browser` and `needs:gpu`. State whether the worker should process it and what happens if no manifest exists.
 3. **Choose a response mode.** Classify four requests—“What port is Tasktrack on?”, “Fix the typo in its README,” “Add API validation,” and “Build a due-date feature across API and web”—and justify who would be spawned and how much context is appropriate.
-4. **Compare consult meanings.** Describe one safe use of a personal agent in an existing project squad and one safe use of `squad consult` in a project without a squad. Include one behavior that differs.
-5. **Audit the docs/code gap.** Explain why the capability article's root-level JSON array should not be used with the v1.1.0 implementation. Give the compatible path and top-level JSON keys.
+4. **Route to the tester.** Which single file do you edit so validation work goes to the tester, whatever host runs the coordinator? On the Copilot path, where does the reviewer gate for that change come from?
+5. **Audit the docs/code gap.** Explain why the capability article's root-level JSON array should not be used with the v2.0.0 implementation. Give the compatible path and top-level JSON keys.
 
 ## Quiz
 
@@ -231,13 +209,12 @@ Routing assigns ownership; response mode sizes the effort. The coordinator can u
 3. What conditions must all be true for a `needs:*` issue to pass capability filtering when a manifest is present?
 4. What is the default behavior when the capability manifest is absent?
 5. Which response mode uses no agent spawn? Is Lightweight also no-spawn?
-6. What are the two distinct workflows called “consult” in v1.1.0?
+6. True or false: in Squad 2.0, each host keeps its own copy of the routing rules.
 7. Does `SquadCoordinator.handleMessage()` call `selectResponseTier()` in the inspected implementation?
-8. What does `squad extract --clean` remove, and why should you verify the remaining local metadata?
+8. What happens if you run `squad consult` with the Squad 2.0 CLI?
 
 ## Further Reading
 
-- [Work Routing](https://bradygaster.github.io/squad/docs/features/routing/)
-- [Capability Routing](https://bradygaster.github.io/squad/docs/features/capability-routing/)
-- [Consult Mode (v1.1.0 source)](https://github.com/bradygaster/squad/blob/v1.1.0/docs/src/content/docs/features/consult-mode.md)
-- [Response Modes](https://bradygaster.github.io/squad/docs/features/response-modes/)
+- [Work Routing](https://github.github.com/squad/docs/features/routing/)
+- [Capability Routing](https://github.github.com/squad/docs/features/capability-routing/)
+- [Response Modes](https://github.github.com/squad/docs/features/response-modes/)

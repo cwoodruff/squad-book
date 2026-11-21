@@ -5,7 +5,7 @@
 ## What You'll Learn
 
 - Distinguish traces, metrics, and logs, and choose a signal for the question you need to answer.
-- Configure Squad v1.1.0's OpenTelemetry (OTel) export without confusing a dashboard with a collector.
+- Configure Squad v2.0.0's OpenTelemetry (OTel) export without confusing a dashboard with a collector.
 - Run the Aspire dashboard locally and understand what `squad aspire` does—and does not do.
 - Interpret Squad's actual SDK traces, metrics, resource attributes, and telemetry lifecycle.
 - Design a production OTLP path that can be secured, sampled, monitored, and operated independently of local development tooling.
@@ -54,7 +54,7 @@ sequenceDiagram
 
 > **Note:** OpenTelemetry defines the telemetry plumbing, not the Squad task model. A collector receiving spans does not mean every task outcome is correct, and a missing trace does not by itself mean the task did not run.
 
-## Squad's OTel Contract in v1.1.0
+## Squad's OTel Contract in v2.0.0
 
 The SDK's provider initialization is in `packages/squad-sdk/src/runtime/otel.ts`. It resolves an explicit `endpoint` in configuration first, then `OTEL_EXPORTER_OTLP_ENDPOINT`. If neither exists, provider initialization returns inactive and instrumentation uses the OpenTelemetry API's no-op behavior. This is opt-in: setting an endpoint is the condition that turns on export. SDK packages for the Node OTel SDK and OTLP/gRPC exporters are loaded lazily; if they are absent, Squad leaves telemetry disabled rather than crashing the application. In debug mode, missing dependencies and startup or shutdown errors are reported to stderr.
 
@@ -117,6 +117,16 @@ Resource attributes identify the emitting service and deployment. Use distinct s
 
 The OTel instrumentation should not be described as content-free without checking the particular span: the EventBus bridge only maps the event type and optional session/agent names, while other spans can contain implementation-specific attributes or exception details. Metrics add agent/model labels and session/context labels in some instruments. Set a privacy review gate before enabling production export.
 
+### Health metadata and the session dashboard
+
+Two Squad 2.0 features sit next to OTel without replacing it. The first is the metadata block in `squad health --json`. The schema is still `squad-health/v1`, but the `metadata` object now records which runtime produced the report: `cliVersion`, `sdkVersion`, `stateBackend`, `bridgeVersion`, `launchMode`, and the resolved paths `resolvedTeamRoot` and `resolvedSquadDir` (the older `resolvedTeamDir` is kept for compatibility). Attach that block to every incident record. When a trace looks wrong, it tells you whether the process ran the CLI version and backend you expected and which team folder it actually used.
+
+```bash
+squad health --json | jq '.metadata'
+```
+
+The second is `squad dashboard`, a live local page that reads Claude Code session transcripts for the current directory and shows the coordinator and each member at work: dispatches, tool calls, results and hook events. It is a viewer for one developer's sessions, bound to `127.0.0.1`, and it is not an OTel receiver or a production monitoring surface. It applies only when Claude Code is a host; Chapter 19 covers it with the rest of the Claude Code setup.
+
 ## Local Aspire and Production Observability
 
 Aspire gives you a quick way to inspect OTLP locally. It is not a production storage system, a cluster collector, or an authentication design. The deployment shape changes when Squad runs in containers:
@@ -126,7 +136,7 @@ Aspire gives you a quick way to inspect OTLP locally. It is not a production sto
 | Local interactive development | Squad CLI process | Aspire on host, host port `4317` | Aspire UI at `http://localhost:18888` |
 | Kubernetes or container platform | Squad process in a pod/container | In-network Collector service/sidecar, usually OTLP gRPC `4317` or HTTP `4318` depending on configured exporter | Azure Monitor, a Grafana/Prometheus pipeline, or another supported backend |
 
-A pod's `localhost` refers to that pod, not the developer workstation. Set `OTEL_EXPORTER_OTLP_ENDPOINT` to a reachable in-cluster collector endpoint. Squad v1.1.0's implementation uses the OTLP gRPC exporter, so do not assume that changing a URL to port `4318` switches it to an HTTP exporter. The source does not configure protocol negotiation through a separate Squad option. Match the receiver and client implementation; test a real export before promoting the manifest.
+A pod's `localhost` refers to that pod, not the developer workstation. Set `OTEL_EXPORTER_OTLP_ENDPOINT` to a reachable in-cluster collector endpoint. Squad v2.0.0's implementation uses the OTLP gRPC exporter, so do not assume that changing a URL to port `4318` switches it to an HTTP exporter. The source does not configure protocol negotiation through a separate Squad option. Match the receiver and client implementation; test a real export before promoting the manifest.
 
 A useful dashboard begins with an explicit operator question, not a catalog of every instrument. A small initial set might include agent duration percentiles, agent/session error counts, token and estimated-cost totals, context utilization, and telemetry exporter health. Separate views by service and environment only when those attributes are actually present. Record a baseline over representative work before setting alert thresholds: a one-agent test run is not a meaningful p95 baseline for a fleet. Alert on sustained symptoms and missing-data conditions, not a single noisy observation. For example, an alert that says “no data” should distinguish an idle service from a broken exporter; pair it with workload or heartbeat evidence where available.
 
@@ -150,7 +160,7 @@ The Aspire dashboard is a local receiver and viewer. From a terminal where the S
 squad aspire --docker
 ```
 
-In v1.1.0, the Docker path starts the image `mcr.microsoft.com/dotnet/aspire-dashboard:latest`, maps host port `18888` to dashboard port `18888`, and maps `4317` to container OTLP/gRPC port `18889`. The command runs in the foreground; press `Ctrl+C` to stop it. Open `http://localhost:18888` in a browser.
+In v2.0.0, the Docker path starts the image `mcr.microsoft.com/dotnet/aspire-dashboard:latest`, maps host port `18888` to dashboard port `18888`, and maps `4317` to container OTLP/gRPC port `18889`. The command runs in the foreground; press `Ctrl+C` to stop it. Open `http://localhost:18888` in a browser.
 
 > **Warning:** The Aspire container is configured with both UI and OTLP authentication set to `Unsecured`. This is a local-development convenience only. Keep the listener bound to a trusted machine/network; never expose this dashboard or unauthenticated receiver publicly.
 
@@ -171,7 +181,7 @@ If you later instrument Tasktrack's `node:http` API, define a bounded question f
 
 ## Configuration Reference
 
-| Setting | v1.1.0 behavior | Practical use |
+| Setting | v2.0.0 behavior | Practical use |
 |---|---|---|
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Environment variable read by the SDK when no explicit `endpoint` is supplied; enables initialization when set | Set to a reachable OTLP/gRPC receiver, e.g. local Aspire `http://localhost:4317` |
 | `endpoint` in `initSquadTelemetry()` | Explicit SDK option takes precedence over the environment variable | Useful for an embedding app with per-service configuration |
@@ -181,11 +191,13 @@ If you later instrument Tasktrack's `node:http` API, define a bounded question f
 | `installTransport` in `initSquadTelemetry()` | Defaults to `true`; can be set false to avoid installing the collector bridge transport | Keep integration behavior explicit in embedded applications |
 | `SQUAD_TELEMETRY=1` | Enables CLI shell metrics with or without an OTel endpoint; does not initialize an exporter endpoint | Use it only when shell measurements are intended; an endpoint is still needed for OTLP export |
 | `squad aspire --docker` | Forces Docker dashboard launch | Use when Docker is available and the local Aspire Dashboard should run in a container |
-| `squad aspire --port <n>` | Exposed as the dashboard port option in CLI help | **Verify before relying on it:** v1.1.0 implementation uses a fixed Docker port mapping despite accepting/printing the supplied port |
-| `squad aspire --stop` | Not a v1.1.0 option | Stop the foreground process with `Ctrl+C`; do not rely on a nonexistent stop flag |
-| `OTEL_METRIC_EXPORT_INTERVAL_MILLIS` | Not read by this v1.1.0 provider implementation | The SDK metric reader interval is fixed at 30 seconds in the source; do not expect this variable to shorten it |
+| `squad aspire --port <n>` | Exposed as the dashboard port option in CLI help | **Verify before relying on it:** v2.0.0 implementation uses a fixed Docker port mapping despite accepting/printing the supplied port |
+| `squad aspire --stop` | Not a v2.0.0 option | Stop the foreground process with `Ctrl+C`; do not rely on a nonexistent stop flag |
+| `squad health --json` | Schema `squad-health/v1`; `metadata` carries `cliVersion`, `sdkVersion`, `stateBackend`, `bridgeVersion`, `launchMode`, `resolvedTeamRoot`, `resolvedSquadDir` (and the older `resolvedTeamDir`) | Attach to incident records to prove which runtime, backend and team folder produced the telemetry |
+| `squad dashboard [start\|stop\|status]` | Local Claude Code session viewer on `127.0.0.1`, from port 4280; flags `--port`, `--session`, `--stream`, `--detach`, `--open`, `--json` | Watch one developer's Claude Code sessions; not an OTel receiver |
+| `OTEL_METRIC_EXPORT_INTERVAL_MILLIS` | Not read by this v2.0.0 provider implementation | The SDK metric reader interval is fixed at 30 seconds in the source; do not expect this variable to shorten it |
 
-There is no verified v1.1.0 support in this code path for an `OTEL_SERVICE_NAME` or `OTEL_RESOURCE_ATTRIBUTES` environment variable. The production scenario page lists those as consumed, but the SDK's provider builder only reads its explicit `serviceName`/`mode` options and version. Do not put unsupported variables in deployment manifests expecting them to change Squad's resource metadata. Likewise, do not claim a custom headers option unless the installed version's verified exporter implementation supports it.
+There is no verified v2.0.0 support in this code path for an `OTEL_SERVICE_NAME` or `OTEL_RESOURCE_ATTRIBUTES` environment variable. The production scenario page lists those as consumed, but the SDK's provider builder only reads its explicit `serviceName`/`mode` options and version. Do not put unsupported variables in deployment manifests expecting them to change Squad's resource metadata. Likewise, do not claim a custom headers option unless the installed version's verified exporter implementation supports it.
 
 ## Under the Hood
 
@@ -236,7 +248,7 @@ SDK shutdown is the normal flush path. A process kill, crash, pod eviction, or t
 ## Summary
 
 - Use traces for a single operation, metrics for trends, and logs for event details; correlate them rather than expecting any one signal to tell the whole story.
-- Squad v1.1.0 enables SDK OTel when an endpoint is configured, exports via OTLP/gRPC, and allows no-op fallback if optional SDK packages are missing.
+- Squad v2.0.0 enables SDK OTel when an endpoint is configured, exports via OTLP/gRPC, and allows no-op fallback if optional SDK packages are missing.
 - `squad aspire` launches a local receiver/dashboard; it does not propagate an endpoint into a different shell or act as a production collector.
 - The SDK defines concrete agent, session, token, latency, context, and shell metrics. Confirm actual exports before building alerts.
 - Production needs secure network paths, deliberate retention/privacy, collector health monitoring, and an independent plan for interrupted work.
@@ -252,7 +264,7 @@ SDK shutdown is the normal flush path. A process kill, crash, pod eviction, or t
 
 1. Which signal is best suited to compare agent failure rates over a week: a trace, a metric, or a log?
 2. Which environment variable activates the SDK exporter when no explicit endpoint is passed?
-3. What OTLP protocol do Squad's v1.1.0 SDK exporters use?
+3. What OTLP protocol do Squad's v2.0.0 SDK exporters use?
 4. Why does starting `squad aspire` not automatically configure a separate terminal's environment?
 5. What is the default periodic metric export interval in the provider implementation?
 6. Does `SQUAD_TELEMETRY=1` by itself configure an OTLP endpoint?
@@ -260,5 +272,5 @@ SDK shutdown is the normal flush path. A process kill, crash, pod eviction, or t
 
 ## Further Reading
 
-- [Aspire Dashboard](https://bradygaster.github.io/squad/docs/scenarios/aspire-dashboard/)
-- [Production Observability](https://bradygaster.github.io/squad/docs/scenarios/production-observability/)
+- [Aspire Dashboard](https://github.github.com/squad/docs/scenarios/aspire-dashboard/)
+- [Production Observability](https://github.github.com/squad/docs/scenarios/production-observability/)

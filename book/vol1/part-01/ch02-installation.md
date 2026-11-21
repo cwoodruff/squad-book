@@ -5,13 +5,13 @@
 ## What You'll Learn
 
 - Select a Squad CLI installer that matches your operating system, network restrictions, and update policy.
-- Distinguish the stable, preview, and insider release channels, and decide between Squad 1.1 and the 2.0 preview.
+- Distinguish the stable, preview, and insider release channels, and know which 1.x features Squad 2.0 removed.
 - Verify the CLI version, diagnose a project with `squad doctor`, and interpret its output.
 - Choose between GitHub Copilot CLI, VS Code, the `squad` CLI, and SDK-first mode for the job in front of you.
 - Update the CLI package and project-installed Squad files as separate steps.
 - Prepare an isolated Tasktrack repository, ready for `squad init` in the next chapter.
 
-> **Preview (Squad 2.0):** `latest` remains v1.1.0; v2.0.0-preview.2 is distributed on npm's `insider` channel, with `preview` as a compatibility alias. It supports seven client hosts instead of one, and it removes personal squads and global mode. See "Which Squad Should I Use? (1.1 vs 2.0)" below, Chapters 18, 19, and 22 (Volume 2), and the [2.0 release notes](https://github.com/bradygaster/squad/blob/v2.0.0-preview.2/docs/src/content/docs/whatsnew.md).
+> **Note:** Changed in Squad 2.0: personal squads, consult mode and the `--global` flags are gone. See "Squad 2.0 and earlier releases" below and the [2.0 release notes](https://github.com/github/squad/blob/v2.0.0/docs/src/content/docs/whatsnew.md).
 
 ## Start with the layers, not the download button
 
@@ -23,27 +23,27 @@ You will make three decisions in this chapter, in order: how to install the CLI,
 
 ## Prerequisites and version boundaries
 
-The v1.1.0 CLI package requires Node.js **22.5.0 or later**, because the runtime depends on `node:sqlite`; the CLI entry point checks the version before loading the rest of the application. This applies to npm-based installs and SDK development. Standalone bundles include a matching Node runtime, so they need no preinstalled Node or npm.
+The CLI package requires Node.js **22.5.0 or later**, because the runtime depends on `node:sqlite`; the CLI entry point checks the version before loading the rest of the application. This applies to npm-based installs and SDK development. Standalone bundles include a matching Node runtime, so they need no preinstalled Node or npm.
+
+That 22.5.0 floor is a compatibility minimum, not a security guarantee. The npm package does not carry its own Node, so if you install with npm, keep the host on a patched Node 22 release (22.23.4 or newer, per the October 2026 Node.js security releases noted in the Squad CHANGELOG). The standalone archives vendor Node 22.23.4 themselves.
 
 You also need Git and a repository in which to initialize project-local Squad. A Copilot CLI or VS Code Copilot extension is installed and authenticated separately. `gh` is needed for workflows that talk to GitHub, such as issue, pull request, and project-board operations, not merely for running `squad init`.
 
 Tasktrack's sample app has a different runtime boundary: its own `package.json` declares Node 22.18 or later because it runs TypeScript through Node's built-in type stripping. Do not mix that up with the CLI minimum. You can install the CLI from a standalone package on a host without Node and still need Node 22.18+ to run the sample.
 
-## Which Squad Should I Use? (1.1 vs 2.0)
+## Squad 2.0 and earlier releases
 
-Two lines of Squad exist, and they share the `squad` command name.
+Squad v2.0.0 is the stable release (npm `latest`, released 2026-11-18), and it is the release this book teaches. A fresh install today gets 2.0, and plain `squad init` still sets up the GitHub Copilot host exactly as earlier releases did.
 
-| | Squad 1.1 | Squad 2.0 preview |
+If you already run a Squad 1.x project, read Chapter 22 (Volume 2) before you upgrade it. Most of what you know still applies, but a few 1.x features were removed outright:
+
+| Removed in 2.0 | What happens now | Replacement |
 |---|---|---|
-| Version | v1.1.0 | v2.0.0-preview.2 |
-| Channel | `latest` (stable) | `insider`, with `preview` as an alias |
-| Hosts | GitHub Copilot (CLI and VS Code) | Seven hosts: Copilot, Claude Code, Kiro, OpenCode, Cursor, OpenAI Codex, Google Antigravity |
-| Covered in this book | All parts except Volume 2, Part IV | Volume 2, Part IV (Chapters 18–22) |
-| Personal squads (`squad init --global`) | Supported | Removed |
+| Personal squads (`squad personal`, `squad init --global`, `squad upgrade --global`) | `--global` fails with "Unknown option: --global". Squad no longer reads or writes a team under your user profile. | None. Keep the team in the project's `.squad/`, or point at a shared team root with `squad init --mode remote`, `--team-root` or `SQUAD_TEAM_ROOT`. |
+| Consult mode (`squad consult`, `squad extract`) | The commands no longer exist. | None |
+| Resolving `.squad/` from your user profile | Squad looks only in the current directory and its parents. Outside a project, `squad status`, `doctor`, `cast` and `cost` report "No squad in this directory". | Run commands from inside the project. |
 
-The 2.0 preview adds multi-client support: `squad init --client <host>` projects one `.squad/` team into the native agent format of the host you choose, without changing the team state itself. That makes it the right tool if your colleagues use Claude Code, Codex, or Cursor and you want a single shared team.
-
-**Recommendation:** start with 1.1.0. It is the stable release, every example outside Volume 2, Part IV targets it, and Copilot CLI plus VS Code cover most workflows. Switch to the preview only if you need multi-client support or want to evaluate 2.0, and do that in a disposable project first. Chapter 22 (Volume 2) walks through the upgrade, and Chapter 19 (Volume 2) covers working across clients. The [Insider Program](https://bradygaster.github.io/squad/docs/insider-program/) page describes how early builds are published.
+2.0 also adds hosts. `squad init --client <list>` projects the same `.squad/` team into Claude Code, Kiro, OpenCode, Cursor, OpenAI Codex or Google Antigravity as well as Copilot. This volume stays on the Copilot path; Chapter 19 (Volume 2) covers the others. The [Insider Program](https://github.github.com/squad/docs/insider-program/) page describes how early builds are published.
 
 ## Choose an installation method
 
@@ -64,7 +64,7 @@ This is the simplest route for developers who already manage Node tools with npm
 The POSIX installer retrieves a platform bundle from GitHub Releases, verifies its checksum against the release's `SHA256SUMS.txt`, unpacks it, and links the executable into a bin directory:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/bradygaster/squad/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/github/squad/main/scripts/install.sh | sh
 ```
 
 This avoids `registry.npmjs.org` and needs no Node toolchain. It installs under `/usr/local` as root or `$HOME/.local` for a normal user. Three environment variables adjust it:
@@ -73,11 +73,11 @@ This avoids `registry.npmjs.org` and needs no Node toolchain. It installs under 
 |---|---|---|
 | `VERSION` | Latest stable release | Pin an exact release tag. |
 | `PREFIX` | `/usr/local` as root; otherwise `$HOME/.local` | Choose the installation prefix. |
-| `REPO` | `bradygaster/squad` | Select the GitHub repository or an internal mirror. |
+| `REPO` | `github/squad` | Select the GitHub repository or an internal mirror. |
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/bradygaster/squad/main/scripts/install.sh \
-  | VERSION="v1.1.0" PREFIX="$HOME/tools" sh
+curl -fsSL https://raw.githubusercontent.com/github/squad/main/scripts/install.sh \
+  | VERSION="v2.0.0" PREFIX="$HOME/tools" sh
 ```
 
 Make sure `$PREFIX/bin` is on `PATH`. The script tracks stable releases; for preview or insider builds use the matching package channel or release asset.
@@ -117,7 +117,7 @@ Download the archive for your OS and CPU, plus the same release's checksum file.
 
 Standalone packages exist for machines that cannot reach the npm registry. Set `REPO` to a trusted mirror for the install script, or mirror the archive and checksums. The installer still needs GitHub-hosted assets or a mirror, so a fully disconnected machine needs staged artifacts; keep the checksum manifest from the same immutable release as the archive. The repository also documents a `squad-init` GitHub Action and a bundle-based Docker image, which are deployment paths rather than different runtimes. Keep version selection explicit in automation.
 
-> **Note:** Bundles omit optional dependencies by default. In v1.1.0 that means OpenTelemetry export and the `sql.js` state backend are absent unless the bundle was built with them; the published container build includes them.
+> **Note:** Bundles omit optional dependencies by default. That means OpenTelemetry export and the `sql.js` state backend are absent unless the bundle was built with them; the published container build includes them.
 
 ```mermaid
 flowchart TD
@@ -136,7 +136,7 @@ flowchart TD
 
 ## Release channels
 
-**Stable** (`latest`) is the default and what this book teaches. **Preview** is a release-candidate channel and **insider** carries development builds; both are published from work on `dev`, and "preview" is a channel name, not a branch. As described above, the 2.0 preview currently ships on `insider`, with `preview` as an alias.
+**Stable** (`latest`) is the default and what this book teaches; it carries v2.0.0. **Preview** is the release-candidate channel and **insider** carries development snapshots. Both are published on demand from `dev`, and "preview" is a channel name, not a branch.
 
 | Channel | npm tag | Homebrew cask | WinGet ID | Typical use |
 |---|---|---|---|---|
@@ -152,9 +152,9 @@ All channels provide the same `squad` command, so do not install several side by
 squad --version
 ```
 
-For the book's baseline, expect `1.1.0` (some launcher builds prefix it with `squad v`). If an older version appears after an update, inspect command resolution with `command -v squad` (macOS/Linux) or `Get-Command squad` (PowerShell); a second installation earlier on `PATH` may be winning.
+For the book's baseline, expect `2.0.0` (some launcher builds prefix it with `squad v`). If an older version appears after an update, inspect command resolution with `command -v squad` (macOS/Linux) or `Get-Command squad` (PowerShell); a second installation earlier on `PATH` may be winning.
 
-Then run `squad doctor` to inspect the local setup. Before initialization it will correctly report that `.squad/` and the coordinator agent file do not exist. Doctor is a diagnostic report, not a test suite: in v1.1.0 it returns success even when a check fails, so read the report rather than relying on the exit code in CI.
+Then run `squad doctor` to inspect the local setup. Before initialization it stops with "No squad in this directory. Run \"squad init\" first." Inside an initialized project it prints a report of individual checks. Doctor exits non-zero when a check fails, so CI can rely on the exit code, but still read the report to see *which* check failed.
 
 ## Choose your interface
 
@@ -169,6 +169,10 @@ Squad has several interfaces because they do different jobs. Treating `squad`, `
 
 A good default is to use `squad` for setup, Copilot CLI or VS Code for daily conversation, and `.squad/` in Git as the shared record. You are not choosing one forever; the project state is the common ground.
 
+### Other AI hosts
+
+Squad 2.0 can project the same team into six more hosts, and Claude Code is the one most readers ask about. Squad ships a Claude Code plugin that you install with `claude plugin marketplace add github/squad` and then `claude plugin install squad@squad --scope project`. This volume sticks to Copilot; Chapter 19 (Volume 2) walks through Claude Code and the other hosts.
+
 ```mermaid
 flowchart LR
   Repo["Task repository"] --> State[".squad/ project state"]
@@ -180,7 +184,7 @@ flowchart LR
 
 ### The `squad` command is not the chat host
 
-`squad init` sets up the repository, `squad doctor` reports setup problems, `squad status` shows which team is active, and `squad upgrade` refreshes Squad-owned files. These return reports; they do not open a conversation. For conversational work, start Copilot CLI and select the Squad agent (one documented shortcut is `copilot --agent squad`), or open Copilot Chat in VS Code and select Squad. In both cases the host loads the coordinator from your repository and supplies the model and tools. The repository guide calls Copilot CLI the recommended conversational interface; that reflects its full agent workflow, not a requirement to leave VS Code. See the [Squad Product Guide](https://bradygaster.github.io/squad/docs/guide/) for the wider map of features, and treat it as a reference to dip into rather than a manual to read front to back.
+`squad init` sets up the repository, `squad doctor` reports setup problems, `squad status` shows which team is active, and `squad upgrade` refreshes Squad-owned files. These return reports; they do not open a conversation. For conversational work, start Copilot CLI and select the Squad agent (one documented shortcut is `copilot --agent squad`), or open Copilot Chat in VS Code and select Squad. In both cases the host loads the coordinator from your repository and supplies the model and tools. The repository guide calls Copilot CLI the recommended conversational interface; that reflects its full agent workflow, not a requirement to leave VS Code. See the [Squad Product Guide](https://github.github.com/squad/docs/guide/) for the wider map of features, and treat it as a reference to dip into rather than a manual to read front to back.
 
 ### Copilot CLI or VS Code?
 
@@ -194,7 +198,7 @@ Both hosts use the same `.squad/` directory, so switching does not create a seco
 | SQL tool | Available in the documented CLI environment. | Not available in the documented setup. |
 | File permissions | Governed by CLI and workspace settings. | Workspace trust and write approvals apply. |
 
-For an edit that depends on selected code and visible diagnostics, VS Code is convenient. For large parallel work, per-spawn model choices, or the SQL tool, use Copilot CLI. See [Squad in VS Code](https://bradygaster.github.io/squad/docs/features/vscode/) for the host's details.
+For an edit that depends on selected code and visible diagnostics, VS Code is convenient. For large parallel work, per-spawn model choices, or the SQL tool, use Copilot CLI. See [Squad in VS Code](https://github.github.com/squad/docs/features/vscode/) for the host's details.
 
 For VS Code, install the GitHub Copilot extension, sign in, open a trusted workspace, and select Squad from the agent picker. Initialize with the CLI first so you can inspect exactly what was generated. `squad init` sets VS Code's default chat mode to Squad when no value exists and preserves an existing value; opt out with:
 
@@ -202,11 +206,11 @@ For VS Code, install the GitHub Copilot extension, sign in, open a trusted works
 squad init --no-vscode-default
 ```
 
-> **Tip:** Use a single-root workspace when first setting up Squad; the v1.1.0 guide notes path-resolution problems in multi-root workspaces.
+> **Tip:** Use a single-root workspace when first setting up Squad; the VS Code guide notes path-resolution problems in multi-root workspaces.
 
 ### The interactive shell
 
-Running `squad` with no command enters an interactive shell with slash commands such as `/status`, `/history`, `/agents`, and `/quit`, described in the [Interactive Shell Guide](https://bradygaster.github.io/squad/docs/guide/shell/). The v1.1.0 product guide marks that shell as deprecated and recommends `copilot --agent squad` for conversation. Treat the shell guide as reference for existing users, not as a starting point. If a command is missing from `squad --help`, do not infer it from an older page.
+Running `squad` with no command enters an interactive shell with slash commands such as `/status`, `/history`, `/agents`, and `/quit`, described in the [Interactive Shell Guide](https://github.github.com/squad/docs/guide/shell/). The product guide marks that shell as deprecated and recommends `copilot --agent squad` for conversation. Treat the shell guide as reference for existing users, not as a starting point. If a command is missing from `squad --help`, do not infer it from an older page.
 
 ### SDK-first mode: when configuration is code
 
@@ -218,24 +222,20 @@ squad build
 squad build --check
 ```
 
-`--check` validates that generated files match the current disk without writing, which suits CI. SDK-first mode is worth it when you want type checking and code-reviewed team configuration. It is not needed for ordinary use, and hand-editing generated files will be overwritten by the next build. Do not confuse it with simply depending on `@bradygaster/squad-sdk` in an application. The [SDK-First Squad Mode](https://bradygaster.github.io/squad/docs/sdk-first-mode/) page has the builder reference; Chapter 14 (Volume 2) covers the SDK in depth.
+`--check` validates that generated files match the current disk without writing, which suits CI. SDK-first mode is worth it when you want type checking and code-reviewed team configuration. It is not needed for ordinary use, and hand-editing generated files will be overwritten by the next build. Do not confuse it with simply depending on `@bradygaster/squad-sdk` in an application. The [SDK-First Squad Mode](https://github.github.com/squad/docs/sdk-first-mode/) page has the builder reference; Chapter 14 (Volume 2) covers the SDK in depth.
 
-> **Note:** v1.1.0 documentation labels SDK-first mode "Phase 1" and describes `--watch` as coming soon. Check `squad build --help` before relying on it.
-
-### Personal squads
-
-A personal squad (`squad init --global`) is an optional, user-level team root holding identity and selected knowledge you want to reuse across repositories. The directory is `~/.config/squad/` on Linux, `~/Library/Application Support/squad/` on macOS, and `%APPDATA%\squad\` on Windows. A project then points at it through a `teamRoot` entry in its own `.squad/config.json` while keeping its decisions and logs local. Use it only for genuinely personal, stable content, never for project-specific or confidential details, and treat the folder as a separate trust boundary that is machine-local unless you back it up. You can ignore it entirely while learning. The [Your Personal Squad](https://github.com/bradygaster/squad/blob/v1.1.0/docs/src/content/docs/guide/personal-squad.md) guide has the details; see also the [Personal Squad](https://bradygaster.github.io/squad/docs/guide/personal-squad/) page. Squad 2.0 removes this feature.
+> **Note:** The documentation still labels SDK-first mode "Phase 1" and describes `--watch` as coming soon, although the v2.0.0 `squad build --help` lists `--watch`. Check the help of your installed CLI before relying on it.
 
 ### Choosing a path
 
-The [Choose Your Interface](https://bradygaster.github.io/squad/docs/get-started/choose-your-interface/) and [Choosing Your Path](https://bradygaster.github.io/squad/docs/get-started/choosing-your-path/) pages cover the same ground from the official side. The practical beginner path is:
+The [Choose Your Interface](https://github.github.com/squad/docs/get-started/choose-your-interface/) and [Choosing Your Path](https://github.github.com/squad/docs/get-started/choosing-your-path/) pages cover the same ground from the official side. The practical beginner path is:
 
 1. Install Squad and verify it (this chapter).
 2. Initialize a repository and hold a first session (Chapter 3).
 3. Meet and shape the team (Chapter 4), then learn routing (Chapter 5).
 4. Deepen selectively. Memory, skills, workflows, and operations are there when your project needs them.
 
-The [Five-Minute Start](https://bradygaster.github.io/squad/docs/get-started/five-minute-start/) shows the shortest version: `squad init`, `squad doctor`, `squad status`, then select Squad in your host and describe the project in a sentence or two. Its example uses a React/Node app; Tasktrack plays that role here, and Chapter 3 annotates the whole conversation.
+The [Five-Minute Start](https://github.github.com/squad/docs/get-started/five-minute-start/) shows the shortest version: `squad init`, `squad doctor`, `squad status`, then select Squad in your host and describe the project in a sentence or two. Its example uses a React/Node app; Tasktrack plays that role here, and Chapter 3 annotates the whole conversation.
 
 ## Update the CLI and update project files separately
 
@@ -256,7 +256,7 @@ squad upgrade
 squad doctor
 ```
 
-`upgrade` refreshes files owned by Squad and is intended to leave user-managed state (agents, decisions, histories) alone. A dry run previews changes, and local coordinator customizations are backed up. Still review the diff and keep a clean working tree. `squad upgrade --self` updates the npm CLI package itself and accepts `--insider`; standalone bundles are not managed by it, so reinstall them, use the package manager, or pull a newer image. Update `@bradygaster/squad-sdk` in your applications separately. Chapter 14 covers upgrades and migration in depth.
+`upgrade` refreshes files owned by Squad and is intended to leave user-managed state (agents, decisions, histories) alone. A dry run previews changes, and local coordinator customizations are backed up. Still review the diff and keep a clean working tree. `squad upgrade --self` updates the npm CLI package itself, following the channel you installed (stable stays on `@latest`, a prerelease follows `@insider`); `--insider` forces the insider channel. Standalone bundles are not managed by it, so reinstall them, use the package manager, or pull a newer image. Update `@bradygaster/squad-sdk` in your applications separately. Chapter 14 covers routine upgrades in depth, and Chapter 22 (Volume 2) covers moving a 1.x project to 2.0.
 
 ```mermaid
 sequenceDiagram
@@ -274,7 +274,7 @@ sequenceDiagram
 ## Hands-On: Install, verify, and prepare Tasktrack
 
 1. Choose one installation method and the stable channel, unless you have a reason to try the preview.
-2. Open a new terminal if your installer changed shell paths, then run `squad --version` and confirm it reports `1.1.0`.
+2. Open a new terminal if your installer changed shell paths, then run `squad --version` and confirm it reports `2.0.0`.
 3. Confirm your Copilot host is installed and authenticated on its own (for example, check the `copilot` command's version). It is a different program from `squad`.
 4. Create your Tasktrack working copy in a **new scratch location**, not inside the book repository. From the root of the `squad-book` repository:
 
@@ -299,7 +299,7 @@ git tag --list ch02-start
 
 With Node.js 22.18 or newer, expect five passing tests, a clean working tree, and the `ch02-start` tag. The sample has no dependencies to install. If `npm test` fails because the runtime is too old, run `node --test api/test/` and check `node --version`.
 
-6. Run `squad doctor` here. Missing project files are expected before initialization; do not mistake them for an install failure.
+6. Run `squad doctor` here. "No squad in this directory" (and a non-zero exit) is expected before initialization; do not mistake it for an install failure.
 
 Do not run `squad init` yet. The tag gives you a clean checkpoint of the uninitialized starter, so that everything the initializer and your agents create later can be reviewed or rolled back. Chapter 3 initializes the project and holds the first session. Where this book mentions the scratch copy later, it means this `~/tasktrack` repository.
 
@@ -313,7 +313,6 @@ Do not run `squad init` yet. The tag gives you a clean checkpoint of the uniniti
 | `squad init --no-workflows` | Not passed by default | Skip generated CI workflows. |
 | `squad init --no-vscode-default` | Not passed by default | Leave VS Code's default chat mode alone. |
 | `squad init --sdk` | Not passed by default | Scaffold SDK-first configuration. |
-| `squad init --global` | Not passed by default | Create a personal squad root (1.1 only). |
 | `squad build` / `--check` | SDK-first projects | Generate / validate generated team files. |
 | `squad upgrade --dry-run` | Not passed by default | Preview project file updates. |
 | `squad upgrade --self` | Not passed by default | Update the CLI package, not project files. |
@@ -342,7 +341,7 @@ Check `node --version`; the CLI needs 22.5.0 or newer. If you cannot change Node
 
 ### Doctor says `.squad/` does not exist
 
-Expected before initialization. Run `squad init` from the intended repository root. Do not copy `.squad/` from another project; state belongs to one repository.
+Expected before initialization: doctor prints "No squad in this directory". Run `squad init` from the intended repository root. Squad resolves `.squad/` only from the current directory and its parents; it never falls back to a directory in your user profile, so running a command from your home folder will not find a team. Do not copy `.squad/` from another project; state belongs to one repository.
 
 ### Copilot CLI is not available
 
@@ -358,7 +357,7 @@ The manifest may still be under community review. Use the direct archive as a br
 
 ### The standalone bundle is blocked by the OS
 
-The v1.1.0 docs identify a signing gap: macOS Gatekeeper may quarantine downloaded bundles and Windows SmartScreen may warn. Verify checksums, follow your organization's policy, and do not bypass protections for an untrusted artifact.
+The standalone install docs identify a signing gap: macOS Gatekeeper may quarantine downloaded bundles and Windows SmartScreen may warn. Verify checksums, follow your organization's policy, and do not bypass protections for an untrusted artifact.
 
 ### You updated the CLI but the repository still looks old
 
@@ -366,22 +365,22 @@ Run `squad upgrade` in that repository, then review the diff.
 
 ### Choosing the wrong interface
 
-Using `squad` to chat, running `squad init` in the book source tree, expecting identical controls in Copilot CLI and VS Code, adopting SDK-first mode because it sounds advanced, or assuming a personal squad is required are all common detours. The tables above tell you which layer owns which job.
+Using `squad` to chat, running `squad init` in the book source tree, expecting identical controls in Copilot CLI and VS Code, or adopting SDK-first mode because it sounds advanced are all common detours. The tables above tell you which layer owns which job.
 
-### Mixing 1.1 and 2.0
+### An old 1.x CLI on PATH
 
-Installing the `insider` channel into a machine that also hosts 1.1.0 projects means `squad upgrade` can refresh those projects with 2.0 files. Check `squad --version` first and keep early builds in a disposable project until you have read Chapter 22 (Volume 2).
+If `squad --version` still reports a 1.x release after you installed 2.0, an older copy is winning on `PATH`, and it will offer commands such as `squad consult` that 2.0 removed. Find every installation (`type -a squad` on macOS and Linux, `Get-Command squad -All` in PowerShell) and remove the old one. Check the version before you run `squad upgrade` in a 1.x project, and read Chapter 22 (Volume 2) first.
 
 ## Summary
 
-Install the CLI in the way that suits your runtime and network constraints, keep to one channel, and verify with `squad --version` and `squad doctor`. Start with Squad 1.1.0 unless you need multi-client support from the 2.0 preview. Use Copilot CLI or VS Code for conversation, `squad` for setup and operations, and SDK-first mode only when TypeScript configuration earns its keep. Keep tool updates distinct from per-project `squad upgrade`. Tasktrack is now copied into its own Git repository and tagged `ch02-start`, ready for the first session in Chapter 3.
+Install the CLI in the way that suits your runtime and network constraints, keep to one channel, and verify with `squad --version` and `squad doctor`. Squad v2.0.0 is the stable release; if you come from 1.x, note what 2.0 removed and read Chapter 22 (Volume 2) before upgrading old projects. Use Copilot CLI or VS Code for conversation, `squad` for setup and operations, and SDK-first mode only when TypeScript configuration earns its keep. Keep tool updates distinct from per-project `squad upgrade`. Tasktrack is now copied into its own Git repository and tagged `ch02-start`, ready for the first session in Chapter 3.
 
 ## Exercises
 
 1. Pick an installation method for a macOS developer with Node installed, a Windows CI runner with no npm access, and an air-gapped Linux runner with an internal artifact mirror. Defend each choice.
 2. Describe the difference between updating the installed CLI and running `squad upgrade` in a project. Which data is intended to stay user-owned?
 3. Your `squad --version` reports the old version after a successful package update. Give two diagnostic steps before reinstalling.
-4. Choose an interface for each situation: editing a file with diagnostics visible, diagnosing missing project files, authoring a reusable TypeScript team config, and running a multi-agent request that needs per-spawn model choices. Then say whether you would use 1.1 or the 2.0 preview for a team that mixes Copilot and Claude Code users, and why.
+4. Choose an interface for each situation: editing a file with diagnostics visible, diagnosing missing project files, authoring a reusable TypeScript team config, and running a multi-agent request that needs per-spawn model choices. Then say which `squad init` option a team that mixes Copilot and Claude Code users needs, and where this book covers it.
 5. Complete the Tasktrack preparation. Confirm a clean worktree, five tests, and a `ch02-start` tag, and write down what the API tests currently protect.
 6. In a hypothetical SDK-first repository, the generated `.squad/team.md` disagrees with `squad.config.ts`. Which file do you change and which command do you run? How could CI catch drift?
 
@@ -389,26 +388,24 @@ Install the CLI in the way that suits your runtime and network constraints, keep
 
 1. Which installation methods include a Node runtime rather than requiring a separately installed Node?
 2. What does `VERSION` control in the POSIX install script?
-3. Which npm tag carries the Squad 2.0 preview, and which tag is stable?
+3. Which npm tags carry stable releases, release candidates, and development snapshots?
 4. True or false: `squad upgrade` and `squad upgrade --self` do the same update.
-5. Which two conversational hosts share the same project `.squad/` state in Squad 1.1?
+5. Which two Copilot conversational hosts share the same project `.squad/` state?
 6. What per-spawn model selection limitation applies in VS Code?
-7. Does a `squad doctor` failure necessarily produce a nonzero exit code in v1.1.0?
+7. Does a failing `squad doctor` check produce a nonzero exit code in Squad 2.0?
 8. What is SDK-first mode's TypeScript source-of-truth file commonly named, and what does `squad build --check` do?
 
 ## Further Reading
 
-- [Installation](https://bradygaster.github.io/squad/docs/get-started/installation/)
-- [Installation in Depth](https://bradygaster.github.io/squad/docs/get-started/install-comprehensive/)
-- [Standalone Install](https://bradygaster.github.io/squad/docs/features/standalone-install/)
-- [Insider Program](https://bradygaster.github.io/squad/docs/insider-program/)
-- [CLI Reference](https://bradygaster.github.io/squad/docs/reference/cli/)
-- [Squad in VS Code](https://bradygaster.github.io/squad/docs/features/vscode/)
-- [Choose Your Interface](https://bradygaster.github.io/squad/docs/get-started/choose-your-interface/)
-- [Choosing Your Path](https://bradygaster.github.io/squad/docs/get-started/choosing-your-path/)
-- [Five-Minute Start](https://bradygaster.github.io/squad/docs/get-started/five-minute-start/)
-- [Squad Product Guide](https://bradygaster.github.io/squad/docs/guide/)
-- [Personal Squad](https://bradygaster.github.io/squad/docs/guide/personal-squad/)
-- [Your Personal Squad (v1.1.0 source)](https://github.com/bradygaster/squad/blob/v1.1.0/docs/src/content/docs/guide/personal-squad.md)
-- [Interactive Shell Guide](https://bradygaster.github.io/squad/docs/guide/shell/)
-- [SDK-First Squad Mode](https://bradygaster.github.io/squad/docs/sdk-first-mode/)
+- [Installation](https://github.github.com/squad/docs/get-started/installation/)
+- [Installation in Depth](https://github.github.com/squad/docs/get-started/install-comprehensive/)
+- [Standalone Install](https://github.github.com/squad/docs/features/standalone-install/)
+- [Insider Program](https://github.github.com/squad/docs/insider-program/)
+- [CLI Reference](https://github.github.com/squad/docs/reference/cli/)
+- [Squad in VS Code](https://github.github.com/squad/docs/features/vscode/)
+- [Choose Your Interface](https://github.github.com/squad/docs/get-started/choose-your-interface/)
+- [Choosing Your Path](https://github.github.com/squad/docs/get-started/choosing-your-path/)
+- [Five-Minute Start](https://github.github.com/squad/docs/get-started/five-minute-start/)
+- [Squad Product Guide](https://github.github.com/squad/docs/guide/)
+- [Interactive Shell Guide](https://github.github.com/squad/docs/guide/shell/)
+- [SDK-First Squad Mode](https://github.github.com/squad/docs/sdk-first-mode/)

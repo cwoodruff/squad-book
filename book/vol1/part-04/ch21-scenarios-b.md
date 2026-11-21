@@ -75,12 +75,12 @@ The monorepo needs two kinds of routing. **Local routing** sends a change in one
 - Which service has a clear human or AI owner? Avoid a specialist per directory when work is sparse or responsibilities overlap.
 - Where is shared code? Define who coordinates changes to `shared/`, generated types, schemas, API clients, and common deployment tooling.
 - Which changes require multi-service integration tests, and who owns them?
-- Is `.github/agents/squad.agent.md` expected at the repository root even when `.squad/` is nested? The v1.1.0 initializer has an `agentFileRoot` option for that monorepo layout decision.
+- Is `.github/agents/squad.agent.md` expected at the repository root even when `.squad/` is nested? The v2.0.0 initializer has an `agentFileRoot` option for that monorepo layout decision.
 - Are folder scopes guidance or access control? Treat `folderScope` as focus guidance; it is not an enforced filesystem sandbox.
 
 ### Step-by-step recipe
 
-1. **Choose the team root.** For a repository-wide monorepo team, keep `.squad/` at the Git root so shared knowledge and routing apply across services. If using a nested state root, decide where the Copilot agent file must live; v1.1.0 initialization supports a separate agent-file root for discovery.
+1. **Choose the team root.** For a repository-wide monorepo team, keep `.squad/` at the Git root so shared knowledge and routing apply across services. If using a nested state root, decide where the Copilot agent file must live; v2.0.0 initialization supports a separate agent-file root for discovery.
 2. **Create a domain map.** List services, owners, public interfaces, tests, and shared packages. Highlight which changes must be coordinated across two or more domains.
 3. **Cast a compact team.** Start with a coordinator/lead, a few domain specialists, and a test or review role where useful. Prefer a specialist who can own several related services over a long roster with overlapping scopes.
 4. **Write routing rules with concrete work descriptions.** Match payment API changes to the payments owner, web UI changes to the frontend owner, and shared schema changes to a coordinating lead. Keep cross-service tests visible instead of routing them to an arbitrary service owner.
@@ -97,9 +97,9 @@ Tasktrack already has two useful domains: `api/` and `web/`. Keep one team and b
 
 ## Scenario 3: Scaling Workstreams with SubSquads
 
-When issue volume, geography, or parallel operating hours create a bottleneck, the problem may be more than routing inside one team. Squad v1.1.0 supports SubSquads: multiple Squad instances can use labels to divide issue intake and can be given folder scopes and workflow modes. This is horizontal partitioning of work, not a way to run several agents against the same change safely. Work should be labeled deliberately and conflicts still need coordination.
+When issue volume, geography, or parallel operating hours create a bottleneck, the problem may be more than routing inside one team. Squad v2.0.0 supports SubSquads: multiple Squad instances can use labels to divide issue intake and can be given folder scopes and workflow modes. This is horizontal partitioning of work, not a way to run several agents against the same change safely. Work should be labeled deliberately and conflicts still need coordination. If what you actually have is several watchers on different machines working one shared queue, rather than label partitions, look at `squad watch --claims git-ref` in Chapter 9: it is off by default and, once enabled, keeps two watchers from taking the same issue.
 
-The v1.1.0 SDK resolver reads `.squad/workstreams.json` with a top-level `defaultWorkflow` and a `workstreams` array. Each entry has a `name` and `labelFilter`; it may also have `folderScope`, `workflow`, and `description`. The accepted workflows are `branch-per-issue` and `direct`. When no entry-specific workflow is set, the top-level default is applied. The source also accepts the deprecated CLI aliases `squad workstreams` and `squad streams`, but prefer the current `squad subsquads` name.
+The v2.0.0 SDK resolver reads `.squad/workstreams.json` with a top-level `defaultWorkflow` and a `workstreams` array. Each entry has a `name` and `labelFilter`; it may also have `folderScope`, `workflow`, and `description`. The accepted workflows are `branch-per-issue` and `direct`. When no entry-specific workflow is set, the top-level default is applied. The source also accepts the deprecated CLI aliases `squad workstreams` and `squad streams`, but prefer the current `squad subsquads` name.
 
 ### Decision checklist
 
@@ -122,7 +122,7 @@ The v1.1.0 SDK resolver reads `.squad/workstreams.json` with a top-level `defaul
 7. **Coordinate shared files.** Define a handoff for shared package changes, overlapping labels, urgent defects, and work that moves between teams. Use branches and PR review when parallel changes can conflict.
 8. **Review the partition.** After a small pilot, compare issue throughput, duplicate work, cross-team handoffs, and abandoned labels. Merge partitions that add overhead without real independence.
 
-> **Note:** The scenario guide describes `.squad/streams.json`; v1.1.0 code resolves `.squad/workstreams.json`. Use the source-verified path in this recipe. The `workstreams` JSON property remains the field name even though the public CLI calls these partitions SubSquads.
+> **Note:** The scenario guide describes `.squad/streams.json`; v2.0.0 code resolves `.squad/workstreams.json`. Use the source-verified path in this recipe. The `workstreams` JSON property remains the field name even though the public CLI calls these partitions SubSquads.
 
 ### Tasktrack variation
 
@@ -132,7 +132,9 @@ For a Tasktrack deployment that uses GitHub issues, add two partitions: `api` fo
 
 A human–AI team should preserve the authority and review practices that already make the project safe. Humans may supply domain knowledge, make policy choices, approve architecture, or review a pull request; agents can help investigate, implement, test, and prepare evidence. A roster entry or routing instruction does not create a human account, send a notification, enforce approval, or guarantee that the coordinator will pause. Treat the human handoff as an explicit conversational workflow that you control.
 
-The Squad initialization skills describe a “Human Team Members” section in `.squad/team.md`, and the coordinator prompt includes human routing concepts. The SDK's `TeamDefinition.members`, however, is a list of string references, not a special human-member type with a tool-backed lifecycle. Humans do not get model sessions, agent charters, or agent histories. Keep their names and roles in team context only when that is appropriate for the repository and its privacy policy.
+The Squad initialization skills describe a “Human Team Members” section in `.squad/team.md`, and the coordinator prompt includes human routing concepts. The SDK's `TeamDefinition.members`, however, is a list of string references, not a special human-member type with a tool-backed lifecycle. Humans do not get model sessions, agent charters, or agent histories. Keep their names and roles in team context only when that is appropriate for the repository and its privacy policy. Squad 2.0 ships `.squad/templates/human-members.md` again; it explains how to add a human to the roster and states the sign-off rule from Chapter 18: a request to do gated work is not the sign-off.
+
+The humans on a team do not all have to use the same AI host. Squad 2.0 can project one `.squad/` into GitHub Copilot, Claude Code and five other hosts (`squad init --client <list>`, or `squad client add <list>` later), so one developer can work in Copilot while another uses Claude Code against the same charters, routing and decisions. Decisions still flow one way: agents propose into `decisions/inbox/`, Scribe merges them into `decisions.md`, and every host's sessions read the committed result. Agree on who runs `squad client sync` after routing changes so each host's projected files stay current. Chapter 19 (Volume 2) walks through a mixed-host setup.
 
 ### Decision checklist
 
@@ -225,7 +227,7 @@ Expected result: the routing table names separate API and frontend responsibilit
 
 ## Configuration Reference
 
-| Item | Purpose | v1.1.0 behavior and caveats |
+| Item | Purpose | v2.0.0 behavior and caveats |
 |---|---|---|
 | `.squad/team.md` | Team roster, context, and human-member notes | Human names can be documented here; this does not create human sessions or notifications. |
 | `.squad/routing.md` | Routing instructions | Keep rules concrete and evidence-based. Markdown can guide routing but is not a file permission policy. |
@@ -235,15 +237,15 @@ Expected result: the routing table names separate API and frontend responsibilit
 | `workstreams[].folderScope` | Directory focus | Optional string array; advisory, not a hard access control. |
 | `workstreams[].workflow` | Per-partition mode | `branch-per-issue` or `direct`; omitted entries inherit `defaultWorkflow`. |
 | `workstreams[].description` | Human-readable domain summary | Optional context for operators. |
-| `defaultWorkflow` | Default SubSquad workflow | `branch-per-issue` or `direct`; v1.1.0 resolver falls back to `branch-per-issue` for an invalid/missing value. |
+| `defaultWorkflow` | Default SubSquad workflow | `branch-per-issue` or `direct`; the v2.0.0 resolver falls back to `branch-per-issue` for an invalid/missing value. |
 | `SQUAD_TEAM` | Select active SubSquad by name | Takes precedence over `.squad-workstream`; an unknown name can resolve to a synthesized `team:<name>` label. |
 | `.squad-workstream` | Local active SubSquad selection | Used when `SQUAD_TEAM` is unset; intended as a local selection file. |
-| `squad subsquads list` / `status` / `activate <name>` | Inspect or activate partitions | Verified v1.1.0 command family. `workstreams` and `streams` are deprecated aliases. |
+| `squad subsquads list` / `status` / `activate <name>` | Inspect or activate partitions | Verified v2.0.0 command family. `workstreams` and `streams` are deprecated aliases. |
 | `agentFileRoot` initialization option | Agent-file discoverability in monorepos | May place `.github/agents/squad.agent.md` at Git root while team state is nested; choose intentionally. |
 
 ## Under the Hood
 
-The scenario recommendations rest on a few concrete v1.1.0 behaviors. The source docs for large codebases, monorepos, and human teams are useful patterns, but examples should be reconciled with the checked-out release before copying them.
+The scenario recommendations rest on a few concrete v2.0.0 behaviors. The source docs for large codebases, monorepos, and human teams are useful patterns, but examples should be reconciled with the checked-out release before copying them.
 
 ### Repository resolution and state boundaries
 
@@ -265,7 +267,7 @@ The initialization code in `packages/squad-sdk/src/config/init.ts` includes an `
 - **An agent misses a shared consumer.** Have it search imports or API consumers, name them in its plan, and run tests that cover the contract. Routing is not dependency analysis.
 - **Too many specialists slow down work.** Combine low-volume domains and route by task. Grow the roster only when repeated work proves ownership separation is useful.
 - **A SubSquad appears not to filter issues.** Verify `.squad/workstreams.json`, the exact active name, the `team:*` label on test issues, and the active selection source. The root `workstreams` key is not a typo: it is the source-compatible property.
-- **The instructions mention `.squad/streams.json`.** That path differs from v1.1.0 source. Use `.squad/workstreams.json` and confirm behavior with `squad subsquads list`.
+- **The instructions mention `.squad/streams.json`.** That path differs from v2.0.0 source. Use `.squad/workstreams.json` and confirm behavior with `squad subsquads list`.
 - **The `folderScope` list seems protective.** It is guidance. Use least privilege, sandboxing, branch protections, and review gates for actual controls.
 - **A human owner is “routed” but never notified.** A routing line cannot contact a person. Send the question through the team's real channel and relay the answer in the active work session.
 - **The coordinator proceeds before human approval.** Stop or redirect it. Add a clear gate in team instructions, but enforce actual merge approval with repository policy.
@@ -276,7 +278,7 @@ The initialization code in `packages/squad-sdk/src/config/init.ts` includes an `
 
 Large codebases reward selective discovery and explicit verification. Monorepos usually benefit from one shared team with meaningful service owners and a named route for shared code. SubSquads help divide issue intake when labels can partition independent work, but folder scope remains advisory and parallel work still needs coordination. Human-team workflows should preserve decision authority, pause deliberately, and rely on real review controls rather than implying a roster or routing rule can enforce approval. Choose the simplest model that fits the project's ownership and trust boundaries, then expand only after a pilot demonstrates value.
 
-**Next steps:** This chapter closes Volume 1. Volume 2 begins with its Part I, Advanced Coordination, which covers Chapters 1–5 (Volume 2), and continues through production operations, internals, the Squad 2.0 preview, and mastery. Use the reading paths in the Volume 1 Preface to choose a starting part: operators can continue with Volume 2, Parts I–II; builders with Volume 2, Part III; and Squad 2.0 evaluators with Volume 2, Part IV.
+**Next steps:** This chapter closes Volume 1. Volume 2 begins with its Part I, Advanced Coordination, which covers Chapters 1–5 (Volume 2), and continues through production operations, internals, Squad 2.0's multi-host support (Part IV, Squad 2.0: One Team, Many Hosts), and mastery. Use the reading paths in the Volume 1 Preface to choose a starting part: operators can continue with Volume 2, Parts I–II; builders with Volume 2, Part III; and multi-host teams, or readers coming from Squad 1.x, with Volume 2, Part IV.
 
 ## Exercises
 
@@ -291,18 +293,18 @@ Large codebases reward selective discovery and explicit verification. Monorepos 
 1. Why should a large-codebase task begin with scoped discovery rather than a blanket request to inspect every file?
 2. When is a single Squad with specialists generally a better starting point than one Squad per service?
 3. What issue property does a SubSquad `labelFilter` partition, and what does `folderScope` not guarantee?
-4. What is the v1.1.0 configuration filename and top-level array key for SubSquads?
+4. What is the v2.0.0 configuration filename and top-level array key for SubSquads?
 5. Name the active SubSquad resolution order.
 6. Does documenting a human in `.squad/team.md` give that person an agent session or guarantee a notification?
 7. Name two repository controls that can enforce human review more reliably than routing prose.
 
 ## Further Reading
 
-- [Squad on Large Codebases](https://bradygaster.github.io/squad/docs/scenarios/large-codebase/)
-- [Squad in Monorepos](https://bradygaster.github.io/squad/docs/scenarios/monorepo/)
-- [Scaling with SubSquads](https://bradygaster.github.io/squad/docs/scenarios/scaling-workstreams/)
-- [Squad Alongside a Team of Human Developers](https://bradygaster.github.io/squad/docs/scenarios/team-of-humans/)
-- [SDK stream types](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-sdk/src/streams/types.ts)
-- [SDK SubSquad resolver](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-sdk/src/streams/resolver.ts)
-- [SDK SubSquad issue filter](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-sdk/src/streams/filter.ts)
-- [Squad initialization options](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-sdk/src/config/init.ts)
+- [Squad on Large Codebases](https://github.github.com/squad/docs/scenarios/large-codebase/)
+- [Squad in Monorepos](https://github.github.com/squad/docs/scenarios/monorepo/)
+- [Scaling with SubSquads](https://github.github.com/squad/docs/scenarios/scaling-workstreams/)
+- [Squad Alongside a Team of Human Developers](https://github.github.com/squad/docs/scenarios/team-of-humans/)
+- [SDK stream types](https://github.com/github/squad/blob/v2.0.0/packages/squad-sdk/src/streams/types.ts)
+- [SDK SubSquad resolver](https://github.com/github/squad/blob/v2.0.0/packages/squad-sdk/src/streams/resolver.ts)
+- [SDK SubSquad issue filter](https://github.com/github/squad/blob/v2.0.0/packages/squad-sdk/src/streams/filter.ts)
+- [Squad initialization options](https://github.com/github/squad/blob/v2.0.0/packages/squad-sdk/src/config/init.ts)

@@ -11,13 +11,13 @@
 - Design result persistence so agent output survives session/context loss without confusing orchestration logs with permanent memory.
 - Recognize current limitations and documentation/code mismatches before designing a multi-replica deployment.
 
-> **Preview (Squad 2.0):** Squad 2.0 introduces a separate backend boundary and experimental MCP tools. See Chapter 21 and the [2.0 release notes](https://github.com/bradygaster/squad/blob/v2.0.0-preview.2/docs/src/content/docs/whatsnew.md) for the preview contract.
+This chapter covers the Git-native state backends and SDK storage. Squad 2.0 also has a separate, experimental conversation backend with its own MCP tools, which is a different thing; Chapter 21 and the [2.0 release notes](https://github.com/github/squad/blob/v2.0.0/docs/src/content/docs/whatsnew.md) cover it.
 
 ## State Is Not One Thing
 
 “Where is Squad state stored?” sounds like a single question, but the SDK has multiple layers with different contracts. A useful architecture separates three concerns:
 
-1. **State selection:** `StateBackend` decides how Squad’s mutable state is persisted in the project context. In v1.1.0, the primary choices are local files, a Git orphan branch, or a two-layer combination.
+1. **State selection:** `StateBackend` decides how Squad’s mutable state is persisted in the project context. In v2.0.0, the primary choices are local files, a Git orphan branch, or a two-layer combination.
 2. **Storage mechanics:** `StorageProvider` is a generic I/O interface for reading, writing, listing, renaming, and deleting file-like keys. It can be backed by a filesystem, memory, SQLite, or a custom remote object store.
 3. **State domain model:** `SquadState` groups typed collections—agents, decisions, routing, team, skills, templates, logs—on top of a `StorageProvider`.
 
@@ -50,6 +50,14 @@ squad upgrade --state-backend two-layer
 
 The choice is persisted as `stateBackend` in `.squad/config.json`; later Squad commands resolve it automatically. If the key is absent, `local` is selected. The CLI currently supports `local`, `orphan`, and `two-layer` as the user-facing values. Legacy `worktree` normalizes to `local`; legacy `git-notes` normalizes to `two-layer`. `external` is accepted only as a legacy alias to the unimplemented `external-stub`, which warns and falls back to local. It is not a cloud state store.
 
+### Migrating an existing project
+
+`squad upgrade --state-backend orphan` (or `two-layer`) on a project that already has local state is a transactional move. Squad imports existing decisions, agent histories, decision-inbox records and the whole governed `memory/` store (its index, configuration, audit archives and tombstones) into the orphan branch in a single commit, and only then switches `stateBackend` in config. Destination files it does not know about are kept. Retrying is safe when a destination file is identical; when a file at the same path differs, migration stops with an error and changes neither copy nor the backend, so you can reconcile by hand. Source files leave the working tree only after the transfer and the config write both succeed. Sessions, scratch files and logs are not migrated, and casting files stay on disk. Reconnect any open MCP sessions afterwards so they resolve the new backend.
+
+> **Note:** Changed in Squad 2.0: in 1.x, migrated files could linger in the working tree until later commits removed them. In 2.0.0 the move is a single transaction that explicitly includes the governed `memory/` store, and the pre-commit hook guards `memory/` and `identity/` instead of `casting/` and `routing/`.
+
+The upgrade also installs two Git hooks. The pre-commit hook blocks additions and edits to the four paths that now belong on the orphan branch: `.squad/decisions.md`, `.squad/agents/*/history.md`, `.squad/memory/` and `.squad/identity/`. Staged deletions of those files are allowed, so the commit that removes migrated sources goes through. The post-commit hook flushes pending two-layer state to the orphan branch after each commit; it is best effort and never blocks.
+
 ### Local
 
 Local state is ordinary content under `.squad/` in the working tree. It is easiest to inspect and edit, works without Git plumbing, and is suitable for a solo developer or a team that deliberately versions Squad state alongside code. Its risks are ordinary Git risks: an uncommitted state file can disappear when changing branches, commits can mix state changes into application PRs, and multiple contributors can conflict on the same Markdown file.
@@ -59,6 +67,8 @@ Local state is ordinary content under `.squad/` in the working tree. It is easie
 The orphan backend stores keys in a dedicated `squad-state` branch that has no shared commit history with the code branches. It does not check out that branch to mutate files. Instead, it uses Git plumbing to read blobs, construct trees and commits, and update the branch reference. This keeps mutable state out of feature branch diffs while preserving a Git history for inspection and recovery.
 
 Orphan storage is not a distributed database. Concurrent writers can race to update the same ref; a compare-and-swap loop retries by rereading the latest tree, but network pushes from independent clones can still reject non-fast-forward updates. A single active writer or coordinated sync is safer than treating orphan as a multi-replica transactional store.
+
+Not everything under `.squad/` moves to the orphan branch. Casting (the policy, the registry and history pair, and its commit marker) and routing are configuration, so they stay on your normal source branch with every backend. Change the casting registry only through Squad’s atomic casting protocol (`squad cast`), never by hand or with the state tools. When a non-local backend is configured, Squad keeps its lock files in a machine-local directory derived from the repository’s shared `.git` common directory, so no `.squad/backend/` folder appears in your working tree.
 
 ### Two-layer
 
@@ -97,7 +107,7 @@ Typical roots are:
 | macOS | `~/Library/Application Support/squad/projects/` |
 | Linux | `$XDG_CONFIG_HOME/squad/projects/` (normally `~/.config/squad/projects/`) |
 
-The project key defaults from the repository directory name but can be overridden with `--key`. A small `.squad/config.json` marker remains in the project with `stateLocation: "external"`, `projectKey`, and `teamRoot`. Squad also adds that marker to `.gitignore`, because its value is machine-specific. The external directory is per project key; it is not pushed to the remote.
+The project key defaults from the project directory name but can be overridden with `--key`. Squad records which project owns each key in an `.owner.json` file inside the external directory. If a different project resolves to a key that is already owned, `squad externalize` refuses before it moves anything; pick a unique key such as `squad externalize --key tasktrack-api`. A populated directory from an older Squad version is adopted only when this project’s `.squad/config.json` already points at that key, and an occupied directory without matching configuration is left untouched. A small `.squad/config.json` marker remains in the project with `stateLocation: "external"`, `projectKey`, and `teamRoot`. Squad also adds that marker to `.gitignore`, because its value is machine-specific. The external directory is per project key; it is not pushed to the remote.
 
 Externalization intentionally leaves a set of discovery/config files in the repository: `config.json`, `manifest.json`, `workstreams.json`, `upstream.json`, `squad-registry.json`, and `_upstream_repos`. Those are consumed by code paths that still need to find local project configuration. Other entries are copied out and removed from the working tree. `squad internalize` copies state back but leaves the external copy in place; it removes external-location fields from the marker and deletes the marker only when no other settings remain.
 
@@ -113,11 +123,11 @@ sequenceDiagram
   X-->>P: internalize copies state back and leaves external copy
 ```
 
-There are sharp operational edges. If `git clean -fdx` removes the ignored marker, the state directory still exists but the resolver may no longer know which external project key to use until you restore or regenerate the marker. Back up the external directory separately. If two clones have the same derived project key, verify the key choice rather than assuming their state is isolated. Externalize and state backend selection also solve different problems: one relocates working-tree contents; the other selects a backend implementation.
+There are sharp operational edges. If `git clean -fdx` removes the ignored marker, the state directory still exists but the resolver may no longer know which external project key to use until you restore or regenerate the marker. Back up the external directory separately. If two projects share a directory name, the second one is refused rather than silently merged; give it its own `--key`. Externalize and state backend selection also solve different problems: one relocates working-tree contents; the other selects a backend implementation.
 
 ## The StorageProvider Contract
 
-The SDK `StorageProvider` provides 12 asynchronous methods: `createIfAbsent`, `read`, `write`, `append`, `exists`, `list`, `delete`, `deleteDir`, `isDirectory`, `mkdir`, `rename`, `copy`, and `stat`—counted carefully, that is 13 if `createIfAbsent` is included with the 12 shown? In v1.1.0 source, the method list is 13 total: `createIfAbsent` plus `read`, `write`, `append`, `exists`, `list`, `delete`, `deleteDir`, `isDirectory`, `mkdir`, `rename`, `copy`, `stat` (12 named after it). It also requires 12 synchronous compatibility methods, for 25 required methods in the interface.
+The SDK `StorageProvider` provides 13 asynchronous methods: `createIfAbsent`, `read`, `write`, `append`, `exists`, `list`, `delete`, `deleteDir`, `isDirectory`, `mkdir`, `rename`, `copy`, and `stat`. It also requires 12 synchronous compatibility methods, for 25 required methods in the interface.
 
 > **Note:** The assigned StorageProvider page calls the interface “13 core async methods” and “24 methods total.” The source has 13 async methods and 12 sync methods (25); use the interface file as the precise inventory.
 
@@ -176,7 +186,7 @@ For team workflows, make the consistency requirement explicit before selecting s
 
 For a single container, a mounted persistent volume can preserve local files across restarts. It does not add process coordination. With more than one live replica against the same directory, two writers can race and corrupt or overwrite state. A read-write-many volume makes a directory mount available; it does not turn operations into transactions. The container selection reference warns that current local/orphan/two-layer backends should not be treated as safe multi-pod storage. The external state provider described there is tracked as future work and not a GA stock CLI backend.
 
-The assigned state-backend-selection page describes an open root-directory issue in `resolveSquadState()` (#1555). The v1.1.0 source inspected for this chapter now constructs `new FSStorageProvider(paths.teamSquadDir)` for the local backend and documents that root as the path-confinement boundary. That is a documentation/code discrepancy: do not repeat the page’s “no configuration-level workaround” warning as current behavior without rechecking the exact release and issue status. Still test path resolution in the project context you deploy, especially for nested squads and worktrees.
+The assigned state-backend-selection page describes an open root-directory issue in `resolveSquadState()` (#1555). The v2.0.0 source still constructs `new FSStorageProvider(paths.teamSquadDir)` for the local backend and documents that root as the path-confinement boundary. That is a documentation/code discrepancy: the page still carries the warning at v2.0.0, so do not repeat its “no configuration-level workaround” claim as current behavior without rechecking the issue status. Still test path resolution in the project context you deploy, especially for nested squads and worktrees.
 
 ## Hands-On: Move Tasktrack State to a Git Backend
 
@@ -205,7 +215,7 @@ This exercise changes your Tasktrack setup to use a backend intended for version
    git status --short
    ```
 
-   Expected: `stateBackend` is `two-layer`; the `squad-state` branch is created or already present; hooks are installed or chained without replacing existing hooks. The exact working-tree state can vary during migration.
+   Expected: `stateBackend` is `two-layer`; the `squad-state` branch is created or already present; hooks are installed or chained without replacing existing hooks. Decisions, histories and `memory/` now live on the orphan branch, while `.squad/casting/` and `routing.md` remain in your working tree.
 
 4. Add and commit only Tasktrack code as you normally would. Inspect state independently with `git log --oneline squad-state` and `git ls-tree --name-only -r squad-state` rather than expecting mutable state to appear in the application branch diff.
 
@@ -225,7 +235,8 @@ Expected result: you can identify the selected backend from config and find its 
 | Legacy `external` / `external-stub` | falls back to `local` | Placeholder, not an implemented cloud provider. |
 | `squad init --state-backend <type>` | `local\|orphan\|two-layer` | Set backend on initialization. |
 | `squad upgrade --state-backend <type>` | `orphan\|two-layer` | Migrate existing state. |
-| `squad externalize --key <name>` | derived project key | Relocate local working-tree state to platform-local storage. |
+| `squad externalize --key <name>` | derived project key | Relocate local working-tree state to platform-local storage. Ownership is recorded in `.owner.json`; a key owned by another project is refused. |
+| Pre-commit hook (orphan, two-layer) | blocks additions and edits | Blocks `decisions.md`, `agents/*/history.md`, `memory/` and `identity/` from the working tree; deletions are allowed. Casting and routing stay committable. |
 | `StorageProvider.createIfAbsent()` | no overwrite | Atomic creation contract; throws conflict or uncertainty. |
 | `SQLiteStorageProvider` DB path | `.squad/squad.db` | Can be overridden in constructor; call `init()` first. |
 | `FSStorageProvider` `rootDir` | optional | Constrains file operations to a resolved tree when supplied. |
@@ -256,6 +267,8 @@ This code makes fallback visible but not necessarily harmless. Production automa
 - **Calling `externalize` “cloud state”:** its path is local OS application data. Back it up locally; use a different sync mechanism to share it.
 - **Selecting `external` in config as if it were Azure:** the current backend type is a stub and falls back to local.
 - **Confusing SDK storage with CLI backend selection:** implementing a provider does not make CLI state use it automatically.
+- **Pre-commit hook rejects a commit:** you staged additions or edits to files that live on the orphan branch. Unstage them with `git restore --staged .squad/decisions.md .squad/agents/*/history.md .squad/memory/ .squad/identity/` and commit again. Casting and routing changes are allowed and do not need unstaging.
+- **Migration stops on a differing file:** a destination file at the same path already holds different content. Squad has changed nothing; compare both copies, reconcile one, and rerun `squad upgrade --state-backend <type>`.
 - **Assuming Git hooks make simultaneous replicas safe:** hooks synchronize around Git operations; they are not distributed locks or a transaction coordinator.
 - **Using SQLite from multiple processes:** the sample’s sql.js implementation loads and rewrites the database and documents single-process use.
 - **Using `exists()` before `write()`:** this is a TOCTOU race; choose `createIfAbsent()` for one-writer-wins behavior.
@@ -289,14 +302,14 @@ The correct storage design starts by naming the requirement: branch persistence,
 
 ## Further Reading
 
-- [External State Storage](https://bradygaster.github.io/squad/docs/features/external-state/)
-- [State Backends](https://bradygaster.github.io/squad/docs/features/state-backends/)
-- [StorageProvider](https://bradygaster.github.io/squad/docs/features/storage-provider/)
-- [Result Persistence](https://bradygaster.github.io/squad/docs/reference/result-persistence/)
-- [State Backend Selection](https://bradygaster.github.io/squad/docs/reference/state-backend-selection/)
-- [Team State Storage](https://bradygaster.github.io/squad/docs/scenarios/team-state-storage/)
-- [`packages/squad-sdk/src/state-backend.ts`](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-sdk/src/state-backend.ts)
-- [`packages/squad-sdk/src/state/`](https://github.com/bradygaster/squad/tree/v1.1.0/packages/squad-sdk/src/state)
-- [`packages/squad-sdk/src/storage/`](https://github.com/bradygaster/squad/tree/v1.1.0/packages/squad-sdk/src/storage)
-- [`samples/storage-provider-sqlite/`](https://github.com/bradygaster/squad/tree/v1.1.0/samples/storage-provider-sqlite)
-- [`samples/storage-provider-azure/`](https://github.com/bradygaster/squad/tree/v1.1.0/samples/storage-provider-azure)
+- [External State Storage](https://github.github.com/squad/docs/features/external-state/)
+- [State Backends](https://github.github.com/squad/docs/features/state-backends/)
+- [StorageProvider](https://github.github.com/squad/docs/features/storage-provider/)
+- [Result Persistence](https://github.github.com/squad/docs/reference/result-persistence/)
+- [State Backend Selection](https://github.github.com/squad/docs/reference/state-backend-selection/)
+- [Team State Storage](https://github.github.com/squad/docs/scenarios/team-state-storage/)
+- [`packages/squad-sdk/src/state-backend.ts`](https://github.com/github/squad/blob/v2.0.0/packages/squad-sdk/src/state-backend.ts)
+- [`packages/squad-sdk/src/state/`](https://github.com/github/squad/tree/v2.0.0/packages/squad-sdk/src/state)
+- [`packages/squad-sdk/src/storage/`](https://github.com/github/squad/tree/v2.0.0/packages/squad-sdk/src/storage)
+- [`samples/storage-provider-sqlite/`](https://github.com/github/squad/tree/v2.0.0/samples/storage-provider-sqlite)
+- [`samples/storage-provider-azure/`](https://github.com/github/squad/tree/v2.0.0/samples/storage-provider-azure)

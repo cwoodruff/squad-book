@@ -5,7 +5,7 @@
 ## What You'll Learn
 
 - Decide whether a Squad customization belongs in core, a reusable plugin, or a team's own `.squad/` configuration.
-- Understand what the v1.1.0 plugin lifecycle actually installs, activates, verifies, and removes.
+- Understand what the v2.0.0 plugin lifecycle actually installs, activates, verifies, and removes, and which spawn paths actually inject plugin context.
 - Author a declarative plugin manifest and read the Graphify, Index Server, and MemPalace examples without confusing metadata with execution.
 - Add a typed SDK tool and understand why a `squad_route` tool needs host-provided fan-out dependencies.
 - Apply pre-tool and post-tool hooks, and distinguish the SDK's hook pipeline from hooks passed to a live session.
@@ -18,7 +18,7 @@ Squad is deliberately layered. A new capability does not automatically require a
 | Layer | Appropriate for | Owner and distribution |
 |---|---|---|
 | Squad core | Coordinator routing, spawning, or enforcement behavior that must apply to every team | Squad maintainers; released with the CLI/SDK |
-| Squad plugin | A reusable collection of guidance and team assets that other teams can opt into | Plugin author; distributed as a local plugin directory in v1.1.0 |
+| Squad plugin | A reusable collection of guidance and team assets that other teams can opt into | Plugin author; distributed as a local plugin directory in v2.0.0 |
 | Team configuration | Local decisions, standards, workflows, and knowledge that only this team needs | Team; kept in its `.squad/` state |
 
 A useful diagnostic is to translate “Squad should do this” into either “our team should do this” or “teams using this domain should do this.” The first usually belongs in the team's files; the second is a strong plugin candidate. Only a capability that changes the coordinator's fundamental behavior is likely to require core work and an RFC.
@@ -38,7 +38,7 @@ This decision is not irrevocable. Begin with team config, watch for repetition, 
 
 ## What a Squad Plugin Is—and Is Not
 
-In v1.1.0, a plugin is a declarative package of static files plus metadata. It can describe agents, ceremonies, decisions, instructions, knowledge, memory, routing, templates, workflows, hooks, and adapters. It can also describe external repository, package, MCP, or Copilot-plugin dependencies. Installation copies files to approved `.squad/` locations, records hashes and state, and leaves the plugin disabled until you enable it.
+In v2.0.0, a plugin is a declarative package of static files plus metadata. It can describe agents, ceremonies, decisions, instructions, knowledge, memory, routing, templates, workflows, hooks, and adapters. It can also describe external repository, package, MCP, or Copilot-plugin dependencies. Installation copies files to approved `.squad/` locations, records hashes and state, and leaves the plugin disabled until you enable it.
 
 A plugin manifest does **not** make every field executable. In particular:
 
@@ -51,6 +51,12 @@ A plugin manifest does **not** make every field executable. In particular:
 > **Warning:** “Install” here means copy declared static files into `.squad/`; it does not mean install an npm/PyPI package, start an MCP server, or execute a plugin. Treat metadata that contains a shell command as a note for the human operator, never as an instruction to paste blindly into a production environment.
 
 The layers complement rather than replace each other. A skill is a focused unit of agent guidance; a plugin can distribute one or more guidance files and other static assets. Copilot plugins belong to Copilot's own extension mechanism. MCP servers are separately configured tools. A Squad plugin can document those integrations, but it does not silently own their installation or trust boundary.
+
+> **Note:** Three things in Squad 2.0 share the words “plugin” and “hook,” and they are unrelated:
+>
+> - A **Squad plugin** is a declarative package installed into `.squad/plugins/` with `squad plugin install`. This chapter covers it.
+> - The **Squad plugin for Claude Code** is a Claude Code marketplace plugin (`claude plugin install squad@squad`) that carries the coordinator, the `squad_state` MCP server and the `/squad:*` skills. It is a host integration, not a Squad plugin; Chapter 19 covers it.
+> - **Claude Code hooks** are the advisory governance hooks Squad projects into `.claude/settings.json` when `"claudeHooks": "advisory"` is set in `.squad/config.json` (any other value is off). Claude Code runs them as `squad hook claude <Event>`; they add session context, warn a locked-out member and remind the coordinator to run Scribe, and they never block a tool call. They are separate from the SDK's `HookPipeline` described below; Chapter 20 covers their mechanics.
 
 ## Author and Install a Declarative Plugin
 
@@ -114,7 +120,22 @@ The plugin runtime has six known lifecycle event names: `onInstall`, `onEnable`,
 
 `refresh` is shorthand for the `onMemoryRefresh` event. `run-lifecycle` accepts a plugin ID and an event name. Both require the plugin to be installed, enabled, and to declare runtime capabilities. An unsupported event, provider, or capability type is rejected or reported as blocked, and the decision is captured in the plugin audit state. Do not equate this narrow allowlisted mechanism with general-purpose plugin hooks.
 
-The Graphify example illustrates why the distinction matters. Its manifest describes a real upstream tool, `graphifyy`, and static guidance; the CLI does not install or run that package. The v1.1.0 built-in provider writes fixed, illustrative graph nodes and a Markdown report from its implementation rather than analyzing the repository with the external Graphify tool. Treat those artifacts as a demonstration of the governed generation seam, not a live graph of your code.
+The Graphify example illustrates why the distinction matters. Its manifest describes a real upstream tool, `graphifyy`, and static guidance; the CLI does not install or run that package. The v2.0.0 built-in provider writes fixed, illustrative graph nodes and a Markdown report from its implementation rather than analyzing the repository with the external Graphify tool. Treat those artifacts as a demonstration of the governed generation seam, not a live graph of your code.
+
+### Which spawn paths see plugin context
+
+Enabling a plugin makes its context available, but only one spawn path actually injects it. On that path Squad reads `.squad/plugins/runtime.json`, finds the enabled active roles, and appends the installed guidance files and provider-contract summaries to the agent's system prompt under a `Plugin Context` section. Everywhere else the files sit under `.squad/` until something points an agent at them.
+
+| How the agent is spawned | Plugin context injected? |
+|---|---|
+| Your code calls the SDK's `AgentLifecycleManager.spawnAgent()` | Yes |
+| Your code uses another SDK spawn helper, such as `spawnParallel` or `SquadCoordinator` | No; these helpers do not read plugin state |
+| The Squad coordinator (`squad.agent.md` or another host's coordinator) | No; the coordinator's spawn prompt does not read plugin state or artifacts |
+| The Squad interactive shell (`squad` with no arguments) | No; agent sessions receive the charter only |
+| `squad watch` | No; it runs `copilot -p` with a prompt built from Ralph's charter and the issue |
+| `squad loop` | No; it runs `copilot -p` with the prompt in your `loop.md` |
+
+> **Warning:** Do not assume an enabled plugin reaches every spawned agent. It reaches only the agents your own code spawns through `spawnAgent()`. For coordinator, shell, `watch` and `loop` sessions, name the plugin file in your request, or add a line such as “Read `.squad/knowledge/graphify/graphify-integration.md` before code relationship work” to the relevant charter or skill.
 
 ## Marketplace Discovery and the Marketplace Template
 
@@ -131,9 +152,9 @@ squad plugin marketplace remove repository
 
 `add` records the source and derives its marketplace name from the last path segment. `list` displays registrations. `browse` requires the GitHub CLI (`gh`) to be installed and authenticated, then lists top-level directories from the registered GitHub repository. `remove` deletes a registration by its name. The help output describes the marketplace subcommands; the CLI implementation also contains local plugin lifecycle commands such as `validate`, `install`, and `enable`.
 
-Do not infer a remote installer from marketplace browsing. In v1.1.0, the lifecycle installer accepts a **local plugin directory**. Browsing lists a repository's directories; it does not fetch, validate, or install a selected remote folder. The template describes a coordinator flow that reads marketplace content and copies a skill into `.squad/skills/` or merges charter guidance after the user agrees. That described manual copy flow is distinct from `squad plugin install`, which deploys the manifest's declared files from a local directory.
+Do not infer a remote installer from marketplace browsing. In v2.0.0, the lifecycle installer accepts a **local plugin directory**. Browsing lists a repository's directories; it does not fetch, validate, or install a selected remote folder. The template describes a coordinator flow that reads marketplace content and copies a skill into `.squad/skills/` or merges charter guidance after the user agrees. That described manual copy flow is distinct from `squad plugin install`, which deploys the manifest's declared files from a local directory.
 
-> **Note:** A legacy marketplace guide describes richer package, cache, version pinning, and `@squad/sdk` APIs. Those names and workflows are not the v1.1.0 local plugin lifecycle. Use the actual v1.1.0 CLI and `@bradygaster/squad-sdk` exports for reproducible examples.
+> **Note:** A legacy marketplace guide describes richer package, cache, version pinning, and `@squad/sdk` APIs. Those names and workflows are not the v2.0.0 local plugin lifecycle. Use the actual v2.0.0 CLI and `@bradygaster/squad-sdk` exports for reproducible examples.
 
 ## Build SDK Tools Around Explicit Contracts
 
@@ -168,7 +189,7 @@ const lookupTask = defineTool<TaskLookupArgs>({
 
 This example illustrates a tool's boundary, not a standalone CLI invocation: the host must register the tool with the session or adapter that runs the model. A custom handler should validate inputs, bound response size and latency, avoid exposing secrets, and return a clear failure result rather than claiming success after an upstream failure.
 
-`ToolRegistry` is the SDK's registry of Squad coordination and state tools. In v1.1.0 its built-ins include `squad_route`, `squad_decide`, `squad_memory`, `squad_status`, `squad_skill`, the `squad_state_*` read/write/append/delete/list/create-if-absent/health operations, and the `memory.*` classify/write/search/promote/delete/audit operations. The exact tool list can evolve, so discover it through `getTools()` rather than hard-coding an assumed count. `getTool(name)` fetches one tool; `getToolsForAgent(allowedTools)` filters by an allowlist; `applySkillHandlers()` replaces handlers for names that already exist. That method deliberately ignores unknown names: skill scripts cannot add arbitrary tools through it.
+`ToolRegistry` is the SDK's registry of Squad coordination and state tools. In v2.0.0 its built-ins include `squad_route`, `squad_decide`, `squad_memory`, `squad_status`, `squad_skill`, the `squad_state_*` read/write/append/delete/list/create-if-absent/health operations, `squad_state_upstreams` (new in 2.0), and the `memory.*` classify/write/search/promote/delete/audit operations. The exact tool list can evolve, so discover it through `getTools()` rather than hard-coding an assumed count. `getTool(name)` fetches one tool; `getToolsForAgent(allowedTools)` filters by an allowlist; `applySkillHandlers()` replaces handlers for names that already exist. That method deliberately ignores unknown names: skill scripts cannot add arbitrary tools through it.
 
 `defineTool()` provides the wrapper for a custom typed tool and instruments calls with an OpenTelemetry span. Argument fields with names that look like content, query, token, secret, password, key, or auth are redacted from span arguments; the serialized argument summary is capped. Still design your own telemetry and result payloads to avoid secrets—redacting argument attributes does not make every tool result or thrown error safe to log.
 
@@ -277,7 +298,7 @@ The hook implementation in `packages/squad-sdk/src/hooks/index.ts` is an indepen
 
 ## Pitfalls and Troubleshooting
 
-- **Plugin installed but agents do not see its material:** installation intentionally leaves it disabled. Enable it and, for a specific role, switch that role to the plugin.
+- **Plugin installed but agents do not see its material:** installation intentionally leaves it disabled. Enable it and, for a specific role, switch that role to the plugin. If it is enabled and the agent still does not see it, check the spawn path: only `AgentLifecycleManager.spawnAgent()` injects plugin context. Coordinator, shell, `watch` and `loop` sessions need an explicit pointer to the file.
 - **Cannot activate a role:** another plugin may already be active for that component. Inspect `squad plugin list --json`, then intentionally disable or switch the existing binding.
 - **`refresh` reports no capabilities:** ordinary declarative knowledge files need no refresh. Refresh only applies to an enabled plugin with a supported runtime capability.
 - **A marketplace item cannot be installed by ID:** browse is discovery, not remote installation. Obtain a local plugin directory and run the local lifecycle commands.
@@ -286,12 +307,12 @@ The hook implementation in `packages/squad-sdk/src/hooks/index.ts` is an indepen
 - **A custom hook appears to do nothing:** confirm the host passes it into the session or calls `runPreToolHooks()` / `runPostToolHooks()` around actual work.
 - **A policy passes a path you expected to reject:** check the exact recognized tool name and argument field. The helper is deliberately simple; test boundary cases and add an independent filesystem-level control.
 - **A route tool claims it spawned an agent:** inspect the returned result. Without configured fan-out dependencies, the SDK returns failure instead of silently reporting success.
-- **A generated Graphify report is not a real code map:** v1.1.0's built-in provider is a static governed example; it does not install or execute Graphify.
+- **A generated Graphify report is not a real code map:** v2.0.0's built-in provider is a static governed example; it does not install or execute Graphify.
 
 ## Summary
 
 - Use core only for product-wide coordinator behavior; use plugins for reusable static capabilities and `.squad/` for team-local choices.
-- A v1.1.0 plugin is declarative: it copies approved static files, records state and hashes, and activates only when enabled.
+- A v2.0.0 plugin is declarative: it copies approved static files, records state and hashes, and activates only when enabled. Its context is injected automatically only for agents spawned through `AgentLifecycleManager.spawnAgent()`.
 - Marketplace browsing and local plugin installation are separate operations; the remote marketplace flow does not download and install a plugin directory.
 - External package, MCP, and Copilot integration fields are metadata; only allowlisted Squad-owned artifact generation runs during a plugin lifecycle.
 - Tools need explicit schemas, bounded handlers, and actual host wiring. `squad_route` requires real fan-out dependencies.
@@ -309,25 +330,26 @@ The hook implementation in `packages/squad-sdk/src/hooks/index.ts` is an indepen
 
 1. Which layer should own a new capability that changes the coordinator's global routing algorithm?
 2. Does `squad plugin install` execute the `upstream.installCommand` field?
-3. What is the difference between marketplace `browse` and plugin lifecycle `install` in v1.1.0?
+3. What is the difference between marketplace `browse` and plugin lifecycle `install` in v2.0.0?
 4. Name two conditions needed before a plugin's lifecycle operation can generate an artifact.
 5. Why can `squad_route` return `fan-out-deps-unavailable`?
 6. How do a `HookPipeline` result and a `SquadSessionHooks.onPreToolUse` result differ?
 7. Why is the built-in email scrubber not a complete privacy control?
+8. You enabled a plugin, but the coordinator's agents in Copilot CLI never mention its guidance. Why, and what are two fixes?
 
 ## Further Reading
 
-- [Plugin marketplace guide](https://bradygaster.github.io/squad/docs/features/plugins/)
-- [Marketplace guide](https://bradygaster.github.io/squad/docs/features/marketplace/)
-- [Building extensions](https://bradygaster.github.io/squad/docs/guide/building-extensions/)
-- [Extensibility guide](https://bradygaster.github.io/squad/docs/guide/extensibility/)
-- [Custom tools and hooks reference](https://bradygaster.github.io/squad/docs/reference/tools-and-hooks/)
-- [`templates/plugin-marketplace.md`](https://github.com/bradygaster/squad/blob/v1.1.0/templates/plugin-marketplace.md)
-- [`packages/squad-sdk/src/marketplace/plugin-manifest.ts`](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-sdk/src/marketplace/plugin-manifest.ts)
-- [`packages/squad-sdk/src/marketplace/plugin-runtime.ts`](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-sdk/src/marketplace/plugin-runtime.ts)
-- [`packages/squad-sdk/src/tools/index.ts`](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-sdk/src/tools/index.ts)
-- [`packages/squad-sdk/src/hooks/index.ts`](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-sdk/src/hooks/index.ts)
-- [`samples/hook-governance/`](https://github.com/bradygaster/squad/tree/v1.1.0/samples/hook-governance)
-- [`samples/plugin-knowledge-graphify/`](https://github.com/bradygaster/squad/tree/v1.1.0/samples/plugin-knowledge-graphify)
-- [`samples/plugin-knowledge-index-server/`](https://github.com/bradygaster/squad/tree/v1.1.0/samples/plugin-knowledge-index-server)
-- [`samples/plugin-memory-mempalace/`](https://github.com/bradygaster/squad/tree/v1.1.0/samples/plugin-memory-mempalace)
+- [Plugin marketplace guide](https://github.github.com/squad/docs/features/plugins/)
+- [Marketplace guide](https://github.github.com/squad/docs/features/marketplace/)
+- [Building extensions](https://github.github.com/squad/docs/guide/building-extensions/)
+- [Extensibility guide](https://github.github.com/squad/docs/guide/extensibility/)
+- [Custom tools and hooks reference](https://github.github.com/squad/docs/reference/tools-and-hooks/)
+- [`templates/plugin-marketplace.md`](https://github.com/github/squad/blob/v2.0.0/templates/plugin-marketplace.md)
+- [`packages/squad-sdk/src/marketplace/plugin-manifest.ts`](https://github.com/github/squad/blob/v2.0.0/packages/squad-sdk/src/marketplace/plugin-manifest.ts)
+- [`packages/squad-sdk/src/marketplace/plugin-runtime.ts`](https://github.com/github/squad/blob/v2.0.0/packages/squad-sdk/src/marketplace/plugin-runtime.ts)
+- [`packages/squad-sdk/src/tools/index.ts`](https://github.com/github/squad/blob/v2.0.0/packages/squad-sdk/src/tools/index.ts)
+- [`packages/squad-sdk/src/hooks/index.ts`](https://github.com/github/squad/blob/v2.0.0/packages/squad-sdk/src/hooks/index.ts)
+- [`samples/hook-governance/`](https://github.com/github/squad/tree/v2.0.0/samples/hook-governance)
+- [`samples/plugin-knowledge-graphify/`](https://github.com/github/squad/tree/v2.0.0/samples/plugin-knowledge-graphify)
+- [`samples/plugin-knowledge-index-server/`](https://github.com/github/squad/tree/v2.0.0/samples/plugin-knowledge-index-server)
+- [`samples/plugin-memory-mempalace/`](https://github.com/github/squad/tree/v2.0.0/samples/plugin-memory-mempalace)

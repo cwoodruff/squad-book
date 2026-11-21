@@ -9,7 +9,7 @@
 - Change a model for one task, one session, one agent, or persistently for the team.
 - Interpret `squad cost` output, including its structured usage ledger, legacy estimates, and coverage indicator.
 - Distinguish usage reporting and a cost estimate from a hard budget cap.
-- Explain the SDK's traffic-light, predictive circuit-breaker, and cooperative rate-pool helpers—and their integration limits in v1.1.0.
+- Explain the SDK's traffic-light, predictive circuit-breaker, and cooperative rate-pool helpers—and their integration limits in v2.0.0.
 
 ## Model Choice Is a Routing Decision
 
@@ -29,6 +29,8 @@ At each spawn, Squad resolves a model using the first applicable source in this 
 4. A preference in the agent charter's `## Model` section.
 5. Task-aware selection under the active profile.
 6. The default model for that profile.
+
+This precedence applies in full where the host lets the coordinator pick a model for each spawn, which is GitHub Copilot CLI (and the Copilot app). VS Code Copilot uses the session model from its model picker, and so do the other hosts, with one exception: in Claude Code each member subagent starts from the model in its charter, and the coordinator can still pass a per-call model when a higher layer applies. See the [client compatibility matrix](https://github.github.com/squad/docs/scenarios/client-compatibility/) and Chapter 20 (Volume 2).
 
 `auto` means that layer does not force a particular model, so resolution continues. Fallback happens after a model has been chosen and is found unavailable; it is not another preference tier. A live list of available models can be authoritative. If an unavailable model appears in its chain, Squad searches only later entries; it does not jump back to an earlier premium option. If no candidate remains, the resolver marks the model to be omitted and lets the host choose its default.
 
@@ -91,7 +93,7 @@ A persistent config may look like:
 
 A per-agent override takes precedence over the global default. Model profiles can be stored in `modelProfile`; the legacy `economyMode: true` also selects economy. When changing a value, preserve unrelated config keys. The SDK's model persistence helpers merge model fields into the existing JSON document. Avoid hand-editing malformed JSON: the reader deliberately treats unparseable config as absent, which can make the runtime appear to ignore the setting.
 
-> **Note:** `squad models` in v1.1.0 is a catalog refresh/diagnostics command, not the command that switches every agent's model. Switching behavior is prompted through the coordinator; persistent values live in `.squad/config.json`.
+> **Note:** `squad models` in v2.0.0 is a catalog refresh/diagnostics command, not the command that switches every agent's model. Switching behavior is prompted through the coordinator; persistent values live in `.squad/config.json`.
 
 ### Economy substitutions and preview models
 
@@ -138,7 +140,7 @@ squad cost --agent fenster
 squad cost --all
 ```
 
-`--agent` filters by a case-insensitive name. Without `--all`, the command scopes structured entries to the current session boundary when it can identify one; `--all` includes historical ledger entries. Compare the summary to the changes and test result, not just the token total. If the task needed multiple retries, consider whether cheaper selection caused expensive rework or whether the requirements should have been clearer. Tag your Tasktrack checkpoint `ch12-start` / `ch12-end` if you are preserving the book's tags.
+`--agent` filters by a case-insensitive name within that scope. Without `--all`, Squad 2.0 scopes structured entries to the newest Squad session, meaning the session of the most recent ledger row; for rows written by an older Squad without a session ID, it falls back to the newest session log in `.squad/log/`. `--all` includes historical ledger entries. (`squad cost --help` still describes the command as reporting "from orchestration logs"; the structured ledger is what it reads first.) Compare the summary to the changes and test result, not just the token total. If the task needed multiple retries, consider whether cheaper selection caused expensive rework or whether the requirements should have been clearer. Tag your Tasktrack checkpoint `ch12-start` / `ch12-end` if you are preserving the book's tags.
 
 The exact dollar amounts in a report are estimates derived from model pricing and recorded token usage; they are not an invoice or a contractual spend cap. If the command reports partial usage coverage, failed/aborted turns may not have a recorded usage result. For a controlled experiment, record the task, selected model, output quality, duration, and retries alongside estimated spend.
 
@@ -150,7 +152,7 @@ Three concepts often get called “budgeting,” but they are different mechanis
 - **Cost estimation** applies pricing information to token counts and produces an estimate.
 - **Spend control** prevents additional work after a configured limit.
 
-A tracker can do the first two without implementing the third. The SDK `CostTracker` accumulates entries per agent and session, sums token counts and estimated cost, tracks turn and fallback counts per agent, formats a summary, and can subscribe to `session:message` events on an `EventBus`. It is an in-memory accumulator; wiring it up and persisting records is the caller's responsibility. The class does not itself enforce a budget or prevent a spawn. Do not confuse a demo budget threshold or an old example's `defineBudget()` with a hard v1.1.0 CLI cost limit.
+A tracker can do the first two without implementing the third. The SDK `CostTracker` accumulates entries per agent and session, sums token counts and estimated cost, tracks turn and fallback counts per agent, formats a summary, and can subscribe to `session:message` events on an `EventBus`. It is an in-memory accumulator; wiring it up and persisting records is the caller's responsibility. The class does not itself enforce a budget or prevent a spawn. Do not confuse a demo budget threshold or an old example's `defineBudget()` with a hard CLI cost limit in v2.0.0.
 
 The `squad cost` CLI reads the structured `UsageLedger` from the active state backend. It prefers structured usage, reports the number of attempted turns that have matching recorded usage, and can skip invalid records. If no structured entries are available, it can parse legacy self-reported orchestration-log rows, which it explicitly labels as estimates. No usage data may mean no completed turn carried usage information; it does not prove that no model calls occurred. Keep the coverage line in reports you use for budget decisions.
 
@@ -221,7 +223,7 @@ Use rate protection as a layered operational practice even if the SDK enforcemen
 
 `packages/squad-sdk/src/runtime/cost-tracker.ts` contains the live accumulator API. The CLI's `packages/squad-cli/src/cli/commands/cost.ts` has evolved to read a structured usage ledger via the active state backend, with a fallback parser for legacy markdown logs. This distinction matters: an in-memory tracker example is useful for SDK consumers, but does not describe the CLI's actual persistence path or prove that every attempted model call is recorded.
 
-The cooperative primitives are in `packages/squad-sdk/src/ralph/rate-limiting.ts`: thresholds, proceed decisions, jittered retry delay, a predictive breaker, pool allocations, and JSON loading. They are small components, not a complete centralized admission-control service. The `samples/cost-aware-router` demonstrates tier choice and cost accounting as an SDK sample. Its docs and PRD are older than some current model APIs and IDs; inspect the current sample and exported SDK types rather than assuming every PRD snippet compiles unchanged against v1.1.0.
+The cooperative primitives are in `packages/squad-sdk/src/ralph/rate-limiting.ts`: thresholds, proceed decisions, jittered retry delay, a predictive breaker, pool allocations, and JSON loading. They are small components, not a complete centralized admission-control service. The `samples/cost-aware-router` demonstrates tier choice and cost accounting as an SDK sample. Its docs and PRD are older than some current model APIs and IDs; inspect the current sample and exported SDK types rather than assuming every PRD snippet compiles unchanged against v2.0.0.
 
 ## Pitfalls and Troubleshooting
 
@@ -255,18 +257,18 @@ Model choice is a per-task routing decision with explicit precedence and fallbac
 2. Does the economy profile remap a model explicitly selected by the user or configured for a particular agent?
 3. What does `squad models refresh` do, and what does it not do?
 4. What is the default `PredictiveCircuitBreaker` warning threshold, and how many samples are needed before prediction?
-5. What computation does the v1.1.0 predictor actually use despite a comment referring to linear regression?
+5. What computation does the v2.0.0 predictor actually use despite a comment referring to linear regression?
 6. Which rate-light states allow priority-1 specialists to proceed?
 7. Does `CostTracker` impose a hard budget cap? Is `squad cost` an invoice?
 8. Why can a file-based `RatePool` fail to coordinate multiple concurrent processes safely?
 
 ## Further Reading
 
-- [Model Selection](https://bradygaster.github.io/squad/docs/features/model-selection/)
-- [Cost Tracking](https://bradygaster.github.io/squad/docs/features/cost-tracking/)
-- [Rate Limiting](https://bradygaster.github.io/squad/docs/features/rate-limiting/)
-- [Switching Models scenario](https://bradygaster.github.io/squad/docs/scenarios/switching-models/)
-- [Cost-aware router sample](https://github.com/bradygaster/squad/tree/v1.1.0/samples/cost-aware-router)
-- [Model resolver](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-sdk/src/agents/model-selector.ts)
-- [Cost tracker](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-sdk/src/runtime/cost-tracker.ts)
-- [Rate-limiting primitives](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-sdk/src/ralph/rate-limiting.ts)
+- [Model Selection](https://github.github.com/squad/docs/features/model-selection/)
+- [Cost Tracking](https://github.github.com/squad/docs/features/cost-tracking/)
+- [Rate Limiting](https://github.github.com/squad/docs/features/rate-limiting/)
+- [Switching Models scenario](https://github.github.com/squad/docs/scenarios/switching-models/)
+- [Cost-aware router sample](https://github.com/github/squad/tree/v2.0.0/samples/cost-aware-router)
+- [Model resolver](https://github.com/github/squad/blob/v2.0.0/packages/squad-sdk/src/agents/model-selector.ts)
+- [Cost tracker](https://github.com/github/squad/blob/v2.0.0/packages/squad-sdk/src/runtime/cost-tracker.ts)
+- [Rate-limiting primitives](https://github.com/github/squad/blob/v2.0.0/packages/squad-sdk/src/ralph/rate-limiting.ts)

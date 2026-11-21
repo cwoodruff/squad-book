@@ -196,9 +196,9 @@ flowchart TD
   H -->|"UNREGISTERED"| K["LOADED_WITH_REPORT"]
 ```
 
-The beacon and behavioral tests are a design requirement for Copilot CLI, not a feature Squad v1.1.0 can supply by itself. The current artifacts can test a fully visible prompt and a deliberately truncated prompt, but cases 3 and 4 need host support to distinguish “selected then missing” from “not selected.” Do not claim that a file check, MCP tool, or model self-report closes that gap.
+The beacon and behavioral tests are a design requirement for Copilot CLI, not a feature Squad v2.0.0 can supply by itself. The current artifacts can test a fully visible prompt and a deliberately truncated prompt, but cases 3 and 4 need host support to distinguish “selected then missing” from “not selected.” Do not claim that a file check, MCP tool, or model self-report closes that gap.
 
-> **Preview:** The runtime identity beacon, signed/registered release manifest, ordered host events, and per-turn tool-inventory evidence described here are proposed upstream Copilot CLI capabilities. They are not an in-prompt Squad API shipped by v1.1.0. The issue brief's acceptance matrix explicitly says the host-level tests cannot pass until the pre-ingestion state machine exists.
+> **Preview:** The runtime identity beacon, signed/registered release manifest, ordered host events, and per-turn tool-inventory evidence described here are proposed upstream Copilot CLI capabilities. They are not shipped in v2.0.0: both `docs/open-issue-runtime-identity-beacon.md` and `docs/canary-identity-matrix.md` are unchanged proposals at that tag, and no Squad code implements a beacon. The issue brief's acceptance matrix explicitly says the host-level tests cannot pass until the pre-ingestion state machine exists.
 
 ## Team Context Templates: `.squad/identity/`
 
@@ -322,6 +322,6 @@ An agent's durable identity is its explicit canonical ID in `.squad/casting/regi
 
 ## Further Reading
 
-- [Agent identity provenance](https://bradygaster.github.io/squad/docs/concepts/agent-identity-provenance/)
-- [Canary identity matrix](https://github.com/bradygaster/squad/blob/v1.1.0/docs/canary-identity-matrix.md)
-- [Runtime identity beacon for coordinator canary cases 3 & 4](https://github.com/bradygaster/squad/blob/v1.1.0/docs/open-issue-runtime-identity-beacon.md)
+- [Agent identity provenance](https://github.github.com/squad/docs/concepts/agent-identity-provenance/)
+- [Canary identity matrix](https://github.com/github/squad/blob/v2.0.0/docs/canary-identity-matrix.md)
+- [Runtime identity beacon for coordinator canary cases 3 & 4](https://github.com/github/squad/blob/v2.0.0/docs/open-issue-runtime-identity-beacon.md)
