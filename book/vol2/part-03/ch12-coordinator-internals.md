@@ -207,7 +207,7 @@ The CLI shell has yet another route: `parseInput()` dispatches slash commands, r
 
 ## Hands-On: Observe a bounded handoff
 
-In the Tasktrack repo, choose a task that belongs to one domain, such as “add a test for rejecting an empty title.” Ask the coordinator to route the task to the appropriate testing specialist, explicitly excluding production code changes. Before it runs, confirm that the selected owner is the tester named in `.squad/team.md` and that the scope is one test file.
+In the Tasktrack repo, choose a task that belongs to one domain, such as “add a test for trimming whitespace from a new task’s title.” Ask the coordinator to route the task to the appropriate testing specialist, explicitly excluding production code changes. Before it runs, confirm that the selected owner is the tester named in `.squad/team.md` and that the scope is one test file.
 
 If your client can show agent sessions, watch the session move from creation to idle/completion. Do not message the agent mid-run. When it returns, inspect the diff yourself and run:
 
