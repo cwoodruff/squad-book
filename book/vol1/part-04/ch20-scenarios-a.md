@@ -45,10 +45,11 @@ Before casting the team, answer:
 - Can you parallelize independent tasks, or will one agent's changes block the others?
 - What state is safe to keep in version control, and which environment-specific notes or secrets must stay out?
 - Is the project small enough that a two- or three-specialist team plus the built-in roles is clearer than a large roster?
+- Which AI host will you work in? Plain `squad init` sets up GitHub Copilot, the path this volume teaches; if you live in Claude Code or another host, `squad init --client <list>` projects the same team there; see Chapter 19 (Volume 2).
 
 ### Step-by-step recipe
 
-1. **Initialize the repository and Squad.** In an existing Git repository, run the v1.1.0 setup flow and inspect the generated files before committing:
+1. **Initialize the repository and Squad.** In an existing Git repository, run the Squad v2.0.0 setup flow and inspect the generated files before committing:
    ```bash
    git status --short
    squad init
@@ -245,7 +246,7 @@ Compare your work to the described `ch20-start` and `ch20-end` tags when those t
 | `npm test` (Tasktrack) | Runs Tasktrack's Node test suite | Requires Node.js 22.18+; expected command is `node --test api/test/` |
 | `npm start` (Tasktrack) | Starts Tasktrack API at configured port (default 3000) | Test health and stop process cleanly; task data is in-memory |
 
-Do not infer that a filename, workflow trigger, label, or feature exists simply because a scenario example mentions it. Inspect the repository and v1.1.0 behavior first. GitHub automation is optional; the core scenario recipes work interactively with a human in the loop.
+Do not infer that a filename, workflow trigger, label, or feature exists simply because a scenario example mentions it. Inspect the repository and v2.0.0 behavior first. GitHub automation is optional; the core scenario recipes work interactively with a human in the loop.
 
 ## Under the Hood
 
@@ -263,7 +264,7 @@ The five paths also differ in what counts as a good first task. A greenfield pro
 - **Protect local changes.** Inspect Git status before initialization, upgrades, restores, and agent work.
 - **Don't overstate automation.** Labels and workflow filenames are not proof that a supported automation is installed or safe.
 - **Treat public issues as untrusted input.** Restrict workflow permissions and require human review.
-- **Avoid stale path and CLI examples.** Confirm `.squad/` paths and current command behavior against the installed v1.1.0 release.
+- **Avoid stale path and CLI examples.** Confirm `.squad/` paths and current command behavior against the installed v2.0.0 release.
 - **Do not commit sensitive context.** Public project memory must not contain credentials, private vulnerability details, or personal data.
 - **Remember Tasktrack's limits.** The current task store is in-memory, the API is small, and a health response is not a production readiness guarantee.
 
@@ -291,8 +292,8 @@ Choose the scenario by assessing ownership, maturity, risk, state, and automatio
 
 ## Further Reading
 
-- [Solo Developer](https://bradygaster.github.io/squad/docs/scenarios/solo-dev/)
-- [New Project](https://bradygaster.github.io/squad/docs/scenarios/new-project/)
-- [Existing Repository](https://bradygaster.github.io/squad/docs/scenarios/existing-repo/)
-- [Mid-Project Adoption](https://bradygaster.github.io/squad/docs/scenarios/mid-project/)
-- [Open Source](https://bradygaster.github.io/squad/docs/scenarios/open-source/)
+- [Solo Developer](https://github.github.com/squad/docs/scenarios/solo-dev/)
+- [New Project](https://github.github.com/squad/docs/scenarios/new-project/)
+- [Existing Repository](https://github.github.com/squad/docs/scenarios/existing-repo/)
+- [Mid-Project Adoption](https://github.github.com/squad/docs/scenarios/mid-project/)
+- [Open Source](https://github.github.com/squad/docs/scenarios/open-source/)

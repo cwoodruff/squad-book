@@ -56,13 +56,13 @@ A quick symptom map:
 | Symptom | First evidence to collect | First safe check |
 |---|---|---|
 | `squad: command not found` | `command -v squad`, `squad --version`, shell `PATH` | Run the installed CLI through the original install channel; avoid mixing installations |
-| No `.squad/` found | `pwd`, `git rev-parse --show-toplevel`, `ls -la` | Confirm repository root and whether the project was initialized |
+| No `.squad/` found (“No squad in this directory”) | `pwd`, `git rev-parse --show-toplevel`, `ls -la` | Confirm repository root and whether the project was initialized |
 | Agent not found | `.squad/team.md`, `.squad/agents/` | Check roster spelling and agent charter location; do not assume a prompt name creates an agent |
 | GitHub API errors | `gh auth status`, relevant scopes and repo access | Reauthenticate or switch to the correct account; don't paste a token into logs |
 | Unexpected agent behavior | active branch, relevant decisions/skills/history, recent prompt | Inspect the relevant state file and diff before deleting or “resetting” the team |
 | Upgrade appears ineffective | CLI version, template version in `.github/agents/squad.agent.md`, install channel | Confirm CLI is upgraded through its package manager, then re-run `squad upgrade` if appropriate |
 
-Squad's general troubleshooting reference lists stale GitHub installation instructions, old Node engines, and `.ai-team` paths among historic scenarios. For the v1.1.0 workflow used in this book, prefer current `.squad/` state, `squad init`, and installation guidance from Chapter 2 (Volume 1). Do not copy a recovery command from an old article without checking its paths and effects against your installed version.
+Squad's general troubleshooting reference lists stale GitHub installation instructions, old Node engines, and `.ai-team` paths among historic scenarios. For the v2.0.0 workflow used in this book, prefer current `.squad/` state, `squad init`, and installation guidance from Chapter 2 (Volume 1). Do not copy a recovery command from an old article without checking its paths and effects against your installed version.
 
 ## Troubleshooting GitHub Access and State
 
@@ -107,7 +107,7 @@ A KEDA `ScaledObject` that is not ready may point to a scaler service or address
 
 ### 6. Readiness is not the same as process health
 
-The production sources document that Squad v1.1.0 does not expose a built-in `/healthz` or `/readyz` HTTP endpoint for checking GitHub authentication/readiness. Do not invent a health port or configure a probe against a nonexistent route. Kubernetes can restart a crashed process, but an alive process with broken credentials may continue failing. Alert on authentication errors and use an external readiness test designed for your deployment. Track the issue for endpoint status before revisiting this assumption.
+The production sources document that Squad v2.0.0 does not expose a built-in `/healthz` or `/readyz` HTTP endpoint for checking GitHub authentication/readiness. Do not invent a health port or configure a probe against a nonexistent route. Kubernetes can restart a crashed process, but an alive process with broken credentials may continue failing. Alert on authentication errors and use an external readiness test designed for your deployment. Track the issue for endpoint status before revisiting this assumption.
 
 For incident escalation, collect a time-bounded log window, pod description, relevant Kubernetes events, image/version, redacted state configuration, backend/scaler condition details, and a trace sample if available. Remove tokens, connection strings, user data, issue text, and private code excerpts unless your organization has approved sharing them. Keep copies in a controlled incident system rather than committing raw diagnostic bundles to the repository.
 
@@ -224,6 +224,8 @@ A successful drill means more than “the command exited zero.” You must demon
 | Item | Purpose | Recovery/troubleshooting note |
 |---|---|---|
 | `squad --version` | Establish installed CLI version | Record before comparing behavior or filing an issue |
+| `squad doctor` | Run the project checks (bridge, portable launcher, upstreams, history archives) | Exits non-zero when a check fails; the portable-launch check flags machine-specific commands |
+| `squad health --json` | Machine-readable health with `metadata` (CLI/SDK version, backend, resolved team root) | Attach to incident bundles; review the paths it contains before sharing |
 | `gh auth status` | Check active GitHub CLI identity | Does not reveal whether every org/SSO permission is sufficient |
 | `gh auth refresh -s project` | Add Project scope when needed | Ask for only necessary access; do not expose credentials |
 | `gh auth switch --user <username>` | Switch among configured accounts | Confirm the account can access the target repository |
@@ -236,7 +238,7 @@ A successful drill means more than “the command exited zero.” You must demon
 
 ## Under the Hood
 
-The v1.1.0 troubleshooting sources separate local CLI problems from production container failures. Production diagnosis follows the runtime chain—pod startup, GitHub auth, state backend, KEDA scaler, image, memory, and OTLP export—rather than treating every “no issues picked up” report as a routing problem. It also records two important operational limits: the documented SDK path has no built-in HTTP liveness/readiness endpoint, and the runtime does not checkpoint in-flight tasks before a pod termination.
+The v2.0.0 troubleshooting sources separate local CLI problems from production container failures. Production diagnosis follows the runtime chain—pod startup, GitHub auth, state backend, KEDA scaler, image, memory, and OTLP export—rather than treating every “no issues picked up” report as a routing problem. It also records two important operational limits: the documented SDK path has no built-in HTTP liveness/readiness endpoint, and the runtime does not checkpoint in-flight tasks before a pod termination.
 
 The VS Code source discusses finite in-memory caps and watcher filtering. In `packages/squad-sdk/src/runtime/streaming.ts`, usage history is limited to 1,000 events using FIFO eviction. `packages/squad-sdk/src/runtime/telemetry.ts` separately caps queued collector events at 500. These are bounded collections, not a global memory ceiling. `packages/squad-sdk/src/runtime/squad-observer.ts` watches state changes and filters high-churn directories at the callback level. The responsible operator still checks system/editor behavior because extensions, open files, large contexts, and other processes affect memory too.
 
@@ -250,7 +252,12 @@ Disaster recovery is mostly a systems property, not a single Squad command. Git 
 - **Do not treat an uncommitted file as backed up.** Git restore only recovers content present in a commit/index or another backup.
 - **Don't overgeneralize Linux commands.** Inotify instructions do not apply to macOS as written.
 - **Avoid remote branch assumptions.** Confirm the actual checkout/commit used by browser or issue automation.
-- **Don't trust old `.ai-team/` examples as current paths.** Verify state layout, flags, and commands against v1.1.0.
+- **Don't trust old `.ai-team/` examples as current paths.** Verify state layout, flags, and commands against v2.0.0.
+- **“No squad in this directory” outside a project.** Squad 2.0 resolves `.squad/` only from the current directory and its parents; there is no personal or global fallback. Run the command from the repository, or pass `--team-root` (or set `SQUAD_TEAM_ROOT`) for a linked team root. `status`, `doctor`, `cast` and `cost` all fail this way outside a project.
+- **`squad doctor` now fails a pipeline.** It exits non-zero when any check fails, so a CI step that ran it for information can start breaking builds. Decide whether the step is a gate; if not, capture its output and ignore the exit status explicitly.
+- **`squad_state` or the Claude hooks fail on a fresh clone.** An older Squad version wrote machine-specific absolute paths into `.mcp.json` or `.claude/settings.json`. `squad doctor` reports a failing **portable squad_state launch** check. Run `squad upgrade` once at the repository root and commit the rewritten files; they then call the committed `.squad/squad.mjs` launcher, which works on every clone.
+- **Many `state-mcp` processes linger on a workstation.** Copilot host sessions can outlive their visible window, and each live host keeps its stdio MCP children. Run `squad upgrade --force` so the project declaration takes precedence and duplicate legacy user entries are removed (after a backup of `~/.copilot/mcp-config.json`), then restart the affected sessions. If you still need to clean up, stop only bridge processes whose parent is gone; never kill by process name.
+- **“Path traversal blocked” through a symlinked team root.** Squad 1.x refused `squad_state` reads and writes when the team folder was reached through a symlink (macOS `/tmp` is really `/private/tmp`). 2.0.0 accepts the original spelling, while paths that really leave the team folder are still refused. If you see the error on 2.0.0, look for a link inside `.squad/` that points outside it.
 - **A long grace period is not a checkpoint.** Use repeatable tasks and durable inputs to recover interrupted work.
 
 ## Summary
@@ -276,8 +283,8 @@ Troubleshoot from evidence, isolate the broken layer, and choose a reversible re
 
 ## Further Reading
 
-- [Troubleshooting](https://bradygaster.github.io/squad/docs/scenarios/troubleshooting/)
-- [Production Troubleshooting Runbook](https://bradygaster.github.io/squad/docs/scenarios/production-troubleshooting/)
-- [VS Code Troubleshooting](https://bradygaster.github.io/squad/docs/reference/vscode-troubleshooting/)
-- [Disaster Recovery](https://bradygaster.github.io/squad/docs/scenarios/disaster-recovery/)
-- [Remote QA](https://bradygaster.github.io/squad/docs/scenarios/remote-qa/)
+- [Troubleshooting](https://github.github.com/squad/docs/scenarios/troubleshooting/)
+- [Production Troubleshooting Runbook](https://github.github.com/squad/docs/scenarios/production-troubleshooting/)
+- [VS Code Troubleshooting](https://github.github.com/squad/docs/reference/vscode-troubleshooting/)
+- [Disaster Recovery](https://github.github.com/squad/docs/scenarios/disaster-recovery/)
+- [Remote QA](https://github.github.com/squad/docs/scenarios/remote-qa/)

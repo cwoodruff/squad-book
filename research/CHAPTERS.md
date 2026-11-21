@@ -1,6 +1,6 @@
 # Chapter Manifest
 
-The book is published in two volumes. **Each volume numbers its parts and chapters from 1** (Volume 1: Parts I–IV, Chapters 1–21; Volume 2: Parts I–V, Chapters 1–25). Unqualified part and chapter references mean the same volume. All parts except Volume 2, Part IV target Squad v1.1.0; Volume 2, Part IV targets Squad v2.0.0-preview.2.
+The book is published in two volumes. **Each volume numbers its parts and chapters from 1** (Volume 1: Parts I–IV, Chapters 1–21; Volume 2: Parts I–V, Chapters 1–25). Unqualified part and chapter references mean the same volume. This is the second edition: all parts target Squad v2.0.0. The first edition (Squad v1.1.0) is tagged `book-squad-v1.1.0`.
 
 # Volume 1 — Using Squad
 
@@ -79,7 +79,7 @@ The book is published in two volumes. **Each volume numbers its parts and chapte
 | 16 | vol2/part-03/ch16-autonomous-agents.md | Building Autonomous and Resilient Agents |
 | 17 | vol2/part-03/ch17-specification.md | The Squad Specification |
 
-## Volume 2, Part IV — Looking Ahead: Squad 2.0 (Preview) (book/vol2/part-04/)
+## Volume 2, Part IV — Squad 2.0: One Team, Many Hosts (book/vol2/part-04/)
 
 | # | File | Title |
 |---|---|---|
@@ -87,7 +87,7 @@ The book is published in two volumes. **Each volume numbers its parts and chapte
 | 19 | vol2/part-04/ch19-across-clients.md | Using Squad Across Clients |
 | 20 | vol2/part-04/ch20-host-projections.md | Host Projections, Client Adapters, and Capability Negotiation |
 | 21 | vol2/part-04/ch21-state-boundary-backend.md | The State MCP Boundary, Runtime Upstreams, and the Experimental Backend |
-| 22 | vol2/part-04/ch22-upgrading-to-2.md | Upgrading to Squad 2.0 and the Road Ahead |
+| 22 | vol2/part-04/ch22-upgrading-to-2.md | Migrating from Squad 1.x to Squad 2.0 |
 
 ## Volume 2, Part V — Mastery (book/vol2/part-05/)
 

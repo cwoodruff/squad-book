@@ -6,12 +6,14 @@
 
 - Understand where `@bradygaster/squad-sdk` fits: typed configuration and reusable runtime APIs alongside the interactive `squad` CLI.
 - Navigate the root barrel and package subpaths without importing internal source files.
-- Distinguish the `defineConfig` schema, SDK-first builder model, and runtime loader contract in v1.1.0.
+- Distinguish the `defineConfig` schema, SDK-first builder model, and runtime loader contract in v2.0.0.
 - Build teams and routing rules with typed builders, resolve the `.squad/` directory, and inspect lifecycle, session, and streaming primitives.
 - Choose an appropriate API from the client, coordinator, tools, hooks, storage, state, telemetry, and platform modules.
 - Use the SDK samples as executable design patterns and build a Tasktrack script that prints its team and routing table.
 
-> **Preview (Squad 2.0):** Two new public surfaces frame the multi-host work: `/client` now also exports host projection and adapter contracts, and `/backend` contains the experimental backend and harness SPI. `/clients` is a deprecated alias for the new host-adapter exports. The prior `/client` APIs such as `SquadClient` and `SquadClientWithPool` remain; the path's meaning has expanded rather than simply moving them. The 2.0 SDK also removes the personal-agent exports available in v1.1.0. See Chapters 18, 20, and 21 and the [2.0 release notes](https://github.com/bradygaster/squad/blob/v2.0.0-preview.2/docs/src/content/docs/whatsnew.md).
+Squad 2.0 adds two public surfaces for the multi-host work. `/client` still exports `SquadClient` and `SquadClientWithPool`, and it now also exports the host projection and adapter APIs; `/clients` is a deprecated alias for those adapter exports. `/backend` holds the experimental backend contract and the execution harnesses. The package entry table below and the “Execution harnesses” section cover both; Chapters 20 and 21 show them in use, and the [2.0 release notes](https://github.com/github/squad/blob/v2.0.0/docs/src/content/docs/whatsnew.md) list every change.
+
+> **Note:** Changed in Squad 2.0: the personal-squad helpers (`resolvePersonalSquadDir`, `ensurePersonalSquadDir`, `resolvePersonalAgents`, `mergeSessionCast` and the `/agents/personal` subpath) are gone. `resolveGlobalSquadPath()` survives only as the base directory for `squad externalize`.
 
 ## What the SDK Is For
 
@@ -19,7 +21,7 @@ The `@bradygaster/squad-sdk` package exposes parts of Squad as TypeScript APIs. 
 
 That distinction prevents a common design mistake: using the SDK as though every command-line feature were a direct function call. The package does not export a single “run the entire Squad” function from its root. Instead, it exposes modules with different responsibilities. A script that builds `.squad/` artifacts, an application that manages live sessions, and a process that reads an existing config have different setup and lifecycle requirements.
 
-The published package is ESM and v1.1.0 declares Node.js `>=22.5.0`. Tasktrack itself asks for Node.js `>=22.18`, which is sufficient for its baseline TypeScript execution through Node's built-in type stripping. Many examples that import `squad.config.ts` directly should be run on the Tasktrack runtime or another toolchain that supports TypeScript ESM imports. Install the SDK into the project where the script runs; do not assume the Tasktrack starter already has it as a dependency.
+The published package is ESM and v2.0.0 declares Node.js `>=22.5.0`. Tasktrack itself asks for Node.js `>=22.18`, which is sufficient for its baseline TypeScript execution through Node's built-in type stripping. Many examples that import `squad.config.ts` directly should be run on the Tasktrack runtime or another toolchain that supports TypeScript ESM imports. Install the SDK into the project where the script runs; do not assume the Tasktrack starter already has it as a dependency.
 
 > **Tip:** Start with the narrowest public surface that solves the task. Use the root package for shared APIs and builders; use a declared subpath such as `/client` or `/coordinator` for focused runtime components. Avoid importing from `packages/squad-sdk/src/` in application code because those files are package internals, not the package's compatibility contract.
 
@@ -46,12 +48,14 @@ The package's `exports` map in `packages/squad-sdk/package.json` identifies the 
 | `@bradygaster/squad-sdk` | Shared types, config, builders, resolution, casting, roles, storage, state, telemetry, memory, and other root APIs | `defineSquad`, `defineConfig`, `resolveSquad`, `MODELS`, `CastingEngine` |
 | `@bradygaster/squad-sdk/config` | Config schema and configuration helpers | `defineConfig`, routing parsers, model registry |
 | `@bradygaster/squad-sdk/builders` | Typed SDK-first builders | `defineTeam`, `defineAgent`, `defineRouting`, `defineSquad` |
-| `@bradygaster/squad-sdk/client` | Copilot connection, sessions, pool, and client events | `SquadClient`, `SquadClientWithPool`, `SessionPool` |
+| `@bradygaster/squad-sdk/client` | Copilot connection, sessions, pool, and client events; host projection and client adapter APIs for the seven hosts | `SquadClient`, `SquadClientWithPool`, `SessionPool`, `HostProjection`, `getHostProjection`, `createClientAdapter`, `installClients`, `uninstallClients`, `CAPABILITY_TOKENS_BY_HOST` |
+| `@bradygaster/squad-sdk/clients` | Deprecated alias that re-exports the same host-adapter symbols | Import from `/client` in new code |
+| `@bradygaster/squad-sdk/backend` | Experimental backend contract and execution harnesses; exported only from this subpath, never the root | `createSquadBackend`, `ClaudeAgentSdkHarness`, `CopilotSdkHarness`, `BACKEND_CONTRACT_STAGE` |
 | `@bradygaster/squad-sdk/coordinator` | Direct-response handling, route decisions, and fan-out | `SquadCoordinator`, `spawnParallel`, `selectResponseTier` |
 | `@bradygaster/squad-sdk/tools` | Typed tool definitions and built-in tool registry | `defineTool`, `ToolRegistry` |
 | `@bradygaster/squad-sdk/hooks` | Pre/post tool and policy hooks | `HookPipeline`, `HookAction` |
 | `@bradygaster/squad-sdk/agents` | Charter compilation, validation, lifecycle, and model selection | `AgentLifecycleManager`, `compileCharter` |
-| `@bradygaster/squad-sdk/casting` | Team casting and casting history | `CastingEngine`, `CastingHistory` |
+| `@bradygaster/squad-sdk/casting` | Team casting, casting history, and transactional casting repair | `CastingEngine`, `CastingHistory` |
 | `@bradygaster/squad-sdk/skills` | Skill parsing and discovery | `loadSkillsFromDirectory`, `SkillRegistry` |
 | `@bradygaster/squad-sdk/state` | Typed state collections and handles | `SquadState`, `AgentsCollection`, `DecisionsCollection` |
 | `@bradygaster/squad-sdk/storage` | Pluggable storage providers | filesystem and in-memory providers |
@@ -65,7 +69,7 @@ Subpaths are not all interchangeable with root exports. For example, the root ba
 
 ## Two Ways to Define Configuration
 
-The v1.1.0 package has both a schema helper called `defineConfig()` and the SDK-first builder family centered on `defineSquad()`. They are related configuration surfaces, but they are not aliases and their types are not identical. You should select one based on the consumer.
+The v2.0.0 package has both a schema helper called `defineConfig()` and the SDK-first builder family centered on `defineSquad()`. They are related configuration surfaces, but they are not aliases and their types are not identical. You should select one based on the consumer.
 
 ### `defineConfig`: the public schema helper
 
@@ -146,28 +150,27 @@ console.log(result.config.models.defaultModel);
 
 In source, `ConfigLoadResult` has `config`, optional `source`, and `isDefault`. The async loader checks `squad.config.ts`, `squad.config.js`, `squad.config.json`, and `.squad/config.json` in the supplied directory, then searches upward, then falls back to `DEFAULT_CONFIG`. TypeScript and JavaScript configs must export a default value or a named `squadConfig`. JSON is parsed and validated. `loadConfigSync()` is narrower: it checks only `squad.config.json` in the supplied directory and falls back to defaults; it does not synchronously import TS/JS or perform the same upward discovery.
 
-> **Warning:** The published reference pages and source do not line up perfectly in v1.1.0. The runtime `loadConfig()` types in `packages/squad-sdk/src/runtime/config.ts` describe `models.defaultModel`, `fallbackChains`, and `routing.rules[].workType`; that runtime `SquadConfig` has no `team` or `agents` property. The separate public schema in `config/schema.ts` and SDK-first builders do have `team`, `agents`, `models.default`, `models.tiers`, and `routing.rules[].pattern`. The `loadConfig()` result type also does not contain `errors` or `warnings` fields. Choose the config surface intentionally, and verify any bridge against the installed package declarations rather than mixing examples.
+> **Warning:** The published reference pages and source do not line up perfectly in v2.0.0. The runtime `loadConfig()` types in `packages/squad-sdk/src/runtime/config.ts` describe `models.defaultModel`, `fallbackChains`, and `routing.rules[].workType`; that runtime `SquadConfig` has no `team` or `agents` property. The separate public schema in `config/schema.ts` and SDK-first builders do have `team`, `agents`, `models.default`, `models.tiers`, and `routing.rules[].pattern`. The `loadConfig()` result type also does not contain `errors` or `warnings` fields. Choose the config surface intentionally, and verify any bridge against the installed package declarations rather than mixing examples.
 
 The loader source expects a working directory as its argument, although the reference describes `squadPath` in some signatures. Pass the project root for the intended local lookup. A `squad.config.ts` intended for SDK-first `squad build` should be imported and passed through that build path; it is not automatically equivalent to the runtime loader's legacy config shape.
 
 ### `resolveSquad()` and related helpers
 
-`resolveSquad(startDir?)` returns the absolute `.squad/` path or `null`. It walks upward, stops at a repository boundary, and has logic to consult the main checkout when the starting path is a Git worktree. A short in-process cache avoids repeating the filesystem walk; `clearResolveSquadCache()` invalidates the cache, and `SQUAD_NO_RESOLVE_CACHE=1` disables it. The API reference says `resolveSquad()` throws if nothing is found; the v1.1.0 implementation instead returns `null`. Check the value before joining a path.
+`resolveSquad(startDir?)` returns the absolute `.squad/` path or `null`. It walks upward, stops at a repository boundary, and has logic to consult the main checkout when the starting path is a Git worktree. A short in-process cache avoids repeating the filesystem walk; `clearResolveSquadCache()` invalidates the cache, and `SQUAD_NO_RESOLVE_CACHE=1` disables it. The API reference says `resolveSquad()` throws if nothing is found; the v2.0.0 implementation instead returns `null`. In 2.0 it also never treats your home directory or the `SQUAD_HOME` root as a project squad, so outside a project the result is `null`. Check the value before joining a path.
 
 Other path helpers have separate jobs:
 
 | Helper | Responsibility |
 |---|---|
-| `resolveGlobalSquadPath()` | Resolve and create the platform's global Squad config directory (`%APPDATA%/squad`, macOS Application Support, or `$XDG_CONFIG_HOME/squad`/`~/.config/squad`). |
-| `resolvePersonalSquadDir()` | Find an existing personal team directory, or return `null`; honors `SQUAD_NO_PERSONAL` and `SQUAD_PERSONAL_DIR`. |
-| `ensurePersonalSquadDir()` | Create the expected personal Squad directory structure. |
+| `resolveGlobalSquadPath()` | Resolve and create the platform's Squad config directory (`%APPDATA%/squad`, macOS Application Support, or `$XDG_CONFIG_HOME/squad`/`~/.config/squad`). In 2.0 it is only the base for externalized project state. |
+| `isRetiredProfileTeamRoot(teamDir)` | Detect a 1.x `teamRoot` that pointed at the removed profile squad; such a root is never followed, and `squad upgrade` removes it. |
 | `ensureSquadPath(filePath, squadRoot)` | Validate a path is inside a Squad directory or the system temp directory; despite the name, this is a path guard, not a `.squad` directory creator. |
 | `scratchDir(squadRoot)` / `scratchFile(...)` | Create or name ephemeral files inside `.squad/.scratch/`. |
 | `deriveProjectKey(projectDir)` | Produce a normalized project key from a path basename. |
-| `resolveExternalStateDir(...)`, `resolveSquadHome(...)`, `resolveSquadState(...)` | Support external state and broader project/team/personal state resolution. |
+| `resolveExternalStateDir(...)`, `resolveSquadHome(...)`, `ensureSquadHome(...)`, `resolveSquadState(...)` | Support external state, the per-user Squad home (`SQUAD_HOME` or `~/.squad`), and project/team state resolution. |
 | `loadDirConfig(...)`, `ensureSquadPathTriple(...)` | Load directory metadata or validate paths against multiple approved roots. |
 
-Do not confuse `resolveGlobalSquadPath()` (the global config directory) with the personal squad itself. Do not treat a path guard as a feature sandbox. The approved-root checks constrain SDK-managed state writes in code paths that call them; they do not prevent arbitrary tools or processes from writing elsewhere.
+Do not confuse `resolveGlobalSquadPath()` (the platform config directory used by externalize) with a team; Squad 2.0 has no personal or global team. Do not treat a path guard as a feature sandbox. The approved-root checks constrain SDK-managed state writes in code paths that call them; they do not prevent arbitrary tools or processes from writing elsewhere.
 
 ## Agent Lifecycle: From Charter to Session
 
@@ -217,6 +220,19 @@ The client subpath also exports the underlying session and permission types. Thi
 
 `HookPipeline` is a policy and lifecycle extension point. Pre-tool hooks can allow, block, or modify tool calls; post-tool hooks can inspect outcomes, and session/error hooks add further integration points. Policies may express allowed write paths, blocked commands, PII scrubbing, and reviewer lockout. Hooks are code-level controls that must be registered in the executing host; merely defining a `hooks` object in configuration does not install or activate a hook implementation.
 
+### Execution harnesses
+
+> **Preview:** The `/backend` subpath and its harnesses are experimental in v2.0.0 (`BACKEND_CONTRACT_STAGE = 'experimental'`). The interfaces can change in a minor release, and no remote DurableSquad server ships with Squad.
+
+`@bradygaster/squad-sdk/backend` is the only place the backend contract is exported; the root package never re-exports it. Beside the `SquadBackend` interface and `createSquadBackend()` (kinds `local`, `mcp` and `durable-http`), v2.0.0 ships the first two execution harnesses:
+
+| Harness | Id | Runs turns on | Approvals |
+|---|---|---|---|
+| `ClaudeAgentSdkHarness` | `claude-agent-sdk` | The Claude Agent SDK, an optional peer dependency (`@anthropic-ai/claude-agent-sdk`). Needs an API credential (an Anthropic API key or Bedrock, Vertex or Foundry settings), never a claude.ai login. | Broker approvals through the SDK's `canUseTool` callback |
+| `CopilotSdkHarness` | `copilot-sdk` | The GitHub Copilot SDK, which is always installed | Broker approvals through `onPermissionRequest` |
+
+Both extend `TurnHarness` and share `TurnApprovals`: approvals are hash-bound, a turn has at most one pending approval, and a deny ends the turn. `HarnessAdapter` and `DefaultHarnessRegistry` let you plug in your own runtime. For SDK callers, `durable-http` requires an explicit `https://` `baseUrl` (plain `http://` only for loopback) and never reads `SQUAD_BACKEND_URL` from the environment; that lookup belongs to the CLI's `squad state-mcp --experimental-backend` bridge, which registers harnesses according to `SQUAD_BACKEND_HARNESSES`. Chapter 21 walks through the broker, the approval queue and the bridge.
+
 ## Runtime Events, Streaming, and Observability
 
 The runtime is not one giant event handler. It provides typed components that can be assembled by a host:
@@ -236,7 +252,7 @@ The runtime is not one giant event handler. It provides typed components that ca
 
 `StreamingPipeline` accepts handlers for deltas, usage, context utilization, and reasoning. Attach session identifiers, mark the start of a message when measuring latency, and feed events to the pipeline. It can aggregate token totals and estimated cost and can use a model-to-context-window resolver to estimate utilization when exact context accounting is unavailable. Exact `context_usage` samples take precedence over estimates for a session. The package caps stored usage-event history to avoid unbounded growth.
 
-The constants are live source values, not the values shown in every generated page. In v1.1.0 `MODELS.DEFAULT` is environment-overridable with `SQUAD_DEFAULT_MODEL`; fallback chains are tier-specific and `NUCLEAR_FALLBACK` is `claude-haiku-4.5`. `TIMEOUTS` includes health-check, Git clone, plugin-fetch, and session-response limits, with environment overrides for several values. The exported `AGENT_ROLES` constant is a small role union (`lead`, `developer`, `tester`, `designer`, `scribe`, `coordinator`); it is distinct from the fuller role catalog exported through `roles`.
+The constants are live source values, not the values shown in every generated page. In v2.0.0 `MODELS.DEFAULT` is environment-overridable with `SQUAD_DEFAULT_MODEL`; fallback chains are tier-specific and `NUCLEAR_FALLBACK` is `claude-haiku-4.5`. `TIMEOUTS` includes health-check, Git clone, plugin-fetch, and session-response limits, with environment overrides for several values. The exported `AGENT_ROLES` constant is a small role union (`lead`, `developer`, `tester`, `designer`, `scribe`, `coordinator`); it is distinct from the fuller role catalog exported through `roles`.
 
 For OpenTelemetry, use `initializeOTel()` and `shutdownOTel()` for explicit control, `getTracer()`/`getMeter()` for instrumentation, and `initSquadTelemetry()` when a convenience handle is sufficient. The root barrel exports telemetry initialization and metric helpers; the lower-level event-bus bridge lives behind the declared `@bradygaster/squad-sdk/runtime/otel-bridge` subpath. Optional OpenTelemetry dependencies are declared as optional dependencies, so deployers should verify the intended exporter is installed and configured rather than assume a local collector exists.
 
@@ -247,9 +263,9 @@ For OpenTelemetry, use `initializeOTel()` and `shutdownOTel()` for explicit cont
 | Root export group | Main module | What it provides |
 |---|---|---|
 | `VERSION` | package metadata | Package version string loaded from the package manifest. |
-| Resolution and state paths | `resolution.ts` | Project, personal, global, external, scratch, and cache helpers plus path/state types. |
+| Resolution and state paths | `resolution.ts` | Project, external, Squad-home, scratch, and cache helpers plus path/state types. |
 | Config | `config/index.ts` | Schema, config sources, routing, models, initialization, migrations, docs sync, feature audits, and state gitignore helpers. |
-| Agent onboarding/personal agents | `agents/onboarding.ts`, `agents/personal.ts` | Onboard new agent files, resolve personal agents, and merge session cast information. |
+| Agent onboarding | `agents/onboarding.ts` | Onboard new agent files. |
 | Casting | `casting/index.ts` | Casting engine/history, provenance records, durable registry operations, and legacy casting types. |
 | Skills | `skills/index.ts` | Skill loading, parsing, source adapters, registry, matching, and skill types. |
 | Response tiers | `coordinator/response-tiers.ts` | `selectResponseTier`, `getTier`, and related types. |
@@ -288,11 +304,11 @@ The sample documentation is not always perfectly aligned with code. For instance
 
 ## Hands-On: Inspect Tasktrack's SDK Configuration
 
-This exercise creates an SDK-first team definition for Tasktrack and a small script that prints the team and routing table. The script imports the typed config directly. That choice is deliberate: v1.1.0's runtime `loadConfig()` shape does not include the `team` and builder-style `pattern` fields used by an SDK-first config. Do not pass one schema into an API expecting the other without a conversion step.
+This exercise creates an SDK-first team definition for Tasktrack and a small script that prints the team and routing table. The script imports the typed config directly. That choice is deliberate: v2.0.0's runtime `loadConfig()` shape does not include the `team` and builder-style `pattern` fields used by an SDK-first config. Do not pass one schema into an API expecting the other without a conversion step.
 
 1. From Tasktrack's repository root, install the package in the project where you will run the script. Tasktrack's ordinary API remains zero-dependency until you choose to add this SDK tool:
    ```bash
-   npm install @bradygaster/squad-sdk@1.1.0
+   npm install @bradygaster/squad-sdk@2.0.0
    mkdir -p scripts
    ```
 2. Create `squad.config.ts` at the Tasktrack root. The builders validate the names and routing objects as the module loads:
@@ -367,6 +383,9 @@ The script is intentionally read-only: it imports the config module and prints i
 | `loadConfigSync(path?)` | root or `/runtime` | Sync runtime config result | Reads only `squad.config.json` in the given directory, then defaults. |
 | `resolveSquad(startDir?)` | root or `/resolution` | `.squad/` path or `null` | Does not create `.squad/`; caches briefly. |
 | `MODELS`, `TIMEOUTS`, `AGENT_ROLES` | root or `/runtime/constants` | Model defaults/chains, standard limits, role IDs | `SQUAD_DEFAULT_MODEL` changes the default model. |
+| `createClientAdapter({ host, ctx })` | `/client` | Host-adapter facade: `describe()`, `projectWorkspace()`, `getCapabilities()` work locally | Runtime methods (`submit`, `subscribe`, `cancel`, `respondApproval`) throw `AdapterUnboundError` until a runtime is bound. |
+| `ClaudeAgentSdkHarness`, `CopilotSdkHarness` | `/backend` | Experimental execution harnesses for the backend broker | Experimental; see the “Execution harnesses” section. |
+| `SQUAD_BACKEND_HARNESSES` | environment (CLI bridge) | Comma-separated harness ids, or `none` | Default `claude-agent-sdk`, registered only when its SDK and an API credential are present; `copilot-sdk` is opt-in. |
 | `SquadClientWithPool` | `/client` | Copilot connection plus managed session pool and events | Requires a compatible runtime/auth setup; call `shutdown()` when done. |
 | `SquadCoordinator` | `/coordinator` | Direct handling, route matching, and optional fan-out | Requires compatible runtime config and spawn dependencies to start agents. |
 | `StreamingPipeline` | root or `/runtime/streaming` | Stream/usage/context event handlers | Add handlers before feeding events and detach/clean up sessions. |
@@ -382,12 +401,12 @@ The header in `packages/squad-sdk/src/index.ts` calls the root module a public A
 A brief root excerpt shows the separation between widely shared APIs and focused exports:
 
 ```typescript
-export { resolveSquad, resolveGlobalSquadPath, ensurePersonalSquadDir,
-  ensureSquadPath, scratchDir, deriveProjectKey, resolveSquadState,
-  clearResolveSquadCache } from './resolution.js';
+export { resolveSquad, resolveGlobalSquadPath, isRetiredProfileTeamRoot,
+  ensureSquadPath, loadDirConfig, scratchDir, scratchFile, deriveProjectKey,
+  resolveExternalStateDir, resolveSquadHome, ensureSquadHome,
+  resolvePresetsDir, resolveSquadState, clearResolveSquadCache } from './resolution.js';
 export * from './config/index.js';
 export * from './agents/onboarding.js';
-export { resolvePersonalAgents, mergeSessionCast } from './agents/personal.js';
 export * from './casting/index.js';
 export * from './skills/index.js';
 export { selectResponseTier, getTier } from './coordinator/response-tiers.js';
@@ -427,13 +446,13 @@ The session pool bounds concurrency and emits pool events. The coordinator's `sp
 
 ### API reference accuracy
 
-`docs/src/content/docs/reference/api-reference.md` is a curated reference page, but its examples are not all aligned with v1.1.0 source. The root barrel and package export map are authoritative for import locations and installed declarations. In this tag:
+`docs/src/content/docs/reference/api-reference.md` is a curated reference page, but its examples are not all aligned with v2.0.0 source. The root barrel and package export map are authoritative for import locations and installed declarations. In this tag:
 
 - `resolveSquad()` returns `string | null` rather than throwing when it finds no directory.
 - `SquadCoordinator` is exported from `/coordinator`; it is not among the root exports in `src/index.ts`.
 - Lower-level `bridgeEventBusToOTel()` and `createOTelTransport()` live in the declared `/runtime/otel-bridge` subpath, not as direct root-barrel exports. The root does export the higher-level `initSquadTelemetry()` helper.
 - The API page shows `TIMEOUTS.agentInitMs`, `agentExecuteMs`, and `coordinatorRouteMs`; source `runtime/constants.ts` defines health-check, Git clone, plugin-fetch, and session-response timeout fields instead.
-- The API page describes `createReadableStream()`; a source search of the v1.1.0 SDK does not find that export.
+- The API page describes `createReadableStream()`; a source search of the v2.0.0 SDK does not find that export.
 - Runtime `ConfigLoadResult` exposes `config`, `source?`, and `isDefault`, not `errors` and `warnings`.
 
 Use the docs as a navigation aid, then verify signatures in the pinned package declarations or source for the version you deploy. This is especially important when examples cross the config schema and runtime coordinator boundary.
@@ -451,7 +470,7 @@ Use the docs as a navigation aid, then verify signatures in the pinned package d
 - **Streaming appears duplicated or stalls.** Attach each session once, register listeners before sending, detach them in `finally`, and shut down the client. Handle session-specific event names and payload shape.
 - **Costs appear as zero.** `estimatedCost` may be zero when pricing data is unavailable. Keep token counts and model identifiers as evidence; do not report an estimate as a bill.
 - **Generated markdown and TypeScript diverge.** Treat the SDK config as the source for files generated by `squad build`; run the drift check, inspect protected or hand-edited files, and decide which representation is authoritative before rebuilding.
-- **An API docs example does not type-check.** Pin the SDK version and inspect its generated declarations. In v1.1.0 some docs use stale root imports or older runtime fields.
+- **An API docs example does not type-check.** Pin the SDK version and inspect its generated declarations. In v2.0.0 some docs use stale root imports or older runtime fields.
 
 ## Summary
 
@@ -468,7 +487,7 @@ The Squad SDK is a set of composable APIs, not a single monolithic runtime call.
 ## Quiz
 
 1. What are the two major TypeScript config surfaces discussed in this chapter, and what is each used for?
-2. What does `resolveSquad()` return when it cannot find `.squad/` in v1.1.0?
+2. What does `resolveSquad()` return when it cannot find `.squad/` in v2.0.0?
 3. Which package subpath exports `SquadClientWithPool`? Which exports `SquadCoordinator`?
 4. What must be injected for the built-in `squad_route` tool to spawn work?
 5. What does `squad build` do with an SDK-first config?
@@ -478,18 +497,18 @@ The Squad SDK is a set of composable APIs, not a single monolithic runtime call.
 
 ## Further Reading
 
-- [SDK Reference](https://bradygaster.github.io/squad/docs/reference/sdk/)
-- [SDK API Reference](https://bradygaster.github.io/squad/docs/reference/api-reference/)
-- [Configuration Reference](https://bradygaster.github.io/squad/docs/reference/config/)
-- [SDK root export barrel](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-sdk/src/index.ts)
-- [SDK package exports](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-sdk/package.json)
-- [Config schema](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-sdk/src/config/schema.ts)
-- [Runtime config loader](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-sdk/src/runtime/config.ts)
-- [SDK-first builder types](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-sdk/src/builders/types.ts)
-- [SDK-first builders](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-sdk/src/builders/index.ts)
-- [SDK path resolution](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-sdk/src/resolution.ts)
-- [Agent lifecycle manager](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-sdk/src/agents/lifecycle.ts)
-- [Client entry point](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-sdk/src/client/index.ts)
-- [Coordinator entry point](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-sdk/src/coordinator/index.ts)
-- [Streaming chat sample](https://github.com/bradygaster/squad/tree/v1.1.0/samples/streaming-chat)
-- [Hello Squad sample](https://github.com/bradygaster/squad/tree/v1.1.0/samples/hello-squad)
+- [SDK Reference](https://github.github.com/squad/docs/reference/sdk/)
+- [SDK API Reference](https://github.github.com/squad/docs/reference/api-reference/)
+- [Configuration Reference](https://github.github.com/squad/docs/reference/config/)
+- [SDK root export barrel](https://github.com/github/squad/blob/v2.0.0/packages/squad-sdk/src/index.ts)
+- [SDK package exports](https://github.com/github/squad/blob/v2.0.0/packages/squad-sdk/package.json)
+- [Config schema](https://github.com/github/squad/blob/v2.0.0/packages/squad-sdk/src/config/schema.ts)
+- [Runtime config loader](https://github.com/github/squad/blob/v2.0.0/packages/squad-sdk/src/runtime/config.ts)
+- [SDK-first builder types](https://github.com/github/squad/blob/v2.0.0/packages/squad-sdk/src/builders/types.ts)
+- [SDK-first builders](https://github.com/github/squad/blob/v2.0.0/packages/squad-sdk/src/builders/index.ts)
+- [SDK path resolution](https://github.com/github/squad/blob/v2.0.0/packages/squad-sdk/src/resolution.ts)
+- [Agent lifecycle manager](https://github.com/github/squad/blob/v2.0.0/packages/squad-sdk/src/agents/lifecycle.ts)
+- [Client entry point](https://github.com/github/squad/blob/v2.0.0/packages/squad-sdk/src/client/index.ts)
+- [Coordinator entry point](https://github.com/github/squad/blob/v2.0.0/packages/squad-sdk/src/coordinator/index.ts)
+- [Streaming chat sample](https://github.com/github/squad/tree/v2.0.0/samples/streaming-chat)
+- [Hello Squad sample](https://github.com/github/squad/tree/v2.0.0/samples/hello-squad)

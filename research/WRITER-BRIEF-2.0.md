@@ -1,5 +1,7 @@
 # Writer Brief — Part X: Squad 2.0 (Preview)
 
+> **Superseded (2026-11-20).** This brief was written for the first edition's Squad 2.0 preview part (`v2.0.0-preview.2`, old continuous chapter numbers 43–47). The second edition targets Squad v2.0.0 throughout: use `research/WRITER-BRIEF.md`, `research/STYLE-GUIDE.md` and `research/UPDATE-PLAN-2.0.md` instead. Kept as history only; do not follow its version, link or Preview-callout rules.
+
 Read `research/WRITER-BRIEF.md` and `research/STYLE-GUIDE.md` first. Every rule in them applies. The exceptions below override them for Part X.
 
 ## Version target for Part X

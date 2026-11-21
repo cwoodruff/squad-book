@@ -5,7 +5,7 @@
 ## What You'll Learn
 
 - Compare issue-driven work across GitHub, GitLab, and Azure DevOps without assuming that similar labels imply identical automation.
-- Understand the GitLab issue workflow and tour as experimental documentation, not a verified v1.1.0 built-in adapter.
+- Understand the GitLab issue workflow and tour as a planned design, not a shipped Squad 2.0 adapter.
 - Explain how Squad detects Azure DevOps remotes and translates work items and pull requests through the platform adapter.
 - Describe the platform-adapter design at a high level and distinguish the intended contract from the stable implementation.
 - Configure Azure DevOps work-item organization, project, type, area path, and iteration path in `.squad/config.json`.
@@ -32,7 +32,7 @@ flowchart LR
     B --> C{"Supported adapter?"}
     C -->|"GitHub"| D["gh: Issues, labels, PRs"]
     C -->|"Azure DevOps"| E["az: work items, tags, PRs"]
-    C -->|"GitLab in v1.1.0"| F["No built-in adapter"]
+    C -->|"GitLab in v2.0.0"| F["No built-in adapter"]
     D --> G["Normalized work item and PR"]
     E --> G
     F --> H["Use GitLab CLI directly or wait for support"]
@@ -54,7 +54,7 @@ The GitLab feature page and tour present a familiar sequence: connect a GitLab p
 
 The comparison is still valuable even when the Squad integration is unavailable. A well-written GitLab issue can use the same structure as a GitHub issue: goal, expected behavior, acceptance criteria, constraints, and test evidence. A reviewer still needs the implementation diff, CI results, and a way to send actionable comments back to the author. A closing reference in the MR body can link work to its issue, subject to GitLab's project rules. Labels and milestones can organize GitLab work, but GitHub-specific namespaces and bot behavior do not automatically carry over.
 
-> **Preview:** The GitLab Issues Mode pages are explicitly marked experimental. More importantly, the v1.1.0 SDK platform types and adapter factory do not include a GitLab adapter: `detectPlatformFromUrl()` checks GitHub and Azure DevOps and otherwise falls back to GitHub, while `createPlatformAdapter()` constructs only GitHub or ADO adapters. Therefore, do not expect a standard `squad watch` or connected Squad workflow to call `glab` for you in v1.1.0. The sample GitLab conversation is a design/tour of the intended workflow, not a verified stable Squad integration.
+The GitLab Issues Mode pages now open with a plain label: **planned, not shipped**. Squad 2.0 has no GitLab platform adapter. `PlatformType` is `github | azure-devops | planner`, `detectPlatformFromUrl()` recognizes GitHub and Azure DevOps hosts and otherwise falls back to GitHub, and `createPlatformAdapter()` constructs only GitHub or ADO adapters. `squad triage` and `squad watch` have no `glab` path, and the coordinator prompt has no GitLab section. The sample GitLab conversation describes the intended workflow. Today it works only if you ask the coordinator to run `glab` ad hoc and it improvises the steps, so treat every GitLab command in this chapter as a direct `glab` operation, not a Squad feature.
 
 If you operate GitLab today, you can still use `glab` directly to maintain work items and MRs, or connect an external automation that explicitly understands GitLab. Make that boundary clear to a team: using similar prompt language does not install an adapter. Do not point an unverified default Squad adapter at a GitLab remote and assume safe behavior; it may be classified as GitHub because unknown URLs fall back to that platform.
 
@@ -74,6 +74,8 @@ Before automating a GitLab flow, answer these practical questions:
 Those are implementation requirements, not details to assume from a tour. In an enterprise setting, also verify whether a self-managed deployment has the same API and feature set as gitlab.com.
 
 ## Azure DevOps: Work Items Follow Your Process Template
+
+Be precise about what "Azure DevOps support" covers in Squad 2.0. Platform **detection** (from the remote host, or `platform` in `.squad/config.json`) works, and so does the CLI monitor loop: `squad triage` and `squad watch` run on Azure DevOps through `az boards`. The **interactive Issues mode** inside a coordinator session ("show me the backlog", "work on item 42") is written for `gh` and is GitHub-only for now. The Azure DevOps commands exist as reference material in `.squad/templates/issue-lifecycle.md`, which the model applies by hand, so a session on an ADO repository usually gets there but is not a first-class path. The rest of this section is about the adapter that `triage` and `watch` use.
 
 Azure DevOps replaces the simple issue-and-label model with work items and tags. Squad's adapter detects common Azure DevOps remote formats such as `https://dev.azure.com/org/project/_git/repo`, `git@ssh.dev.azure.com:v3/org/project/repo`, and legacy `org.visualstudio.com` URLs. Branch operations remain ordinary Git operations; work tracking and PR operations use the ADO CLI.
 
@@ -125,11 +127,11 @@ JSON requires a literal backslash in a string to be escaped, hence `\\` in the M
 
 The selection order for an item is: explicit per-item type, configured `defaultWorkItemType`, then `User Story`. For area and iteration, an explicit value can override the configuration in adapter calls; otherwise the configured path is used. The base adapter API and normal CLI command set do not expose every proposed per-item override as a user-facing `squad create issue` option, so use the settings documented and implemented for your actual entry point rather than guessing a flag.
 
-### Introspection and validation: what exists in v1.1.0
+### Introspection and validation: what exists in v2.0.0
 
 The stable SDK exports `getAvailableWorkItemTypes(org, project)` and `validateWorkItemType(org, project, typeName)`. The adapter also exposes methods with those operations. It queries `az boards work-item type list`, parses the returned types, and reports disabled types. If the CLI call fails, the helper falls back to a small common list (User Story, Bug, Task); validation is deliberately fail-open when the type list cannot be retrieved. As a result, a “valid” result when the ADO call could not be made is not the same as proof that the type exists in your project.
 
-The assigned ADO feature page describes a richer sequence—`squad init --introspect`, saving suggestions, checking area paths and iterations, `squad config set`, and `squad config validate`. Those command examples do not match the v1.1.0 CLI help or the implementation. The installed v1.1.0 `squad init --help` does not list `--introspect`, and the CLI's `squad config` help does not promise those setter or validation commands. The ADO adapter code introspects work-item types, but it does not implement a matching area-path and iteration-path discovery/validation flow. Use direct JSON configuration for the implemented fields and verify paths in Azure DevOps itself.
+The assigned ADO feature page describes a richer sequence—`squad init --introspect`, saving suggestions, checking area paths and iterations, `squad config set`, and `squad config validate`. Those command examples do not match the v2.0.0 CLI help or the implementation. The installed v2.0.0 `squad init --help` does not list `--introspect`, and the CLI's `squad config` help does not promise those setter or validation commands. The ADO adapter code introspects work-item types, but it does not implement a matching area-path and iteration-path discovery/validation flow. Use direct JSON configuration for the implemented fields and verify paths in Azure DevOps itself.
 
 > **Note:** For a low-risk first test, configure the ADO defaults on a dedicated test repo, confirm `az devops configure --list`, and list an existing work item before allowing any automated process to add tags or create work items.
 
@@ -139,7 +141,7 @@ An enterprise may keep code in one system and tasks in another. The docs describ
 
 Planner is not an alias for ADO. Its tasks, buckets, and Graph API are a separate contract; the enterprise guide describes obtaining an Azure CLI token for Microsoft Graph and configuring a plan ID. The SDK has a Planner type and adapter-related code, but the primary factory shown in `packages/squad-sdk/src/platform/index.ts` selects based on the repo remote and constructs GitHub or ADO. The docs' hybrid config and Planner workflow should therefore be treated as an integration requiring explicit verification rather than a guarantee that every `squad watch` call follows `workItems: planner` automatically.
 
-The enterprise guide also documents Azure DevOps MCP as an optional way to expose richer API access. It is not required for the stable ADO adapter, which calls `az`; any MCP server must be configured and trusted in the actual agent host. Avoid a configuration that installs an unpinned package without review. If your organization provides a managed MCP server, use its approved install instructions and permission model rather than copying a generic example blindly.
+The enterprise guide also documents Azure DevOps MCP as an optional way to expose richer API access. It is not required for the stable ADO adapter, which calls `az`; any MCP server must be configured and trusted in the actual agent host. For Copilot CLI, add that server to `.mcp.json` at the repository root, next to `squad_state` (or to your personal `~/.copilot/mcp-config.json`); the project `.copilot/mcp-config.json` that `squad init` writes is only a sample and Copilot CLI does not read it. Avoid a configuration that installs an unpinned package without review. If your organization provides a managed MCP server, use its approved install instructions and permission model rather than copying a generic example blindly.
 
 For Microsoft Entra-managed or multiple GitHub accounts, the GitHub adapter supports `gh auth` account switching as a non-fatal best effort when a preferred account or inferable owner is available. That behavior does not change ADO auth, which is tied to Azure CLI. Keep identity boundaries explicit in a multi-org setup: the active CLI account and the repository remote must match the intended enterprise identity.
 
@@ -165,7 +167,7 @@ A semantic difference deserves emphasis: in GitHub, a `squad:backend` label ofte
 
 ### Choosing a process template
 
-A process template determines which work-item types and fields exist, and fields that are required by your process may not be satisfied by the generic creation operation. Before relying on automatic creation, select a representative type and confirm its required fields in the project. Scrum commonly distinguishes Product Backlog Items, Bugs, Tasks, and Epics; Agile or CMMI may use different names or hierarchy. Your organization can customize the process, so examples such as `Bug`, `Scenario`, or `User Story` are not guaranteed. The v1.1.0 helper can list types if the Azure CLI call succeeds, but it does not infer a complete schema for custom fields or automatically populate every required field.
+A process template determines which work-item types and fields exist, and fields that are required by your process may not be satisfied by the generic creation operation. Before relying on automatic creation, select a representative type and confirm its required fields in the project. Scrum commonly distinguishes Product Backlog Items, Bugs, Tasks, and Epics; Agile or CMMI may use different names or hierarchy. Your organization can customize the process, so examples such as `Bug`, `Scenario`, or `User Story` are not guaranteed. The v2.0.0 helper can list types if the Azure CLI call succeeds, but it does not infer a complete schema for custom fields or automatically populate every required field.
 
 When creation fails, diagnose the exact ADO response. A type may be disabled, an area path may be misspelled, an iteration can be outside the active team's schedule, or a required custom field may be missing. If the adapter is being used by `watch`, the failure may occur after issue discovery and triage; avoid retrying an operation blindly if you do not know whether the work item was already created. Use the item URL or ID to detect partial success.
 
@@ -230,7 +232,7 @@ This lab prepares the Tasktrack companion project to use an ADO backlog without 
 
 ## Configuration Reference
 
-| Setting / command | v1.1.0 behavior | Notes |
+| Setting / command | v2.0.0 behavior | Notes |
 |---|---|---|
 | `az extension add --name azure-devops` | Installs CLI extension used by the adapter | Requires Azure CLI |
 | `az login` | Establishes Azure CLI authentication | ADO operations use that context |
@@ -240,9 +242,9 @@ This lab prepares the Tasktrack companion project to use an ADO backlog without 
 | `ado.defaultWorkItemType` | Default ADO creation type | Defaults to `User Story` in adapter code |
 | `ado.areaPath` | Default area path for created items | Omit to use ADO's project/team default |
 | `ado.iterationPath` | Default iteration path | Omit to use ADO's project/team default |
-| `squad init --introspect` | Not present in v1.1.0 CLI help | Described by assigned feature docs, but unverified against stable CLI |
-| `squad config set ...` / `config validate` | Not documented by v1.1.0 CLI help | Edit JSON and validate it with a JSON parser; verify ADO values in ADO |
-| GitLab `glab` flow | Experimental documentation | No GitLab adapter in stable v1.1.0 platform factory |
+| `squad init --introspect` | Not present in v2.0.0 CLI help | Described by assigned feature docs, but not implemented in the CLI |
+| `squad config set ...` / `config validate` | Not documented by v2.0.0 CLI help | Edit JSON and validate it with a JSON parser; verify ADO values in ADO |
+| GitLab `glab` flow | Planned, not shipped | No GitLab adapter in the v2.0.0 platform factory |
 
 ## Under the Hood
 
@@ -250,7 +252,7 @@ This lab prepares the Tasktrack companion project to use an ADO backlog without 
 
 The ADO implementation is in `packages/squad-sdk/src/platform/azure-devops.ts`. `AdoWorkItemConfig` contains the five ADO-specific settings used here. `listWorkItems()` builds a WIQL query and fetches each result's detail; `getWorkItem()` normalizes `System.Tags`, `System.AssignedTo`, title, state, description, and URL. `createWorkItem()` selects the type by per-call override, configured default, or `User Story`, then optionally checks the type if `validateType` is true. `getAvailableWorkItemTypes()` calls `az boards work-item type list`, but area- and iteration-path validation from the feature page is not implemented in the same adapter.
 
-The GitLab feature and tour live in `docs/src/content/docs/features/gitlab-issues.md` and `docs/src/content/docs/tour-gitlab-issues.md`, and are explicitly marked experimental. Comparing those pages with the adapter factory surfaces the support boundary: the tour presents a desired `glab` flow; the stable factory does not create that integration.
+The GitLab feature and tour live in `docs/src/content/docs/features/gitlab-issues.md` and `docs/src/content/docs/tour-gitlab-issues.md`, and are explicitly marked "planned, not shipped". Comparing those pages with the adapter factory surfaces the support boundary: the tour presents a desired `glab` flow; the stable factory does not create that integration.
 
 ## Pitfalls and Troubleshooting
 
@@ -258,39 +260,39 @@ The GitLab feature and tour live in `docs/src/content/docs/features/gitlab-issue
 - **The remote is ADO but the CLI uses the wrong project.** Check the URL-encoded project segment and `ado.project`; test with `az boards work-item show` against an existing ID.
 - **A custom type is rejected.** Use the exact name reported by `az boards work-item type list`; confirm the type is enabled. Remember that offline fallback values are not authoritative.
 - **The area or iteration does not appear on the board.** Confirm the path exists and is assigned to the correct team/sprint in ADO. The stable adapter does not discover those paths automatically.
-- **GitLab commands target the wrong system.** The current stable Squad platform factory does not detect GitLab; `glab` commands are direct GitLab CLI operations, not evidence that Squad selected a GitLab adapter.
+- **GitLab commands target the wrong system.** The v2.0.0 platform factory does not detect GitLab; `glab` commands are direct GitLab CLI operations, not evidence that Squad selected a GitLab adapter.
 - **Config changes silently do nothing.** Check that the JSON object is named exactly `ado`, is in `.squad/config.json`, and that the actual remote is ADO. ADO org/project overrides apply to work-item queries and creation.
 - **A GitHub project is mistaken for ADO work tracking.** The `project` permission scope belongs to GitHub Projects; ADO work items use `az` authentication and organization/project context.
 - **Planner hybrid claims do not match runtime behavior.** Verify that the exact code path uses Planner as the work-item source before relying on the docs' hybrid example.
 
 ## Summary
 
-GitLab, GitHub, and Azure DevOps share an issue-driven shape but differ in their artifacts and adapter support. The GitLab pages give a useful experimental tour using `glab`, but v1.1.0's platform detection and factory do not provide a GitLab adapter. Azure DevOps is a supported repo/work-item adapter: it uses the Azure CLI, maps tags and work items into Squad's shared model, and reads optional `ado` defaults from `.squad/config.json`. Configure only the fields implemented in the stable adapter, and verify paths and permissions directly in ADO. Treat Planner's enterprise hybrid workflow and richer GitLab paths as integrations to validate, not universal defaults.
+GitLab, GitHub, and Azure DevOps share an issue-driven shape but differ in their artifacts and adapter support. The GitLab pages give a useful tour of the planned `glab` workflow, but v2.0.0's platform detection and factory do not provide a GitLab adapter. Azure DevOps is a supported repo/work-item adapter: it uses the Azure CLI, maps tags and work items into Squad's shared model, and reads optional `ado` defaults from `.squad/config.json`. Configure only the fields implemented in the stable adapter, and verify paths and permissions directly in ADO. Treat Planner's enterprise hybrid workflow and richer GitLab paths as integrations to validate, not universal defaults.
 
 ## Exercises
 
-1. Given a GitLab remote URL and the v1.1.0 platform factory behavior, explain why a standard `squad watch` run must not be assumed to use `glab`. Name two safe alternatives for a team that needs GitLab today.
+1. Given a GitLab remote URL and the v2.0.0 platform factory behavior, explain why a standard `squad watch` run must not be assumed to use `glab`. Name two safe alternatives for a team that needs GitLab today.
 2. An ADO organization uses a custom work-item type named `Scenario` and stores tasks in a separate project, `Platform Intake`. Write the `ado` configuration fragment that sets the type and project while leaving area and iteration paths to the project defaults.
 3. Describe how `System.Tags` is represented when the adapter reads an ADO work item and how it updates tags. Why should an automation read current tags before replacing them?
 4. The ADO type-introspection call fails because the developer is offline, but validation returns a list including `Bug`. Explain why this is not proof that `Bug` exists in the real project, then identify the evidence needed before accepting an adapter/type-mapping proposal for production.
-5. Compare the platform-adapter PRD with the v1.1.0 SDK: identify two ways the implementation is broader or more nuanced, and describe how you would verify actual CLI/auth behavior before relying on it.
+5. Compare the platform-adapter PRD with the v2.0.0 SDK: identify two ways the implementation is broader or more nuanced, and describe how you would verify actual CLI/auth behavior before relying on it.
 6. Match these needs to the appropriate layer: list an ADO work item, add an ADO tag, create a pull request, and create a programmatic Copilot session. Explain why the session API is not the work-tracking adapter.
 
 ## Quiz
 
-1. Which two platform implementations does the v1.1.0 remote adapter factory construct?
+1. Which two platform implementations does the v2.0.0 remote adapter factory construct?
 2. What is the default ADO work-item type when no per-call or config override is provided?
 3. Which CLI authenticates the stable ADO adapter?
 4. What do the assigned GitLab pages say about the maturity of GitLab Issues Mode?
-5. Does `squad init --introspect` appear in the installed v1.1.0 init help?
+5. Does `squad init --introspect` appear in the installed v2.0.0 init help?
 6. Which ADO setting controls the default team area path for new work items?
-7. Can a GitLab URL be safely assumed to select a native GitLab adapter in v1.1.0?
-8. Which SDK abstraction normalizes work items and pull requests, and does the PRD guarantee every proposed operation is implemented in v1.1.0?
+7. Can a GitLab URL be safely assumed to select a native GitLab adapter in v2.0.0?
+8. Which SDK abstraction normalizes work items and pull requests, and does the PRD guarantee every proposed operation is implemented in v2.0.0?
 
 ## Further Reading
 
-- [GitLab Issues Mode](https://bradygaster.github.io/squad/docs/features/gitlab-issues/)
-- [GitLab Issues Walkthrough](https://bradygaster.github.io/squad/docs/tour-gitlab-issues/)
-- [Enterprise Platforms](https://bradygaster.github.io/squad/docs/features/enterprise-platforms/)
-- [ADO Configurable Work Items](https://github.com/bradygaster/squad/blob/v1.1.0/docs/features/ado-configurable-work-items.md)
-- [Platform Adapter PRD](https://github.com/bradygaster/squad/blob/v1.1.0/docs/_internal/specs/platform-adapter-prd.md)
+- [GitLab Issues Mode](https://github.github.com/squad/docs/features/gitlab-issues/)
+- [GitLab Issues Walkthrough](https://github.github.com/squad/docs/tour-gitlab-issues/)
+- [Enterprise Platforms](https://github.github.com/squad/docs/features/enterprise-platforms/)
+- [ADO Configurable Work Items](https://github.com/github/squad/blob/v2.0.0/docs/features/ado-configurable-work-items.md)
+- [Platform Adapter PRD](https://github.com/github/squad/blob/v2.0.0/docs/_internal/specs/platform-adapter-prd.md)

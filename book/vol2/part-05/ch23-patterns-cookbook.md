@@ -332,7 +332,7 @@ If you find a material ambiguity, stop and report options rather than guessing.
 
 **Problem:** Teammates use different AI hosts, but the repository should keep one shared team, routing policy, and charter set rather than forking its Squad identity.
 
-**Pattern:** In Squad 2.0, select each supported host projection with `squad init --client <list>` for a new project or `squad upgrade --client <list>` for an existing one. Keep `.squad/` as the shared team source, review the generated coordinator and MCP configuration for each host, and test the delegation behavior on the actual clients your team uses. Host features and authentication differ; do not assume one license or tool set covers every client. Follow Chapter 19 for the walkthrough and compatibility caveats ([client scenario](https://bradygaster.github.io/squad/docs/scenarios/using-squad-across-clients/)).
+**Pattern:** Select each host projection with `squad init --client <list>` for a new project, or `squad client add <list>` (or `squad upgrade --client <list>`) for an existing one. Keep `.squad/` as the one team source and commit it. After you change the roster or `routing.md`, run `squad client sync` so every configured host picks up the change; Claude Code's member subagents, for example, are regenerated from the roster. Review the generated coordinator and MCP configuration for each host, then test delegation on the clients your teammates really use. Host features and sign-in differ, and one license does not cover every client. A teammate on Copilot alone needs nothing extra: the Copilot files stay in place whatever else you project. Chapter 19 has the walkthrough and the compatibility caveats ([client scenario](https://github.github.com/squad/docs/scenarios/using-squad-across-clients/)), and Appendix H summarizes what each host supports.
 
 
 The recipes below are starting points. Adjust the role names and stack to the roster you actually cast.
@@ -399,11 +399,11 @@ Treat prompts as adaptable starting points, not templates to paste unchanged: re
 
 ### Should I use the Squad CLI or Copilot CLI?
 
-Use the interface appropriate to the task. The Squad CLI handles setup, diagnostics, triage, export/import, state, and other explicit commands. Copilot is the conversational surface for asking the team to inspect, plan, or build. Their capabilities are not interchangeable; check `squad --help` for the installed v1.1.0 command surface.
+Use the interface appropriate to the task. The Squad CLI handles setup, diagnostics, triage, export/import, state, and other explicit commands. Copilot is the conversational surface for asking the team to inspect, plan, or build. Their capabilities are not interchangeable; check `squad --help` for the installed v2.0.0 command surface. Other hosts, such as Claude Code, are conversational surfaces in the same way; Chapter 19 covers them.
 
 ### Is Ralph the same as `squad triage`?
 
-They are related, but do not collapse the names into a guarantee that every interface behaves identically. “Ralph” commonly refers to the work-monitor role/loop discussed in Chapter 9 (Volume 1). The v1.1.0 CLI exposes `squad triage`; it scans and categorizes work, and `--execute` enables spawning agents. Verify flags with `squad triage --help`; avoid relying on a legacy `squad ralph` command unless the installed CLI documents it.
+They are related, but do not collapse the names into a guarantee that every interface behaves identically. “Ralph” commonly refers to the work-monitor role/loop discussed in Chapter 9 (Volume 1). The v2.0.0 CLI exposes `squad triage` (it also answers to `squad watch`); it scans and categorizes work, and `--execute` enables spawning agents. Verify flags with `squad triage --help`; there is no `squad ralph` CLI command in v2.0.0. (`/squad:ralph` in the Squad plugin for Claude Code is a slash command inside Claude Code, not a shell command.)
 
 ### Can Squad work without GitHub Issues?
 
@@ -411,7 +411,7 @@ Yes. Conversational work, team memory, and local development do not inherently r
 
 ### What happens if I run `squad init` twice?
 
-The v1.1.0 `squad init` help says it is safe to re-run and preserves existing files. That is not a license to skip backups or assume every custom artifact will be merged. Read the resulting diff and protect custom configuration before initialization or upgrades.
+The v2.0.0 `squad init` help says it is safe to re-run and preserves existing files. That is not a license to skip backups or assume every custom artifact will be merged. Read the resulting diff and protect custom configuration before initialization or upgrades.
 
 ### Why does an issue workflow not pick up my issue?
 
@@ -475,15 +475,16 @@ The cookbook mostly concerns prompts rather than new settings. These are the dur
 | `squad triage --execute` | Spawn agents to work on selected issues | Enable only after verifying repository scope and issue selection |
 | `squad triage --max-concurrent N` | Set maximum parallel issue count; default is 1 | Start low; more concurrency increases overlap and review load |
 | `squad triage --timeout N` | Set maximum minutes per issue; default is 30 | Choose a value appropriate to the work; do not interpret timeout as proof of completion |
-| `squad triage --self-pull`, `--board`, `--two-pass`, `--wave-dispatch`, `--retro`, `--decision-hygiene` | Optional triage capabilities listed by v1.1.0 help | Opt in only when the repository and team are configured for that capability; `--no-<capability>` can disable one |
+| `squad triage --claims git-ref`, `--max-rounds N`, `--max-duration 8h`, `--agent-preset claude` | Claim issues across several watchers (default `none`), bound a run, or run agents with Claude Code instead of Copilot (default `copilot`) | Use claims when more than one machine watches the same repository; see Chapter 9 (Volume 1). Bound unattended runs |
+| `squad triage --self-pull`, `--board`, `--two-pass`, `--wave-dispatch`, `--retro`, `--decision-hygiene` | Optional triage capabilities listed by v2.0.0 help | Opt in only when the repository and team are configured for that capability; `--no-<capability>` can disable one |
 
 ## Under the Hood
 
-The advice in this chapter is about prompt design, but the behaviors it references have concrete CLI boundaries. The v1.1.0 command entry point lists `triage`, `loop`, `state-mcp`, `doctor`, `health`, and `aspire` separately. That is why this chapter labels prompt cues as prompts and shell invocations as commands rather than implying that natural-language phrases are executable CLI flags.
+The advice in this chapter is about prompt design, but the behaviors it references have concrete CLI boundaries. The v2.0.0 command entry point lists `triage`, `loop`, `state-mcp`, `doctor`, `health`, and `aspire` separately. That is why this chapter labels prompt cues as prompts and shell invocations as commands rather than implying that natural-language phrases are executable CLI flags.
 
 The triage interface and its option parsing live under `packages/squad-cli/src/cli/commands/watch/` and `packages/squad-cli/src/cli-entry.ts`. The top-level help describes `triage` as scanning and categorizing issues; its help distinguishes core execution flags from opt-in capabilities. The actual work monitor must be understood from the installed version and configuration, not from an old sample prompt alone.
 
-The cookbook sources are examples, not normative configuration schemas. Several source pages contain older naming and workflow descriptions; when they conflict with the v1.1.0 command help or current repository state, prefer the verified version-specific behavior. Treat sample project names, roster names, and stack choices as illustrative.
+The cookbook sources are examples, not normative configuration schemas. Several source pages contain older naming and workflow descriptions; when they conflict with the v2.0.0 command help or current repository state, prefer the verified version-specific behavior. Treat sample project names, roster names, and stack choices as illustrative.
 
 ## Pitfalls and Troubleshooting
 
@@ -494,7 +495,7 @@ The cookbook sources are examples, not normative configuration schemas. Several 
 | Too many overlapping edits | Task boundaries or file ownership are unclear | Narrow scope, assign owners, or work sequentially |
 | Triage proposes irrelevant work | Repository, labels, or routing do not match expectations | Run an observational scan, review routing, and check the current repo context |
 | Work report says “done,” but behavior is missing | Completion claim was not independently verified | Run tests, inspect the diff, and compare each acceptance criterion |
-| A copied prompt requests an unsupported feature | The prompt came from a different version or environment | Check the v1.1.0 CLI help and source before executing it |
+| A copied prompt requests an unsupported feature | The prompt came from a different version or environment | Check the v2.0.0 CLI help and source before executing it |
 
 ## Summary
 
@@ -512,7 +513,7 @@ Patterns make collaboration repeatable when they preserve clear boundaries: defi
 
 1. What must a boundary-first prompt state besides the desired outcome?
 2. When is a named-agent request usually preferable to “Team”?
-3. In the v1.1.0 CLI, what does `--execute` change about `squad triage`?
+3. In the v2.0.0 CLI, what does `--execute` change about `squad triage`?
 4. Why should a shared API contract be settled before parallel frontend and backend implementation?
 5. Is a “tests pass” statement sufficient evidence that a feature is complete? Why or why not?
 6. What is the distinction between a conversational Ralph cue and the `squad triage` command?
@@ -520,9 +521,9 @@ Patterns make collaboration repeatable when they preserve clear boundaries: defi
 
 ## Further Reading
 
-- [Recipes & Advanced Scenarios](https://bradygaster.github.io/squad/docs/cookbook/recipes/)
-- [Frequently Asked Questions](https://bradygaster.github.io/squad/docs/guide/faq/)
-- [Sample Prompts (Guide)](https://bradygaster.github.io/squad/docs/guide/sample-prompts/)
-- [Tips and Tricks (Guide)](https://bradygaster.github.io/squad/docs/guide/tips-and-tricks/)
-- [Sample Prompts](https://bradygaster.github.io/squad/docs/sample-prompts/)
-- [Tips and Tricks](https://bradygaster.github.io/squad/docs/tips-and-tricks/)
+- [Recipes & Advanced Scenarios](https://github.github.com/squad/docs/cookbook/recipes/)
+- [Frequently Asked Questions](https://github.github.com/squad/docs/guide/faq/)
+- [Sample Prompts (Guide)](https://github.github.com/squad/docs/guide/sample-prompts/)
+- [Tips and Tricks (Guide)](https://github.github.com/squad/docs/guide/tips-and-tricks/)
+- [Sample Prompts](https://github.github.com/squad/docs/sample-prompts/)
+- [Tips and Tricks](https://github.github.com/squad/docs/tips-and-tricks/)

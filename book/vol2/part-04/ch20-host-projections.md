@@ -2,13 +2,12 @@
 
 > **Prerequisites:** Volume 1 (or equivalent Squad experience); Chapters 14 and 19.
 
-> **Preview:** This chapter describes Squad 2.0 (`v2.0.0-preview.2`, insider channel). Interfaces, host integrations, and compatibility details may change before 2.0.0 is stable.
-
 ## What You'll Learn
 
 - Separate a workspace-only `HostProjection` from a runtime-bound `ClientAdapter` and an execution-side `HarnessAdapter`.
 - Read canonical capability tokens, derive compatibility flags, and calculate the client/backend/policy intersection without confusing advertisement with authorization.
-- Trace coordinator instructions into seven host formats, including dispatch-time charter inlining.
+- Trace coordinator instructions into seven host formats, explain why the six non-Copilot coordinators are self-contained (ADR-003), and follow dispatch-time charter inlining.
+- Read the version 3 Claude projection: member subagents, native and on-demand skills, the scoped allowlist, advisory hooks, lockout records and plugin mode.
 - Keep persisted client IDs portable and understand additive merge, refusal, uninstall, and ownership rules.
 - Interpret the host feature matrix as evidence rather than a blanket compatibility promise.
 - Design a host inspection script and a testable adapter extension without inventing runtime behavior.
@@ -102,13 +101,13 @@ The broker-side `HarnessAdapter`, exported from `@bradygaster/squad-sdk/backend`
 
 Cancellation and approval deliveries carry stable operation IDs so a harness can make redelivery idempotent. Harness event envelopes carry run identity and sequence, with optional lease epoch information. These are execution integration requirements, not jobs for a file generator.
 
-> **Warning:** The preview ships the harness SPI and registry, not a concrete execution harness implementation. Installing seven projections is not installing seven broker-integrated execution engines. Chapter 21 explains why the bundled experimental MCP conversation bridge reports execution unavailable without a registered harness.
+> **Preview:** The execution harnesses are experimental in v2.0.0. Two ship in `@bradygaster/squad-sdk/backend`: `ClaudeAgentSdkHarness` and `CopilotSdkHarness`. Installing seven projections still does not install seven broker-integrated execution engines; the Kiro, OpenCode, Cursor, Codex and Antigravity projections have no harness at all. Chapter 21 explains when the experimental MCP conversation bridge registers a harness and when it reports execution unavailable.
 
 ## Capability Tokens Are the Vocabulary
 
 `CAPABILITY_TOKENS_BY_HOST` is the authoritative declaration used by the adapter facade. It combines runtime/transport baseline tokens with projection-level tokens. It is a static table, not a probe of your installed CLI version, account plan, quota, network, or current tools.
 
-The complete client token list in this preview contains nine entries:
+The complete client token list in v2.0.0 contains nine entries:
 
 | Token | Meaning at the adapter boundary |
 |---|---|
@@ -185,7 +184,7 @@ You can preserve the *outcome* by waiting for a specialist synchronously. The ma
 
 With no runtime binding, `adapter.getCapabilities()` still works. Internally, absent backend and policy callbacks produce `undefined` restrictions, so `effectiveCapabilities` equals the advertised client list. The returned `backendCapabilities` and `policyCapabilities` fields nevertheless appear as empty arrays.
 
-That is a preview-level reporting subtlety: those empty report fields can mean *no provider was bound*, not an explicit deny-all grant. Never use an unbound inspection result as evidence that a remote service authorized anything. Compare this with an actual `RuntimeBinding` callback returning `[]`: that explicit restriction makes the effective list empty.
+That is a reporting subtlety you should know about: those empty report fields can mean *no provider was bound*, not an explicit deny-all grant. Never use an unbound inspection result as evidence that a remote service authorized anything. Compare this with an actual `RuntimeBinding` callback returning `[]`: that explicit restriction makes the effective list empty.
 
 The boolean helper `resolveEffectiveCapabilities` has analogous partial-object semantics: omitted keys do not restrict; explicit `false` does. It intersects transport-mode lists and removes `mcp-bridge` if `supportsMcpTransport` becomes false. Use the token helper for the full nine-token vocabulary; use the boolean helper only when an older integration really requires its narrower representation.
 
@@ -193,25 +192,41 @@ Finally, the facade delegates runtime methods rather than enforcing every capabi
 
 ## Rendering One Coordinator for Seven Hosts
 
-Chapter 12 examined the canonical coordinator, and Chapter 5 discussed client compatibility in the earlier deployment model. The preview adds explicit projections rather than assuming all hosts load Copilot's file format.
+Chapter 12 examined the canonical coordinator, and Chapter 5 discussed client compatibility on the Copilot surfaces. Squad 2.0 adds explicit projections rather than assuming all hosts load Copilot's file format.
 
 There are two rendering tracks. The CLI's init/upgrade pipeline renders and stamps `.github/agents/squad.agent.md` from its coordinator template. The SDK's Copilot projection only supplies MCP wiring; it does not generate that agent file. The other projections call `buildCoordinatorInstructions(host, squadDir, repoRoot)` and wrap the resulting compact coordinator digest in the host's native representation.
 
-The compact body combines `coreCoordinatorProtocol`, a per-host `Dispatch adapter` section, and a transport section. `resolveCanonicalCoordinatorSource` inspects the canonical file when present, extracts recognized headings and a version stamp, and adds a pointer instructing the host to read that canonical contract. It does not mechanically translate every paragraph of the canonical template. This is why a synchronized digest can still have explicit feature gaps.
+The compact body combines `coreCoordinatorProtocol`, a per-host `Dispatch adapter` section, and a transport section. The digest is written from the same shared template source as Copilot's file (`.squad-templates/squad.agent.md` in the Squad repository), and it names the canonical sections it covers, but it is a condensed rewrite, not a paragraph-by-paragraph translation. This is why a synchronized digest can still have explicit feature gaps. For Claude Code, `buildCoordinatorInstructions` also cuts five items out of the digest and serves them as skills; the next section covers that.
+
+### Host-neutral coordinators (ADR-003)
+
+In the 2.0 previews, every non-Copilot digest told the model that `.github/agents/squad.agent.md` was the authoritative contract and that it should read that file when present. A Claude Code or Kiro coordinator therefore leaned on an 80 KB file under a Copilot path, shaped for Copilot. ADR-003 (`docs/specification/adr-003-host-neutral-canonical-coordinator.md`, accepted 2026-11-13) settled the question. It weighed three options:
+
+| Option | What it meant | Outcome |
+|---|---|---|
+| A | Keep pointing the other hosts at Copilot's file | Rejected |
+| B | Move the canonical coordinator to a host-neutral workspace file and generate Copilot's from it | Not adopted for 2.0; kept as an opt-in experiment |
+| C | Keep Copilot's file canonical for Copilot, and make every other digest complete on its own | **Chosen** |
+
+Under option C, which shipped in v2.0.0, the Claude Code, Kiro, OpenCode, Cursor, Codex and Antigravity coordinators never point at Copilot's file. Each digest opens by saying it is the host's complete protocol and that a `.github/agents/squad.agent.md` in the workspace must not be read for instructions. `coreCoordinatorProtocol` no longer reads that file at all: the digest is the same whether the Copilot file is absent, stock or customized. `resolveCanonicalCoordinatorSource` is still exported for tooling, but the digest no longer depends on it. The version stamp in each digest is `COORDINATOR_SQUAD_VERSION`, taken from the SDK package, and the `squad_state_health` handshake requires the bridge to report that same version.
+
+Three things did not change. Copilot's coordinator output is unchanged, guarded by a Copilot snapshot in `test/host-projection-regression-guards.test.ts`. `squad init` still writes `.github/agents/squad.agent.md` even in a repository that projects only non-Copilot hosts; the ADR treats that as a separate decision. And the hosts are kept in step by digest parity tests, not by a shared file.
+
+The evidence matters as much as the choice. Before the decision, the maintainers checked 43 Claude Code sessions for any read of the Copilot file and found none. After it, they ran behavioral scenarios on Claude Code with Copilot's file deleted (routing, human sign-off, reviewer rejection, restart continuity, customization precedence, a monorepo subfolder, a backend outage and a satellite repository), and the host feature matrix's live run log records them as passing on 2026-11-12 and 2026-11-13. Azure DevOps was deferred. If you customize Tasktrack's `.github/agents/squad.agent.md`, that customization now reaches Copilot only. Put team policy that every host must follow into `.squad/` files (`team.md`, `routing.md`, decisions, charters), which every digest reads.
 
 ### Native envelopes and discovery
 
 | Host | Agent anchor and envelope | Companion discovery or MCP surface |
 |---|---|---|
 | Copilot | `.github/agents/squad.agent.md`; full CLI-rendered coordinator | `.mcp.json`; other Copilot support files are handled by the CLI |
-| Claude | `.claude/agents/squad.md`; YAML `name`, `description`, `tools` | `.mcp.json`, managed `CLAUDE.md` block, Claude worktree ignore lines |
+| Claude | `.claude/agents/squad.md`; YAML `name`, `description` (no `tools` list) | `.mcp.json`, managed `CLAUDE.md` block, Claude worktree ignore lines, member subagents, skills, `.claude/settings.json` keys |
 | Kiro | `.kiro/steering/squad.md`; YAML `inclusion: manual` | `.kiro/agents/squad.json`, `.kiro/settings/mcp.json` |
 | OpenCode | `.opencode/agent/squad.md`; YAML `description`, `mode: primary` | `opencode.json`, or existing `opencode.jsonc` when no JSON file exists |
 | Cursor | `.cursor/agents/squad.md`; YAML `name`, `description`, `model: inherit` | `.cursor/rules/squad.mdc` with `alwaysApply: false`; `.cursor/mcp.json` |
 | Codex | `.codex/agents/squad.toml`; `name`, `description`, multiline `developer_instructions` | Short `AGENTS.md` discovery block; `.codex/config.toml` |
 | Antigravity | `.agents/agents/squad.md`; `name`, `description`, `mainAgent: true`, `subagent: false`, explicit tools | Inline `mcpServers:` frontmatter; managed `GEMINI.md` block |
 
-Claude's tools field names `Task, Read, Write, Edit, Bash, Glob, Grep, mcp__squad_state`. Its discovery block recommends `claude --agent squad --mcp-config .mcp.json`, reflecting project-server approval requirements. The table describes generated configuration, not an assertion that every future host release retains those tool names.
+The Claude coordinator has no `tools` allowlist. Like Copilot's `tools: ["*"]`, it inherits every tool in the session, so an MCP server you add next to `squad_state` stays callable; the previews' allowlist named only `mcp__squad_state` and hid those servers. The `CLAUDE.md` discovery block recommends `claude --agent squad --mcp-config .mcp.json`, because interactive Claude Code does not load a project-scoped `.mcp.json` server until you approve it. In plugin mode the block says to install the Squad plugin and run plain `claude` instead. The table describes the full projection; the next section shows what plugin mode removes. It describes generated configuration, not an assertion that every future host release keeps these file names.
 
 Kiro's descriptor deserves special attention. Its prompt URI is `file://../steering/squad.md`, relative to the agent descriptor directory. Its team and routing resources use workspace-root forms such as `file://.squad/team.md`. Making all three paths relative to the same directory would break discovery.
 
@@ -223,9 +238,100 @@ Antigravity receives an explicit tool list because omitting tools means no tools
 
 Do not confuse rendering the coordinator with compiling every specialist charter into it. `buildCoordinatorInstructions` does not enumerate `.squad/agents/` and paste all charters into the generated file. Instead, the protocol tells the coordinator to read the selected member's charter and inline it into that member's delegation prompt, along with the task, relevant decisions, working directory, and state-tool rules.
 
-Claude dispatch uses a general-purpose `Task` subagent. OpenCode uses its `general` child-session agent. Codex explicitly requests one `worker` agent per specialist and waits for results. Antigravity uses `invoke_subagent` with `self` and a clean-context prompt. Kiro and Cursor document an explicit charter-adoption fallback if subagents are unavailable. Copilot selects `task`, `create_session`, or `runSubagent` according to its surface.
+Claude Code is the exception. Its projection writes one subagent file per member, and the coordinator spawns that member by name with Claude Code's `Agent` tool (`subagent_type: "<member>"`; the tool was called `Task` in earlier Claude Code releases). The member file tells the subagent to read its own charter and history, so the coordinator passes the task, decisions and context, not the charter text. Only a member without a subagent file falls back to a general-purpose subagent with the charter inlined. OpenCode uses its `general` child-session agent. Codex explicitly requests one `worker` agent per specialist and waits for results. Antigravity uses `invoke_subagent` with `self` and a clean-context prompt. Kiro and Cursor document an explicit charter-adoption fallback if subagents are unavailable. Copilot selects `task`, `create_session`, or `runSubagent` according to its surface.
 
-This is identity portability through authored context, not a promise that every product registers a native agent definition for each Tasktrack member. Charters remain static team configuration. Their optional examples and responsibilities travel with the member's prompt, while mutable histories and decisions remain behind the state boundary.
+Everywhere except Claude Code, this is identity portability through authored context, not a native agent definition for each Tasktrack member. Charters remain static team configuration. Their optional examples and responsibilities travel with the member's prompt, while mutable histories and decisions remain behind the state boundary.
+
+## The Claude Projection, Version 3
+
+Claude Code is the first host after Copilot where Squad uses the host's own features instead of the shared minimum. Every addition still goes through the same `HostProjection` contract, so it is all visible in `getHostProjection('claude').project(ctx)`. Chapter 19 shows how to install and use it. This section explains what each file is and who owns it.
+
+The projection is versioned. `CLAUDE_PROJECTION_VERSION` in `adapters.ts` is `3`:
+
+| Version | Adds |
+|---|---|
+| v1 | The coordinator, the `.mcp.json` entry, the `CLAUDE.md` block and the `.gitignore` lines |
+| v2 | One subagent per member, the template and coordinator skills, the opt-in hooks in `.claude/settings.json` |
+| v3 | Plugin mode (`"claudePlugin": true`), in which the Squad plugin for Claude Code carries the shared parts |
+
+Every generated Claude Markdown file ends its generated-file comment with `Claude projection v3.` The comment keeps the v1 wording as a prefix, so `squad upgrade` still recognizes v1 and v2 files as Squad's own and replaces them in place. JSON has no comments, so Squad recognizes its `settings.json` entries by their content instead (described below).
+
+### Member subagents
+
+For every directory under `.squad/agents/` that holds a `charter.md`, built-ins included, the projection writes `.claude/agents/<id>.md`. The ID must be lowercase words joined by hyphens, and `squad` is reserved for the coordinator. `claude-members.ts` maps the charter onto Claude Code frontmatter:
+
+| Charter field | Subagent frontmatter |
+|---|---|
+| `Identity: ID` (or the directory name) | `name` |
+| `Identity: Purpose` (or name and role), plus the member's work types from `routing.md` | `description` |
+| `Model: Preferred` | `model`, only for a Claude alias (`sonnet`, `opus`, `haiku`, `fable`, `inherit`) or a `claude-*` model ID; omitted for `auto` |
+| `Model: Reasoning Effort` | `effort`; a value in `.squad/config.json` outranks the charter |
+| `## X-squad-host-claude`, `Tools` | `tools` |
+| `## X-squad-host-claude`, `Isolation` (`worktree` only) | `isolation` |
+
+`X-squad-host-claude` is a namespaced charter extension (Chapter 17 covers the `## X-` rule). A charter for Tasktrack's tester might add:
+
+```markdown
+## X-squad-host-claude
+
+- **Tools:** Read, Grep, Glob, Bash, mcp__squad_state__*
+- **Isolation:** worktree
+```
+
+These values are runtime configuration, not authorization. A preference the projection cannot apply, such as a non-Claude model, an `Isolation` other than `worktree`, or `long_context` without a long-context Claude model, is written into an HTML comment in the generated file instead of being dropped silently. The body of the file is short: it tells the subagent to read its charter and history (or, for a project linked to a team repository, carries the charter inline and reads history through `squad_state`), not to spawn subagents of its own, and to use the `squad_state` tools.
+
+Ownership is checked per file. Member files are `managed` entries with an `ownedMarker`, the generated-file comment. If a file at `.claude/agents/backend.md` lacks that comment, you wrote it, and apply reports it as `skipped` and leaves it alone. When a charter disappears, the old generated file becomes an `obsolete` entry and is deleted, but only while it still carries the marker. `squad cast` and `squad client sync` refresh the member files, which is why Init Mode runs `squad client sync` after it writes `routing.md`: the descriptions then name what each member owns.
+
+### Native skills and on-demand coordinator skills
+
+`claude-skills.ts` projects Squad's template skills from `.squad/templates/skills/` into `.claude/skills/<name>/SKILL.md`, with two exceptions. A team skill with the same name in `.squad/skills/` keeps its precedence, so the template is not projected. And Copilot's `init-mode` and `coordinator-init-mode` skills are never projected, because they wait for an `ask_user` tool Claude Code does not have.
+
+It also writes five `squad-coordinator-*` skills cut from the digest itself: `init-mode`, `ralph-mode`, `ceremonies`, `issues-mode` and `prd-mode` (core-protocol items 0, 9, 15, 18 and 19). The Claude digest keeps a stub for each, with its trigger and the rules that must hold before the skill loads; the full item text moves verbatim into the skill. Loading coordinator sections on demand is not new to Claude: Copilot's `squad.agent.md` has loaded Init Mode through a skill since v1.1.0. Claude moves four more modes out. The shared digest for the other five hosts keeps every item inline. Projected skills are still untrusted data under core-protocol item 17; projecting them changes how Claude Code discovers them, not what they may do.
+
+### `.claude/settings.json`: allowlist, hooks and plugin keys
+
+`.claude/settings.json` is your file. `claude-hooks.ts` merges up to three kinds of Squad entries into it and records ownership so that rollback removes only what Squad added.
+
+The **scoped allowlist** is on unless `.squad/config.json` sets `"claudePermissions": "off"`. It adds `permissions.allow` rules for the nine `squad_state` tools the coordinator uses, by name, and for four CLI calls: `Bash(squad cast:*)`, `Bash(squad client sync:*)`, `Bash(squad lockout reject:*)` and `Bash(squad lockout status:*)`. When `.mcp.json` runs the committed launcher, the same four appear again as `Bash(node .squad/squad.mjs …:*)`. Nothing else is allowed: no `Edit`, no general `Bash`, no experimental `squad_backend_*` approval tool. The lockout steps that move toward release (`assign`, `submit`, `approve`, `override`) still prompt, so a coordinator cannot clear a lockout on its own. Squad records the rules it added in `.claude/.squad-permissions.json`; a rule you already had is never recorded and survives rollback. Claude Code applies project allow rules only after you trust the folder on your first interactive run.
+
+The **advisory hooks** are off unless `"claudeHooks": "advisory"`; any other value means off. Each handler runs the same launcher as the MCP server with `hook claude <Event>` in place of `state-mcp`. With the committed launcher, that is `node "$CLAUDE_PROJECT_DIR/.squad/squad.mjs" hook claude <Event>`, which works from any working directory. Squad recognizes its own handlers by that argument tail, so your hooks in the same file are never touched.
+
+| Event | Matcher | What the handler does |
+|---|---|---|
+| `SessionStart`, `SubagentStart` | `squad` (SubagentStart only) | For the coordinator: adds the CLI version the bridge must match, the roster, routing, active lockouts and an open Ralph circuit breaker |
+| `PreToolUse` | `Edit\|MultiEdit\|Write\|NotebookEdit` | Warns a member listed in an active lockout who edits a path the subject covers |
+| `PostToolUse` | `Agent\|Task` | After a member spawn: adds a `squad-coordination-handoff/v0.1` envelope (`result`, or `acknowledgement` for a background launch) and a reminder to record verdicts and run the reviewer gate |
+| `Stop` | none | Asks for Scribe when `decisions/inbox/` has entries |
+
+No handler returns a permission decision or blocks a stop. `packages/squad-cli/src/cli/commands/hook.ts` reads the event JSON on stdin, prints advisory JSON, and on any error prints nothing and exits 0, so a broken hook cannot stop a session. `squad hook` does not appear in `squad --help`, and `squad hook --help` prints no detailed help; the usage line is `squad hook claude <SessionStart|SubagentStart|PreToolUse|PostToolUse|Stop>`. One limit follows from reading files on disk: on a non-local state backend, the inbox lives elsewhere, so `Stop` gives no Scribe reminder.
+
+### Lockout records
+
+The `PreToolUse` warning needs a durable record to read. That is the lockout ledger, `.squad/governance/lockouts.json`, written by `squad lockout reject|assign|submit|approve|override|status`. Chapter 18 (Volume 1) teaches the commands and the states (`author-locked`, `revision-assigned`, `revision-submitted`, `cleared`, `deadlocked`). Here the point is who writes and who reads. The Claude coordinator's dispatch section tells it to record each transition with Bash, and the allowlist lets it run `reject` and `status` without a prompt. The Copilot coordinator does not call `squad lockout`; in a Copilot-only project you run the commands yourself. The hooks read the ledger and warn. The record grants or removes no repository permission: it is evidence for people and hooks, not a write barrier.
+
+The CLI side is `packages/squad-cli/src/cli/commands/lockout.ts`. The state machine lives in the SDK's `packages/squad-sdk/src/client/adapters/lockout.ts`, which takes an interprocess lock around every read-transition-write and refuses a `governance/` path that resolves outside the team directory. Because `squad lockout --help` prints no detailed help, use the usage text in `lockout.ts` as the reference.
+
+### Plugin mode
+
+With `"claudePlugin": true` (set by `--claude-plugin`, cleared by `--no-claude-plugin`), the Squad plugin for Claude Code carries the parts that are the same in every repository: the `squad:squad` coordinator, the skills, the slash commands, the hooks and its own `squad_state` server. The projection then writes only what differs per repository.
+
+```mermaid
+flowchart TD
+    C[".squad/config.json"] --> P{"claudePlugin is true?"}
+    P -->|no| F["Full projection"]
+    P -->|yes| G["Plugin mode"]
+    F --> F1["Coordinator .claude/agents/squad.md"]
+    F --> F2["Skills in .claude/skills/"]
+    F --> F3[".mcp.json squad_state entry"]
+    F --> F4["Hook handlers if claudeHooks is advisory"]
+    G --> G1["Remove Squad-owned coordinator, skills and hook handlers"]
+    G --> G2["settings.json agent and disabledMcpjsonServers"]
+    G --> G3["Leave .mcp.json as it is"]
+    F --> B["Both: member subagents, CLAUDE.md block, .gitignore lines, allowlist"]
+    G --> B
+```
+
+The two plugin keys are `agent: "squad:squad"`, so plain `claude` starts the plugin coordinator, and `squad_state` in `disabledMcpjsonServers`, so the project `.mcp.json` entry (which other hosts still use) neither prompts for approval nor duplicates the plugin's tools. In plugin mode the member subagents use the plugin's tool prefix, `mcp__plugin_squad_squad_state__`, and so do the allowlist rules. Squad owns `agent` only while it is `squad:squad`; if you set another agent, it stays. The previous values are recorded in `.claude/.squad-plugin-settings.json`, and leaving plugin mode restores only what plugin mode changed.
 
 ## Portable IDs, Not Portable Credentials
 
@@ -249,13 +355,14 @@ The apply/uninstall lifecycle is transaction-like, but its transaction boundary 
 
 | Kind | Ownership and operation |
 |---|---|
-| `managed` | Entire generated file; refresh replaces its contents |
-| `json` | Shared JSON object; update only the declared Squad keys |
+| `managed` | Entire generated file; refresh replaces its contents. With `ownedMarker`, an existing file without the marker is treated as user-authored and skipped |
+| `obsolete` | A file the projection used to generate (a removed member, a skill no longer projected); deleted only while it still carries `ownedMarker` |
+| `json` | Shared JSON object; update only the declared Squad keys, with an optional `remove` that undoes the update on rollback |
 | `block` | Marker-scoped text within a user-owned document |
 | `lines` | Missing lines added under an ID-scoped comment |
 | `text` | Structured shared text transformation; currently used for Codex TOML |
 
-`applyProjection` groups transformations by relative path, so Copilot and Claude updates to `.mcp.json` compose before one write. It reads the original, computes the next content, preserves the dominant LF/CRLF convention, compares the result, and writes changed content through a sibling file followed by rename. The result is `created`, `updated`, `unchanged`, or `error` per path. Failure on one path does not stop remaining paths, and successful earlier writes are not rolled back automatically.
+`applyProjection` groups transformations by relative path, so Copilot and Claude updates to `.mcp.json` compose before one write. It reads the original, computes the next content, preserves the dominant LF/CRLF convention, compares the result, and writes changed content through a sibling file followed by rename. The result is `created`, `updated`, `unchanged`, `removed`, `skipped`, or `error` per path. A JSON update that changes nothing keeps your original bytes, and a file that would be left empty is never created (or is removed if it exists). Owned `managed` and `obsolete` entries are applied after the merged paths, each with its own marker check. Failure on one path does not stop remaining paths, and successful earlier writes are not rolled back automatically.
 
 ```mermaid
 sequenceDiagram
@@ -304,7 +411,7 @@ A scalar target or an ancestor defined as an inline/scalar value is refused when
 
 ### Markdown markers and ignore lines
 
-Shared Markdown uses `<!-- squad:begin ... -->` and `<!-- squad:end -->`, with ID-scoped variants such as `squad:begin:codex` and `squad:end:codex`. Existing text outside the managed region is retained during replacement; new blocks are separated from existing content. An opened marker without its matching closing marker causes refusal, because treating the rest of the user's document as disposable would be unsafe.
+Shared Markdown uses `<!-- squad:begin ... -->` and `<!-- squad:end -->`, with ID-scoped variants such as `squad:begin:codex` and `squad:end:codex`. Existing text outside the managed region is retained during replacement. A new block is appended after exactly one blank line, and a file that had no final newline still has none afterward, so `removeBlock` can take back exactly what `upsertBlock` added. In v2.0.0, rolling back the `CLAUDE.md`, `AGENTS.md` and `GEMINI.md` blocks restores the original bytes however the file ended. An opened marker without its matching closing marker causes refusal, because treating the rest of the user's document as disposable would be unsafe.
 
 Claude's `.gitignore` integration is line-oriented, not an HTML-marker block. It adds `.claude/worktrees/` under `# squad:claude` only when that line is missing. A preexisting user-authored ignore line does not become Squad-owned. Removal takes back the marker and matching adjacent lines rather than deleting every matching occurrence throughout the file.
 
@@ -321,11 +428,11 @@ const results = uninstallClients(['claude'], {
 }, ['copilot']);
 ```
 
-The third argument lists hosts that remain installed. It keeps shared JSON paths, particularly `.mcp.json`, when a remaining host still projects that path. Omitting it while removing Claude can remove the bridge used by Copilot. The example's launch specification describes a locally available preview `squad`; it is not a recommendation to mix CLI versions.
+The third argument lists hosts that remain installed. It keeps shared JSON paths, particularly `.mcp.json`, when a remaining host still projects that path. Omitting it while removing Claude can remove the bridge used by Copilot. The example's launch specification assumes a `squad` 2.0.0 on PATH; the CLI itself commits the portable `node .squad/squad.mjs state-mcp` launcher (Chapter 21), and you should not mix CLI versions.
 
-`removeProjection` deletes managed files, removes `squad_state` from recognized JSON server containers, removes the Codex table and its sub-tables or equivalent definitions, and strips owned blocks and lines. Empty files and directories are pruned. It never removes `.squad/` team state. It does not update persisted `clients[]`; an SDK caller that wants permanent removal must also reconcile static configuration deliberately, or a later upgrade may project the host again. There is no `squad client remove` subcommand in this preview.
+`removeProjection` deletes managed files, removes `squad_state` from recognized JSON server containers, removes the Codex table and its sub-tables or equivalent definitions, and strips owned blocks and lines. Empty files and directories are pruned. It never removes `.squad/` team state. It does not update persisted `clients[]`; an SDK caller that wants permanent removal must also reconcile static configuration deliberately, or a later upgrade may project the host again. There is no `squad client remove` subcommand in v2.0.0; `squad client` offers only `list`, `add` and `sync`.
 
-The regression suite contains an all-seven-host install, idempotent-refresh, and byte-exact uninstall round trip for selected user-file fixtures. That is valuable evidence, but it does not establish a universal snapshot restoration guarantee. The implementation stores no original-byte journal. A minified JSON file can emerge pretty-printed; a preexisting Squad entry is removed rather than restored to its former launch fields; marker separator normalization can change whitespace; an OpenCode `$schema` equal to the generated schema can be removed with the entry. Fully managed files are deleted even if they existed before installation.
+The regression suite contains an all-seven-host install, idempotent-refresh, and byte-exact uninstall round trip for selected user-file fixtures. That is valuable evidence, but it does not establish a universal snapshot restoration guarantee. The implementation stores no original-byte journal. A minified JSON file that Squad changed can emerge pretty-printed; a preexisting Squad entry is removed rather than restored to its former launch fields; an OpenCode `$schema` equal to the generated schema can be removed with the entry. Marker blocks are now the exception: their separator handling is exact, so block rollback restores the original bytes. Managed files without an `ownedMarker`, such as `.claude/agents/squad.md` or the Kiro steering file, are deleted even if they existed before installation; marker-owned files such as Claude member subagents and skills are left alone when you wrote them.
 
 Therefore interpret *byte-preserving rollback* as the specification's intent for unowned content and the demonstrated fixture behavior, not an arbitrary-file time machine. If Tasktrack requires forensic byte identity, capture hashes or a Git baseline before projection and compare after uninstall. Keep backups for unusual formatting or preexisting owned keys. Never describe this API as a whole-workspace atomic rollback.
 
@@ -345,24 +452,24 @@ Do not transfer these guarantees to every `managed` SDK projection. The host app
 
 ## A Distilled Seven-Host Feature Matrix
 
-The reference matrix contains 51 feature rows per host. Its main lesson is not the count of green cells; it is the distinction between *dependency* and *evidence*.
+The v2.0.0 reference matrix contains 51 feature rows per host, generated from `test-fixtures/spec/suite-v0.2/host-feature-matrix.json`. Its main lesson is not the count of green cells; it is the distinction between *dependency* and *evidence*.
 
 A feature can depend on the CLI alone, coordinator-prompt content, the state MCP bridge, host runtime features, or platform tools such as `gh` and `az`. Passing a CLI test does not prove a real model invoked the right tool inside a host. Conversely, an expected-failure test can positively prove that a coordinator section is missing.
 
-In the following compact tables, **S** means supported in the published matrix, **D** means degraded, **U** means unsupported, and **—** means not applicable. Runtime mechanism rows use explicit descriptions instead. These tables distill the pinned preview source, not a fresh certification of today's third-party products.
+In the following compact tables, **S** means supported in the published matrix, **D** means degraded, **U** means unsupported, and **—** means not applicable. Runtime mechanism rows use explicit descriptions instead. These tables distill the v2.0.0 matrix, not a fresh certification of today's third-party products.
 
 ### Dispatch, isolation, and model control
 
 | Area | copilot | claude | kiro | opencode | cursor | codex | antigravity |
 |---|---|---|---|---|---|---|---|
-| Specialist primitive | task/session/editor | Task | subagent | task/general | subagent/composer | worker spawn | invoke_subagent |
+| Specialist primitive | task/session/editor | Agent (named member) | subagent | task/general | subagent/composer | worker spawn | invoke_subagent |
 | Parallel specialist fan-out | S | S | S | S | S | S | S |
 | Non-blocking support agents | S | S | D | S | D | D | D |
 | Git worktree workflow | S | S | S | S | S | S | S |
-| Per-spawn model runtime parameter | yes | no | no | no | no | no | no |
-| Complete projected model-selection behavior | U | U | U | U | U | U | U |
+| Per-spawn model runtime parameter | yes | yes | no | no | no | no | no |
+| Complete projected model-selection behavior | U | S | U | U | U | U | U |
 
-The model rows are intentionally different. Copilot's runtime offers a model override parameter, but the projected digest lacks the section teaching per-agent model, reasoning-effort, and context-tier selection. Claude can specify a model in an agent definition, and OpenCode can configure a model per agent; neither is the same as a per-call override. Chapter 12 (Volume 1)'s model-control workflow must not be assumed portable just because the runtime has some model setting.
+The model rows are intentionally different. Copilot's runtime offers a model override parameter, but the projected digest lacks the section teaching per-agent model, reasoning-effort, and context-tier selection, so the matrix keeps Copilot unsupported (an expected-failure test pins the gap). Claude Code is the one host where the whole behavior is supported: each member subagent carries the charter's model and the resolved reasoning effort, and the Claude dispatch section passes the higher-precedence layers (a user directive, `agentModelOverrides`, `defaultModel`, the session's choice) as the `model` argument of the `Agent` call. Two limits remain: the `Agent` tool has no per-call effort, and a non-Claude model in a charter is noted, not applied. OpenCode configures a model per agent, which is not a per-call override. Chapter 12 (Volume 1)'s model-control workflow must not be assumed portable just because the runtime has some model setting.
 
 Worktrees require shell access and Git, not a magical adapter-owned isolation token. The matrix reports worktree workflows supported while separately reporting team-root/subfolder prompt gaps. Basic isolated branches and complete monorepo discovery are not the same feature.
 
@@ -390,15 +497,15 @@ Hook and steering rows come from the SDK token declarations; they are not additi
 | Reviewer lockout/Rai/Fact Checker | S | S | S | S | S | S | S |
 | Ceremonies/humans/PRD mode | S | S | S | S | S | S | S |
 | GitHub issues/labels/interactive Ralph | S | S | S | S | S | S | S |
-| Ralph CLI execution without host override | S | D | D | D | D | D | D |
+| Ralph CLI execution (`watch`/`loop --execute`) | S | S | D | D | D | D | D |
 | Automatic marketplace-on-cast behavior | U | U | U | U | U | U | U |
 | Interactive GitLab/ADO issue behavior | U | U | U | U | U | U | U |
 | Complete monorepo/team-root prompt behavior | U | U | U | U | U | U | U |
-| Dual-root remote-mode prompt behavior | U | U | U | U | U | U | U |
+| Dual-root remote-mode prompt behavior | S | S | S | S | S | S | S |
 
-Ralph's interactive coordinator loop differs from the CLI's execution launcher. The latter defaults to Copilot unless `--agent-cmd` is configured; installing a Claude projection does not rewrite that default. An authenticated platform CLI is still required inside the host for issue operations.
+Ralph's interactive coordinator loop differs from the CLI's execution launcher. The launcher still defaults to Copilot. Claude Code has its own runner, `squad watch --execute --agent-preset claude` (or `watch.agentPreset: "claude"`), which is why its cell is supported; the other hosts need a custom `--agent-cmd`. Installing a Claude projection does not change the default by itself. An authenticated platform CLI is still required inside the host for issue operations.
 
-The unsupported rows identify prompt gaps, not necessarily absent low-level functions. Azure DevOps CLI/platform adapters exist, and observed models sometimes followed an on-demand issue reference, but the projected Issues section is GitHub-focused. GitLab has further SDK/CLI gaps in this matrix. Similarly, CLI marketplace commands can work while the coordinator omits the browse-on-cast step. Preserve the matrix's *unsupported* label rather than upgrading an improvised workaround into a supported integration.
+The unsupported rows identify prompt gaps, not necessarily absent low-level functions. Azure DevOps CLI/platform adapters exist, and observed models sometimes followed an on-demand issue reference, but the projected Issues section is GitHub-focused. GitLab has further SDK/CLI gaps in this matrix. Dual-root remote mode moved the other way: in v2.0.0 every digest says to read a linked team only through `squad_state`, and the cells are supported. Similarly, CLI marketplace commands can work while the coordinator omits the browse-on-cast step. Preserve the matrix's *unsupported* label rather than upgrading an improvised workaround into a supported integration.
 
 Upstream inheritance and cross-squad delegation are supported across hosts through shared tools and skills. Chapter 21 covers runtime upstream resolution; the essential boundary here is that local snapshots and provenance remain backend concerns, not a new inheritance implementation in each adapter.
 
@@ -412,17 +519,17 @@ Upstream inheritance and cross-squad delegation are supported across hosts throu
 | Fleet mesh/rate limiting/autoscaling | S | S | S | S | S | S | S |
 | Copilot VS Code integration | S | — | — | — | — | — | — |
 | Squad RC/start and gh-aw surface | S | — | — | — | — | — | — |
-| Recorded passing live-model host runs | none here | yes | blocked | yes | blocked | unavailable | blocked |
+| Recorded passing live-model host runs | harness only | yes | blocked | yes | blocked | unavailable | blocked |
 
 Most infrastructure rows are host-independent, which is why seven supported cells can arise from one CLI or SDK test suite. Copilot-specific wrappers do not become generic simply because seven clients share state.
 
-The recorded live runs are dated October 22, 2026. Claude Code and OpenCode have passing recorded scenarios, including roster reads, parallel delegation, decisions, reviewer lockout, and worktrees. Kiro, Cursor, and Antigravity were blocked by usage limits; Codex lacked a binary/auth setup on the reference machine. These environmental limits do not prove the products lack the capabilities, but they prevent a passing live claim.
+The first live runs are dated October 22, 2026. Claude Code and OpenCode passed recorded scenarios, including roster reads, parallel delegation, decisions, reviewer lockout, and worktrees. Kiro, Cursor, and Antigravity were blocked by usage limits; Codex lacked a binary/auth setup on the reference machine. These environmental limits do not prove the products lack the capabilities, but they prevent a passing live claim. Later runs added Claude-only evidence: the plugin's MCP server connecting with no approval prompt (2026-11-10) and the ADR-003 scenarios with Copilot's file deleted (2026-11-12 and 2026-11-13). Copilot's one live row is the experimental `copilot-sdk` harness (2026-11-09 and 2026-11-10), not a coordinator run, and Claude's `claude-agent-sdk` harness has its own run (2026-11-10).
 
 There are five evidence labels: `validated-test`, `validated-live`, `static-only`, `untested`, and `blocked`. The repository distinguishes opt-in headless tests that observe an actual `squad_state_read` JSON-RPC call from weaker checks that merely recognize text in stdout. For your own acceptance tests, inspect the tool event or bridge transcript, not the model's assertion that it read a roster.
 
 ### Choosing a host for Tasktrack
 
-Choose Copilot when you rely on its app/editor surfaces, existing Ralph execution defaults, or Copilot-specific remote-control tooling. Choose Claude Code or OpenCode when you want the strongest non-Copilot live evidence recorded in this preview and background specialists. Expect Claude project MCP approval/configuration steps; expect OpenCode's different MCP manifest shape.
+Choose Copilot when you rely on its app/editor surfaces, existing Ralph execution defaults, or Copilot-specific remote-control tooling. Choose Claude Code or OpenCode when you want the strongest non-Copilot live evidence in the v2.0.0 matrix and background specialists. Claude Code adds named member subagents, per-spawn models and the optional plugin, which avoids the project MCP approval step; without the plugin, expect to approve the server or pass `--mcp-config`. Expect OpenCode's different MCP manifest shape.
 
 Choose Kiro or Cursor for their native steering/editor workflow, but budget for synchronous support agents and verify actual discovery in your workspace. Choose Codex when its trusted-project custom-agent model fits your environment; validate its TOML role and MCP setup locally because the published reference machine did not exercise it live. Treat Antigravity as an experimental projection and explicitly test whether specialists can reach state tools.
 
@@ -438,9 +545,13 @@ The portable SPI then identifies submissions, subscriptions, approval responses,
 
 The host chapters establish canonical agent anchors, MCP locations, companion files, and execution primitives. They explain why Codex uses a discovery pointer, why Kiro distinguishes resource and prompt URI roots, and why Antigravity embeds MCP configuration. Those decisions are the portability layer; they are not a common host tool catalog.
 
-The final sections define ownership, layout, and promotion criteria. Promotion requires common contract tests across Copilot and another host, all-seven-host path fixtures, portable approval/cancellation traces, stable MCP projections, broker-to-harness identity preservation, reconnect traces preserving unknown events, and rollback tests preserving unowned bytes. The principle of forwarding unknown event kinds protects extensibility: a UI must not discard durable events simply because its current renderer does not recognize them.
+Section 7 is now the longest host section. It documents the Claude projection described earlier in this chapter: the version 3 file set, the member frontmatter mapping, the hook table, the lockout record, the `Agent` tool's `subagent_type`, `model`, `run_in_background` and `isolation: "worktree"` parameters, and plugin mode (§7.4). Its implementation note also lists the two experimental harnesses under `packages/squad-sdk/src/backend/harnesses/`.
 
-Some draft details lag implementation. It describes Kiro's MCP JSON as fully managed, while code applies an additive JSON merge. It mentions uppercase Claude marker blocks, while the actual ignore integration uses `# squad:claude`. Its opening implementation-status wording also understates the seven projections now present. Follow code for operational instructions and retain the draft as architectural intent.
+The final sections define ownership, layout, and promotion criteria. Section 13's ownership list now covers marker-owned member and skill files, the user-owned `.claude/settings.json` with Squad-owned handlers and plugin keys, and the exact block rollback. ADR-003 records that it affects §4–§5 and §13. Promotion (§15) requires common contract tests across Copilot and another host, all-seven-host path fixtures, portable approval/cancellation traces, stable MCP projections, broker-to-harness identity preservation, reconnect traces preserving unknown events, and rollback tests preserving unowned bytes. The principle of forwarding unknown event kinds protects extensibility: a UI must not discard durable events simply because its current renderer does not recognize them. The CHANGELOG says the Claude harness gives these profiles the non-Copilot host they need for §15 item 1, and that promoting them is still pending.
+
+> **Preview:** In v2.0.0 the profile is still a non-claimable requirements draft. Profile promotion (§15.1 here, §14.4 in the backend-decoupling profile) is pending, so do not describe any host adapter as conformant to it.
+
+Some draft details lag implementation. Section 13 still describes Kiro's MCP JSON as fully managed, while code applies an additive JSON merge. Its opening implementation-status paragraph also understates the seven projections now present. The v2.0.0 revision fixed the old uppercase Claude marker-block wording; it now describes the `# squad:claude` ignore lines the code writes. Follow code for operational instructions and retain the draft as architectural intent.
 
 ### Four related 2.0 documentation changes
 
@@ -448,7 +559,7 @@ The SDK reference now puts `HostProjection` and `ClientAdapter` alongside the ex
 
 The API reference changes the meaning described for `resolveGlobalSquadPath()`: it returns the platform configuration directory used for externalized project state under `projects/<projectKey>/`, not a globally resolved personal Squad. The SDK overview removes the personal-state example accordingly. Do not interpret that directory as another team that a host adapter should discover and merge automatically. Chapter 22 revisits migration consequences.
 
-The specification index adds the client/backend decoupling and client/harness adapter v0.2 drafts to its registry and dependency graph. Its implementation notes explicitly distinguish seven projections from the absence of a shipped execution harness. Chapter 17's profile discipline still applies: implementation presence and normative maturity are different axes.
+The specification index adds the client/backend decoupling and client/harness adapter v0.2 drafts to its registry and dependency graph. Its implementation note for the adapter profile still says that no `HarnessAdapter` implementation ships, which v2.0.0's own code and CHANGELOG contradict; trust the code. The index does not list the ADRs; read ADR-003 directly in `docs/specification/`. Chapter 17's profile discipline still applies: implementation presence and normative maturity are different axes.
 
 The charter profile adds optional `## Examples`, after optional `## Model` and before namespaced extensions. Editors must preserve examples during unrelated edits and round trips; duplicate sections produce `SQC011`, and a canonical no-op preserves original bytes. The sample YAML assertion shape is informative, not an installed runner. Examples grant no permissions and are not held-out evaluations. When a charter is inlined into a specialist prompt, its examples are authored behavioral guidance, not evidence that the agent passed an evaluation. Deeper evaluation tooling and result storage remain outside that profile.
 
@@ -464,23 +575,23 @@ Next add capability declarations and tests. A useful fixture begins with user co
 
 Only after projection behavior is dependable should you bind a runtime. A `RuntimeBinding` must preserve the client's submit, subscription, cancellation, approval, and capability semantics. A broker-side harness additionally needs stable run identity, idempotent redelivery handling, event ordering, cancellation targeting, reconnect behavior, and correct approval translation. The client approval shape uses `requestHash` and `approved`/`rejected`/`cancelled`; the backend harness shape uses `hash` and `approve`/`deny`. They require deliberate translation, not a type assertion.
 
-This preview does not expose a general plugin registration API for adding an eighth arbitrary client ID to all these tables. `ClientId`, host-kind and anchor mappings, capability declarations, and CLI parsing are coordinated source-level registries. Passing a custom `HostProjection` for an existing ID is possible, but inventing a new ID with a cast will leave those mappings undefined. Extend the registries and tests together in a source contribution rather than advertising a nonexistent `registerClientAdapter` API.
+Squad 2.0.0 does not expose a general plugin registration API for adding an eighth arbitrary client ID to all these tables. `ClientId`, host-kind and anchor mappings, capability declarations, and CLI parsing are coordinated source-level registries. Passing a custom `HostProjection` for an existing ID is possible, but inventing a new ID with a cast will leave those mappings undefined. Extend the registries and tests together in a source contribution rather than advertising a nonexistent `registerClientAdapter` API.
 
 ## Hands-On: Inspect Tasktrack Without Writing Host Files
 
 Your deliverable is a small script you would place at `sample/scripts/inspect-hosts.ts` in the companion tree, or `scripts/inspect-hosts.ts` inside your Tasktrack checkout. This chapter presents it; the book's baseline sample does not include a generated copy. Use your own `v2-ch20-start` and `v2-ch20-end` tags to record the exercise.
 
-The script uses Node's built-in filesystem/path modules and the SDK—no argument-parser, table, dotenv, or TypeScript-runner dependency. Tasktrack's application remains zero-dependency. Strictly speaking, a script importing an external SDK is not dependency-free: the preview SDK is an explicit tooling prerequisite, as in Chapter 14. A global CLI installation alone does not make the SDK resolvable by Node's ESM importer.
+The script uses Node's built-in filesystem/path modules and the SDK—no argument-parser, table, dotenv, or TypeScript-runner dependency. Tasktrack's application remains zero-dependency. Strictly speaking, a script importing an external SDK is not dependency-free: the 2.0.0 SDK is an explicit tooling prerequisite, as in Chapter 14. A global CLI installation alone does not make the SDK resolvable by Node's ESM importer.
 
 In your Tasktrack checkout, ensure the matching SDK is locally resolvable. If you have not installed it for SDK work already, these are reader-side setup commands:
 
 ```bash
-npm install --no-save --package-lock=false @bradygaster/squad-sdk@2.0.0-preview.2
+npm install --no-save --package-lock=false @bradygaster/squad-sdk@2.0.0
 mkdir -p scripts
 squad client list --json
 ```
 
-The npm command supplies tooling without adding an application dependency declaration; it still downloads the SDK's dependency graph. Use Node 22.18+ and a preview `squad` binary for the CLI inspection. Do not run these commands against the author's stable CLI and assume it supports preview subcommands.
+The npm command supplies tooling without adding an application dependency declaration; it still downloads the SDK's dependency graph. Use Node 22.18+ and the `squad` 2.0.0 CLI, and keep the SDK and CLI at the same version: the projections they generate must agree.
 
 Create the following script in your exercise checkout:
 
@@ -524,7 +635,7 @@ git status --short
 npm test
 ```
 
-For `clients: ['claude', 'kiro']`, both rows report `['approvals', 'mcp-bridge', 'subagents']` in the source token order. Claude advertises background execution, but policy removes it. Kiro never advertised it. Claude's plan includes a managed agent, shared JSON, a Markdown block, and ignore lines; Kiro's includes steering, descriptor JSON as a managed file, and shared MCP JSON. Copilot-only fallback uses `clients: []` or an absent `clients` property in an existing config and plans `.mcp.json`; the canonical Copilot agent is still owned by the CLI bootstrap path.
+For `clients: ['claude', 'kiro']`, both rows report `['approvals', 'mcp-bridge', 'subagents']` in the source token order. Claude advertises background execution, but policy removes it. Kiro never advertised it. Claude's plan is the longest: a managed coordinator, the shared `.mcp.json`, the `CLAUDE.md` block and ignore lines, then one `managed` line per member subagent (your cast members plus the built-ins), a `managed` line per skill under `.claude/skills/`, and `json` lines for `.claude/settings.json` and `.claude/.squad-permissions.json`, which carry the scoped allowlist. The skill lines run to dozens, so pipe the output through `grep -v skills/` for a first read. Kiro's plan has three lines: steering, descriptor JSON as a managed file, and shared MCP JSON. If your config has `"claudePlugin": true`, the Claude plan instead shows `obsolete` lines for the coordinator and for any skills an earlier full projection generated, plus a `json` line for the `.claude/.squad-plugin-settings.json` ownership record. Its `.mcp.json` line, when present, is a no-op update that only records Squad's earlier ownership. Copilot-only fallback uses `clients: []` or an absent `clients` property in an existing config and plans `.mcp.json`; the canonical Copilot agent is still owned by the CLI bootstrap path.
 
 The root must already have an initialized `.squad/config.json`; missing or malformed files intentionally fail rather than silently pretending to inspect a configured team. Unknown clients also fail through the strict assertion. If you are auditing forward-version configuration, use `normalizeClientIds` and report rejected *reasons* instead, taking care not to log arbitrary raw values.
 
@@ -547,6 +658,13 @@ No second host login or license is required to complete this inspection. Running
 | Codex MCP table | Default `startup_timeout_sec = 60` | Applied only when absent, preserving an explicit user timeout |
 | Shipped manifest | `.squad/templates/.shipped-manifest.json` | CLI upgrade provenance, not an SDK projection rollback journal |
 | Backup suffix | `.local-backup` | Verified original bytes for customized CLI-owned upgrade files |
+| `claudePlugin` in `.squad/config.json` | `true` with `--claude-plugin`; removed by `--no-claude-plugin`; default off | Claude projection v3 plugin mode |
+| `claudePermissions` in `.squad/config.json` | On unless `"off"` | Scoped `permissions.allow` rules in `.claude/settings.json`, recorded in `.claude/.squad-permissions.json` |
+| `claudeHooks` in `.squad/config.json` | Off unless `"advisory"` | Squad hook handlers in `.claude/settings.json` (or the plugin's hooks) |
+| `## X-squad-host-claude` charter section | `Tools`, `Isolation` (`worktree` only); optional | Member subagent `tools` and `isolation` frontmatter |
+| `.squad/governance/lockouts.json` | Written by `squad lockout`; absent until the first record | Read by the `SessionStart`, `PreToolUse` and `PostToolUse` hooks |
+| `CLAUDE_PROJECTION_VERSION` | `3` in v2.0.0 | Stamped in every generated Claude Markdown file |
+| `CLAUDE_PROJECT_DIR` | Set by Claude Code for hooks | Locates the committed launcher and the project for `squad hook claude` |
 
 No environment variable is required by the pure host projection API. CLI/backend environment configuration belongs to the layers discussed in Chapters 19 and 21, not to an implicit credential lookup in `project(ctx)`.
 
@@ -554,7 +672,17 @@ New host selection is additive in the CLI. `syncClients` unions requested hosts 
 
 ## Under the Hood
 
-Follow the implementation in three stages. First, `packages/squad-sdk/src/client/adapters` contains the projection machinery: `types.ts` defines the union and pure interface; `capabilities.ts` owns tokens and intersections; `portable.ts` handles persisted IDs; `coordinator.ts` builds the digest and dispatch sections; `adapters.ts` supplies seven projections; `apply.ts` performs guarded updates and removal; `index.ts` re-exports them.
+Follow the implementation in three stages. First, `packages/squad-sdk/src/client/adapters` contains the projection machinery: `types.ts` defines the union and pure interface; `capabilities.ts` owns tokens and intersections; `portable.ts` handles persisted IDs; `coordinator.ts` builds the digest and dispatch sections; `adapters.ts` supplies seven projections; `apply.ts` performs guarded updates and removal; `safe-path.ts` keeps reads inside the team directory; `index.ts` re-exports them.
+
+The Claude projection pulls in four more modules from the same folder. `claude-members.ts` renders the member subagents, `claude-skills.ts` projects template and coordinator skills, `claude-hooks.ts` owns everything Squad writes into `.claude/settings.json` (allowlist, hooks, plugin keys) and runs the hook events, and `claude-plugin.ts` builds the plugin tree that the Squad repository commits under `plugins/squad/`. `lockout.ts` holds the lockout state machine, and `repo-launcher.ts` recognizes the committed launcher. In `coordinator.ts`, the self-contained digest (ADR-003) is `coreCoordinatorProtocol`, and the Claude split happens in one line of `buildCoordinatorInstructions`:
+
+```ts
+let core = coreCoordinatorProtocol(squadDir, repoRoot);
+if (client === 'claude') core = splitOnDemandSections(core, squadDir).core;
+return `${core}\n${dispatch}\n\n${transports}`;
+```
+
+`splitOnDemandSections` finds each on-demand item by its marker (`0. **Init Mode`, `9. **Ralph mode`, and so on), throws if one is missing, replaces it with its stub, and returns the removed text as skills. The throw is a guard: if someone renumbers the shared digest, the Claude build fails instead of silently keeping a mode inline.
 
 Second, `packages/squad-sdk/src/client/adapter-contract.ts` builds the runtime facade. Its essential capability computation is small:
 
@@ -567,7 +695,9 @@ return client.filter((t) =>
 
 That excerpt is the filtering rule in `resolveEffectiveCapabilityTokens`; the facade obtains its optional lists from the binding before invoking the helper. Notice that an empty array is truthy in JavaScript: it restricts everything, while `undefined` removes that side's restriction.
 
-Third, `packages/squad-cli/src/cli/core/clients.ts` connects command parsing and persisted configuration to SDK installation. It resolves a version-appropriate state MCP launch specification, computes `squadDir` relative to the destination, calls `installClients`, and examines per-file errors. A newly requested host with a failed projection path is not persisted as newly healthy; already-configured hosts remain configured. Unknown portable IDs are preserved and warned about. `syncClients({ dryRun: true })` returns the computed set without writes or persistence; it does not run all merge callbacks to discover file-level conflicts.
+Third, `packages/squad-cli/src/cli/core/clients.ts` connects command parsing and persisted configuration to SDK installation. It records `claudePlugin` when `--claude-plugin` or `--no-claude-plugin` is passed (adding `claude` to the requested hosts), resolves the committed state MCP launch specification, computes `squadDir` relative to the destination, calls `installClients`, and examines per-file errors. A newly requested host with a failed projection path is not persisted as newly healthy; already-configured hosts remain configured. Unknown portable IDs are preserved and warned about. `syncClients({ dryRun: true })` returns the computed set without writes or persistence; it does not run all merge callbacks to discover file-level conflicts.
+
+Two more CLI files serve the Claude projection. `packages/squad-cli/src/cli/commands/lockout.ts` parses `squad lockout` and calls the SDK transitions, and `packages/squad-cli/src/cli/commands/hook.ts` is the `squad hook claude <Event>` entry point. `hook.ts` resolves the project from `CLAUDE_PROJECT_DIR`, then the event's `cwd`, then the process directory, and always exits 0.
 
 `packages/squad-cli/src/cli/core/squad-owned-files.ts` is the separate provenance/planning layer described earlier. `packages/squad-cli/src/cli/core/managed-file.ts` provides EOL-aware writes and Copilot-instructions marker integration. Its atomic writer uses a flushed sibling file and rename. Do not assume the SDK writer has identical flushing behavior merely because both avoid direct in-place replacement.
 
@@ -581,7 +711,7 @@ The plural alias does not offer a second implementation or its own host registry
 
 ## Pitfalls and Troubleshooting
 
-**The host sees Squad, but not state tools.** Verify its actual MCP configuration and project trust/approval state. Discovery is not bridge readiness. Claude may require explicit project config approval or `--mcp-config`; Codex requires trusted project configuration. Antigravity attaches the server to agent frontmatter. Confirm a real health/read tool call, not a reassuring model sentence.
+**The host sees Squad, but not state tools.** Verify its actual MCP configuration and project trust/approval state. Discovery is not bridge readiness. Without the plugin, Claude may require explicit project config approval or `--mcp-config`; with plugin mode, check that the plugin is installed and enabled and that `disabledMcpjsonServers` is not hiding the only server you have. Codex requires trusted project configuration. Antigravity attaches the server to agent frontmatter. Confirm a real health/read tool call, not a reassuring model sentence.
 
 **A capability appears enabled, but execution fails.** Separate static advertisement, negotiated grant, runtime binding, and current availability. An unbound facade cannot submit. A real host can hit quota even when its static capability table is correct. The facade's boolean description is not its full token vocabulary.
 
@@ -593,13 +723,21 @@ The plural alias does not offer a second implementation or its own host registry
 
 **An upgrade reorders or rewrites a file unexpectedly.** Distinguish shared JSON reserialization from managed template replacement and owned-file provenance. Check `.local-backup` only where the CLI backup mechanism applies. For byte-sensitive rollback, compare your own baseline; the installer does not retain arbitrary original formatting.
 
-**A feature worked once but is marked unsupported.** A model can improvise from a canonical reference or on-demand template. That is not equivalent to a shipped digest contract with adequate tests. Keep the six pinned prompt-gap categories unsupported until their sections and evidence change.
+**A feature worked once but is marked unsupported.** A model can improvise from a canonical reference or on-demand template. That is not equivalent to a shipped digest contract with adequate tests. Keep the five expected-failure digest gaps (four for Claude Code, which closed model selection) unsupported until their sections and evidence change.
+
+**A Copilot coordinator customization has no effect in Claude Code.** That is ADR-003 working as designed. The non-Copilot digests never read `.github/agents/squad.agent.md`. Move policy that every host must follow into `.squad/` (`routing.md`, decisions, charters).
+
+**Claude Code still prompts for `squad cast` or `squad_state` tools.** The scoped allowlist applies only after you trust the folder in an interactive `claude` run, and `claudePermissions: "off"` turns it off. The lockout steps `assign`, `submit`, `approve` and `override` prompt by design.
+
+**A member subagent did not update after a charter change.** Check the apply result for `skipped`: the file lacks the generated-file comment, so Squad treats it as yours. Delete it or restore the comment, then run `squad client sync`. A charter preference that could not be applied appears as an HTML comment in the generated file.
+
+**The advisory hooks never fire.** Check `"claudeHooks": "advisory"` exactly; any other value is off. In plugin mode the plugin's hooks stand down when `.claude/settings.json` still has Squad's project handlers. Remember that the hooks warn and never block, and that `squad hook` swallows errors and exits 0, so silence is not proof of success.
 
 ## Summary
 
 A host projection is a workspace plan; a client adapter is a locally inspectable facade with optional runtime delegation; a harness is a separate execution integration. Tokens are authoritative, effective capability is an intersection, and no advertisement grants authority by itself.
 
-Seven projections preserve one team through native file envelopes and dispatch-time charter context. Their apply/uninstall helpers preserve owned boundaries but are neither a whole-install transaction nor a universal original-byte restore system. The CLI's shipped-file hashes and verified backups solve a related but distinct upgrade problem. Use the feature matrix's dependency and evidence axes to decide what you can actually rely on in Tasktrack.
+Seven projections preserve one team through native file envelopes and dispatch-time charter context. Under ADR-003, the six non-Copilot coordinators are complete on their own and never read Copilot's file. The version 3 Claude projection goes further than the shared minimum, with named member subagents, native and on-demand skills, a scoped allowlist, opt-in advisory hooks over the lockout ledger, and a plugin mode that moves the shared parts into the Squad plugin for Claude Code. Their apply/uninstall helpers preserve owned boundaries but are neither a whole-install transaction nor a universal original-byte restore system. The CLI's shipped-file hashes and verified backups solve a related but distinct upgrade problem. Use the feature matrix's dependency and evidence axes to decide what you can actually rely on in Tasktrack.
 
 ## Exercises
 
@@ -608,23 +746,25 @@ Seven projections preserve one team through native file envelopes and dispatch-t
 3. Design a Claude/Copilot uninstall test with a user server, an existing user-authored `.claude/worktrees/` ignore line, and both clients installed. State which files/keys remain when only Claude is removed.
 4. Construct a rollback acceptance plan for a hypothetical eighth host using a shared JSON manifest and Markdown discovery pointer. Include one byte-level limitation and three refusal cases; do not invent a registration API.
 5. Choose a host for a Tasktrack audit that needs independent specialists and a durable decision record, but prohibits background work. Justify the capability intersection, runtime prerequisites, and evidence you would collect.
+6. Give Tasktrack's tester an `## X-squad-host-claude` section that limits it to read-only tools plus `squad_state`, and isolates it in a worktree. Predict the generated `.claude/agents/<tester>.md` frontmatter, then name what happens when you add `- **Isolation:** container` and when you replace the generated file with your own.
 
 ## Quiz
 
 1. Which implemented interface has `project(ctx)`, and which factory creates the runtime facade?
-2. Why is `cursor-reconnect` unrelated to selecting the Cursor product?
+2. After ADR-003, does editing Tasktrack's `.github/agents/squad.agent.md` change what its Claude Code coordinator does? Why?
 3. What differs between an omitted policy list and `[]` in token negotiation?
 4. Does `getCapabilities()` on an unbound facade prove backend authorization? Why?
 5. Where does a specialist charter get inlined, and is every charter embedded during projection?
 6. What extra argument protects Copilot's shared MCP entry when uninstalling Claude?
 7. Why can a feature be both unsupported and `validated-test` in the matrix?
-8. What does the plural `/clients` alias preserve, and what does it not add?
+8. Which `squad lockout` subcommands does the scoped Claude allowlist let the coordinator run without a prompt, and why not the rest?
 
 ## Further Reading
 
-- [Client and Harness Adapter Profile v0.2](https://github.com/bradygaster/squad/blob/v2.0.0-preview.2/docs/specification/client-harness-adapters-v0.2.md): requirements draft, host anchors, SPI boundaries, and promotion criteria.
-- [Host Feature Matrix](https://bradygaster.github.io/squad/docs/reference/host-feature-matrix/): the complete per-feature capability/evidence ledger and recorded live-run log.
-- [SDK Reference](https://bradygaster.github.io/squad/docs/reference/sdk/): canonical `/client` exports, deprecated alias, and experimental backend boundary.
-- [API Reference](https://bradygaster.github.io/squad/docs/reference/api-reference/): signatures and the revised externalized-state meaning of the platform config directory.
-- [Specification Index](https://github.com/bradygaster/squad/blob/v2.0.0-preview.2/docs/specification/README.md): profile maturity registry and the v0.2 dependency additions.
-- [Charter Profile v0.1](https://github.com/bradygaster/squad/blob/v2.0.0-preview.2/docs/specification/charter-v0.1.md): canonical sections, optional examples, preservation rules, and evaluation limits.
+- [Client and Harness Adapter Profile v0.2](https://github.com/github/squad/blob/v2.0.0/docs/specification/client-harness-adapters-v0.2.md): requirements draft, host anchors, SPI boundaries, and promotion criteria.
+- [Host Feature Matrix](https://github.github.com/squad/docs/reference/host-feature-matrix/): the complete per-feature capability/evidence ledger and recorded live-run log.
+- [SDK Reference](https://github.github.com/squad/docs/reference/sdk/): canonical `/client` exports, deprecated alias, and experimental backend boundary.
+- [API Reference](https://github.github.com/squad/docs/reference/api-reference/): signatures and the revised externalized-state meaning of the platform config directory.
+- [Specification Index](https://github.com/github/squad/blob/v2.0.0/docs/specification/README.md): profile maturity registry and the v0.2 dependency additions.
+- [Charter Profile v0.1](https://github.com/github/squad/blob/v2.0.0/docs/specification/charter-v0.1.md): canonical sections, optional examples, `## X-` extensions, preservation rules, and evaluation limits.
+- [ADR 003: Host-Neutral Canonical Coordinator in the Workspace](https://github.com/github/squad/blob/v2.0.0/docs/specification/adr-003-host-neutral-canonical-coordinator.md): the three options, the session evidence, and the option C decision.

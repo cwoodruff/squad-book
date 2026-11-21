@@ -7,13 +7,13 @@ Welcome to Volume 2, *Operating and Extending Squad*. The next ten chapters move
 ## What You'll Learn
 
 - Explain how MCP servers turn external capabilities into tools available to a Squad agent, and distinguish MCP configuration from Squad routing and memory.
-- Locate the MCP configuration locations that matter in Squad v1.1.0, especially the generated repository-root `.mcp.json` used by `squad_state`.
+- Locate the MCP configuration locations that matter in Squad v2.0.0, especially the generated repository-root `.mcp.json` used by `squad_state` and the committed `.squad/squad.mjs` launcher it runs.
 - Configure a server without committing credentials, preserve user-managed entries, and reason about the security boundary created by loading executable server definitions.
 - Understand agent frontmatter MCP declarations and the limits of `squad init --mcp-frontmatter` across harnesses.
 - Diagnose the Copilot CLI folder-trust behavior that can hide workspace MCP configuration in non-interactive sessions.
 - Trace the configuration path from `squad init` through the MCP writer and into a spawned Copilot CLI process.
 
-> **Preview (Squad 2.0):** MCP configuration is host-specific, and the state server has a defined boundary between mutable runtime state and static team files. See Chapters 19–21 and the [multi-client scenario](https://bradygaster.github.io/squad/docs/scenarios/using-squad-across-clients/).
+This chapter covers the Copilot hosts: Copilot CLI and VS Code. Each host that `squad init --client` adds has its own MCP file, and Squad writes the `squad_state` entry into it for you; Chapter 19 and the [multi-client scenario](https://github.github.com/squad/docs/scenarios/using-squad-across-clients/) list them. The state server also keeps mutable runtime state apart from static team files, a boundary that Chapter 21 explains in depth.
 
 ## MCP Is a Tool Boundary, Not a Squad Agent
 
@@ -41,24 +41,32 @@ MCP also differs from Skills. A skill is reusable guidance and procedures that a
 
 MCP configuration is host-specific. Copilot CLI, VS Code, and custom harnesses do not necessarily read the same file or use identical schema conventions. Treat file location and JSON shape as part of the client contract, not as a universal Squad setting.
 
-Squad v1.1.0’s initialization path deserves special attention. It writes the `squad_state` server into the repository-root `.mcp.json`, preserving other `mcpServers` entries, and removes stale Squad-owned entries from the older `.copilot/mcp-config.json` location. This is the configuration path used by the CLI’s own state bridge. A legacy `.copilot/mcp-config.json` may remain for unrelated servers; its existence does not make it the current source of truth for Squad’s state server.
+Squad’s initialization path deserves special attention. It writes the `squad_state` server into the repository-root `.mcp.json`, preserving other `mcpServers` entries, and removes stale Squad-owned entries from the older `.copilot/mcp-config.json` location. Copilot CLI reads the root `.mcp.json` once you trust the folder. It does **not** read a `.copilot/mcp-config.json` inside the project, even though `squad init` still writes a sample there, so a server you add to that sample never loads. VS Code reads `.vscode/mcp.json`, whose top-level key is `servers` rather than `mcpServers`. Your personal servers for every project go in `~/.copilot/mcp-config.json`, which both Copilot CLI and VS Code read.
 
-A simplified generated entry for a published v1.1.0 CLI installation looks like this:
+> **Note:** Changed in Squad 2.0: Squad 1.x already wrote the root `.mcp.json`. What changed is the guidance (the project `.copilot/mcp-config.json` is a sample only) and the launch command inside the entry, which is now the portable launcher shown below. Run `squad upgrade` once in an older repository to rewrite the entry.
+
+A simplified generated entry for an installed v2.0.0 CLI looks like this (the real `-e` argument is a one-line script that walks up to the repository root, shortened here):
 
 ```json
 {
   "mcpServers": {
     "squad_state": {
-      "command": "npx",
-      "args": ["-y", "@bradygaster/squad-cli@1.1.0", "state-mcp"],
+      "command": "node",
+      "args": ["-e", "<repo-root finder>", ".squad/squad.mjs", "state-mcp"],
       "env": {},
-      "tools": ["*"]
+      "tools": ["*"],
+      "x-squad": {
+        "managed": true,
+        "version": "2.0.0",
+        "machineSpecific": false,
+        "source": "repo-launcher"
+      }
     }
   }
 }
 ```
 
-The exact launch command is resolved by the CLI’s MCP-spec helper: a published version can use a pinned `npx` package; an unpublished version can use `@insider`; a standalone installation can use the portable `squad` executable. The illustration assumes the pinned release is published, a fact to check for your installed build. Do not copy an illustrative `command` blindly into another project. Inspect the generated `.mcp.json` after initialization and retain its Squad-managed launch command. If you add your own server, add a separate key under `mcpServers` rather than replacing the object.
+The CLI’s MCP-spec helper picks the launch command, and it writes only forms that work on every clone. When you installed the CLI from npm (globally, in the project, or from a source build), the entry runs `node .squad/squad.mjs state-mcp`. That launcher is a small file Squad writes and you commit. On whichever machine runs it, it looks for a CLI in this order: `SQUAD_CLI` if set, then the project’s own `node_modules`, then `squad` on PATH, then the CLI that last ran `squad init` or `squad upgrade` on that machine (recorded in `~/.squad/cli.json`). It skips any of the last three that is older than the version that wrote the launcher, and when it finds nothing it prints install instructions. It falls back to `npx` with the exact version only when you set `SQUAD_ALLOW_NPX=1`. A standalone bundle install writes a bare `squad state-mcp`, and a CLI run through `npx` writes the exact-version `npx` command. Squad never writes a dist-tag such as `@insider`, and `squad doctor` warns when a committed entry points at a path on one machine. Do not copy an illustrative `command` blindly into another project. Inspect the generated `.mcp.json` after initialization and retain its Squad-managed launch command. If you add your own server, add a separate key under `mcpServers` rather than replacing the object.
 
 For user-managed server configuration, a generic stdio entry can be represented as:
 
@@ -93,6 +101,18 @@ If a state tool is absent, changing the team charter will not fix the client not
 
 The current state bridge is also narrower than an unrestricted filesystem API. State operations should be scoped to Squad keys and validate their path and operation. That is an important security design: an MCP server with arbitrary shell or filesystem access would be a much larger trust grant than a state server constrained to `.squad` concepts.
 
+In v2.0.0 the server registers these tools:
+
+| Tool group | Tools | What they do |
+|---|---|---|
+| State | `squad_state_read`, `squad_state_write`, `squad_state_append`, `squad_state_delete`, `squad_state_list`, `squad_state_create_if_absent` | Read and change mutable runtime state (decisions, inbox, logs, histories, identity). They refuse static configuration such as `team.md`, `routing.md`, `config.json` and charters. |
+| Decisions | `squad_decide` | Record a team decision through the backend. |
+| Health | `squad_state_health` | Report backend health. `squad health --json` carries the same runtime metadata (`cliVersion`, `sdkVersion`, `stateBackend`, `resolvedTeamRoot`, `resolvedSquadDir`). |
+| Upstreams | `squad_state_upstreams` | Resolve declared upstream inheritance from local snapshots only; it never fetches (Chapter 4). |
+| Governed memory | `memory.classify`, `memory.write`, `memory.search`, `memory.promote`, `memory.delete`, `memory.audit` | The same governed store that the `squad memory` command uses, so the CLI and agents see one set of records; see Chapter 15 (Volume 1). |
+
+The experimental `squad_backend_*` conversation tools appear only when you start the server with `squad state-mcp --experimental-backend` or set `SQUAD_EXPERIMENTAL_BACKEND=1`; Chapter 21 covers them.
+
 ## Agent Frontmatter as an Alternative
 
 Some harnesses read MCP declarations from an agent file’s YAML frontmatter. Squad’s SDK initializer supports an `agent-frontmatter` MCP mode; the CLI recognizes `--mcp-frontmatter` and passes that choice into initialization. In that mode, the agent declaration can contain a mapping similar to:
@@ -114,7 +134,7 @@ Use this only when the target harness explicitly consumes MCP configuration from
 
 Frontmatter mode can make an agent artifact more self-contained, but it narrows portability in another way: the agent definition is now carrying a client-specific integration declaration. A different harness might use another key or no frontmatter support. It also makes review of executable launch configuration part of agent-file review.
 
-> **Note:** The docs describe `squad init --mcp-frontmatter`, and the v1.1.0 CLI source parser recognizes that flag. However, the installed `squad init --help` output does not list it. Treat the option as undocumented/poorly surfaced in this build; validate on a throwaway repo before relying on it in automation.
+> **Note:** The docs describe `squad init --mcp-frontmatter`, and the v2.0.0 CLI source parser recognizes that flag. However, the installed `squad init --help` output does not list it. Treat the option as undocumented/poorly surfaced in this build; validate on a throwaway repo before relying on it in automation.
 
 There is a second nuance in the CLI implementation: after the SDK initialization call, the CLI’s normal path also ensures the repository-root `.mcp.json` state entry. Therefore, do not assume frontmatter mode guarantees that no standalone `.mcp.json` is written in every path. The current docs’ promise that no separate configuration file is written is broader than the inspected CLI behavior. If a truly single-file bundle is required, inspect both the agent frontmatter and `.mcp.json` produced by the exact installed version.
 
@@ -145,13 +165,17 @@ Finally, keep a rollback path. Record which server version and config revision w
 
 Copilot CLI treats workspace MCP configuration as executable configuration. In interactive use it may ask whether to trust the workspace before loading its `.mcp.json`. This protects you from a repository silently launching arbitrary binaries. In a non-interactive `copilot -p` process, there is no prompt UI to complete that trust decision, so the workspace file may be skipped. `--yolo` alone is not the same as explicitly loading a particular MCP config.
 
-The v1.1.0 Squad code includes a targeted workaround for subprocesses it controls. If the command is the bare `copilot` executable and the project has `.mcp.json`, Squad prepends:
+Squad’s code includes a targeted workaround for subprocesses it controls. If the command is the bare `copilot` executable and the project has `.mcp.json`, Squad prepends:
 
 ```bash
---yolo --additional-mcp-config @/absolute/path/to/.mcp.json
+--additional-mcp-config @/absolute/path/to/.mcp.json
 ```
 
-The `@path` argument explicitly names the project file. `--yolo` suppresses tool-consent prompts that otherwise could block automation; it is a significant consent change, not a generic convenience switch. Squad only injects this pair on its own relevant subprocess path. If you launch a custom command, use a different harness, invoke Copilot outside the project root, or replace `copilot` with a wrapper, verify that your process still loads the intended config. The helper deliberately does not inject flags for a custom agent command.
+The `@path` argument explicitly names the project file. Loading that file no longer changes tool permissions. Permission flags come from the caller: `squad loop` passes `--yolo` when you give it no `--copilot-flags`, and `squad watch --execute` does the same, but a `--copilot-flags` value you supply is kept as written. `--yolo` suppresses tool-consent prompts that otherwise could block automation; it is a significant consent change, not a generic convenience switch.
+
+> **Note:** Changed in Squad 2.0: Squad 1.1.0 injected `--yolo` together with `--additional-mcp-config`, which overrode tool restrictions a caller had set. In 2.0.0 the helper adds only the config flag. The docs page on the trust gate still shows the old pair; the source (`copilot-invocation.ts`) is authoritative.
+
+Squad only injects the config flag on its own relevant subprocess path. If you launch a custom command, use a different harness, invoke Copilot outside the project root, or replace `copilot` with a wrapper, verify that your process still loads the intended config. The helper deliberately does not inject flags for a custom agent command.
 
 A diagnostic sequence:
 
@@ -197,7 +221,7 @@ sequenceDiagram
   I->>W: create or update squad_state entry
   W->>F: preserve siblings and write managed config
   S->>S: resolve team root and check config exists
-  S->>C: prepend --yolo and --additional-mcp-config @path
+  S->>C: prepend --additional-mcp-config @path
   C->>F: load explicitly named config
   C->>C: start MCP process and register tools
 ```
@@ -234,8 +258,13 @@ Expected result: the existing Squad state tool remains available, the additional
 
 | Item | Location or value | Notes |
 |---|---|---|
-| Squad’s current project MCP config | Repository-root `.mcp.json` | CLI init writes/updates `mcpServers.squad_state`; sibling entries are retained. |
-| Legacy project MCP config | `.copilot/mcp-config.json` | Older generated Squad entry is tombstoned; unrelated entries may remain. |
+| Squad’s project MCP config (Copilot CLI) | Repository-root `.mcp.json` | CLI init writes/updates `mcpServers.squad_state`; sibling entries are retained. Copilot CLI reads it once the folder is trusted. |
+| Project sample (not read) | `.copilot/mcp-config.json` | `squad init` writes a sample; Copilot CLI does not load it. An older generated Squad entry is tombstoned. |
+| VS Code workspace config | `.vscode/mcp.json` | Top-level key `servers`, not `mcpServers`. |
+| Personal config | `~/.copilot/mcp-config.json` | Read by Copilot CLI in every project and by VS Code. |
+| Other hosts | Per host (`.kiro/settings/mcp.json`, `.cursor/mcp.json`, `opencode.json`, `.codex/config.toml`; Claude Code shares `.mcp.json`) | Written by `squad init --client <list>`; see Chapter 19. |
+| Committed launcher | `.squad/squad.mjs` | Run by the `squad_state` entry as `node .squad/squad.mjs state-mcp`. Lookup: `SQUAD_CLI`, project `node_modules`, `squad` on PATH, last recorded CLI. |
+| `SQUAD_ALLOW_NPX` | `1` to enable | Lets the launcher fall back to the exact-version `npx` command. Off by default. |
 | Server map | `mcpServers` | Top-level host configuration mapping server names to launch specs. |
 | `command` | Executable path or command name | Must resolve in the host process environment. Avoid machine-specific paths in shared config. |
 | `args` | String array | Passed to the server command. The exact launcher is client-specific. |
@@ -243,13 +272,13 @@ Expected result: the existing Squad state tool remains available, the additional
 | `tools` | String array, often `["*"]` | Host/server allowlist convention; do not assume all clients enforce it identically. |
 | Frontmatter mode | `squad init --mcp-frontmatter` | Recognized by source parser; missing from installed command help. Validate exact output. |
 | Non-interactive config override | `--additional-mcp-config @<path>` | Explicitly supplies a config file to Copilot CLI. Verify current CLI syntax with `copilot --help`. |
-| Non-interactive consent flag | `--yolo` | Suppresses per-tool consent in the code path Squad manages; it expands trust. |
+| Non-interactive consent flag | `--yolo` | Suppresses per-tool consent. Not added by the MCP helper; `squad loop` and `squad watch --execute` default to it when no `--copilot-flags` are given. It expands trust. |
 
 ## Under the Hood
 
-`templates/mcp-config.md` is an explanatory template, not the authoritative output of the v1.1.0 CLI. It describes repository-level `.copilot/mcp-config.json`, workspace `.vscode/mcp.json`, user-level config, and CLI overrides, while current CLI init writes the Squad state MCP entry to repository-root `.mcp.json`. Likewise, some examples in that file use third-party package names that should be verified before running; the file itself cannot prove a package is maintained, safe, or compatible.
+`templates/mcp-config.md` is an explanatory template, not the authoritative output of the CLI. In v2.0.0 it matches the generated layout: repository-root `.mcp.json` for Squad’s own entry, `.vscode/mcp.json` with `servers` for VS Code, `~/.copilot/mcp-config.json` for personal servers, the `--additional-mcp-config` override, and the files other hosts read. Likewise, some examples in that file use third-party package names that should be verified before running; the file itself cannot prove a package is maintained, safe, or compatible.
 
-The relevant call path is in `packages/squad-cli/src/cli/core/init.ts`, `packages/squad-cli/src/cli/core/mcp-root.ts`, and `packages/squad-cli/src/cli/core/copilot-invocation.ts`. The init options select `copilot-file` or `agent-frontmatter` for the SDK scaffolder. The CLI then manages the root state-server entry. The writer refuses malformed JSON instead of overwriting it, preserves non-Squad keys, and keeps environment/tool customization when it can safely parse them. The invocation helper checks for `.mcp.json` and returns no injected arguments when the command is not bare `copilot` or no project root is available.
+The relevant call path is in `packages/squad-cli/src/cli/core/init.ts`, `packages/squad-cli/src/cli/core/mcp-root.ts`, `packages/squad-cli/src/cli/core/mcp-spec.ts` (which turns a machine path into the committed launcher form), and `packages/squad-cli/src/cli/core/copilot-invocation.ts`. The init options select `copilot-file` or `agent-frontmatter` for the SDK scaffolder. The CLI then manages the root state-server entry. The writer refuses malformed JSON instead of overwriting it, preserves non-Squad keys, and keeps environment/tool customization when it can safely parse them. The invocation helper checks for `.mcp.json` and returns no injected arguments when the command is not bare `copilot` or no project root is available.
 
 A short source excerpt captures the central behavior:
 
@@ -259,7 +288,7 @@ if (!existsSync(configPath)) {
   console.warn('[squad] .mcp.json not found ...');
   return [];
 }
-return ['--yolo', '--additional-mcp-config', `@${configPath}`];
+return ['--additional-mcp-config', `@${configPath}`];
 ```
 
 This is not a blanket flag injection into every process. It depends on Squad knowing both the executable and team root. For custom subprocesses, inspect the generated argument vector and set up config explicitly rather than assuming this helper runs.
@@ -267,7 +296,7 @@ This is not a blanket flag injection into every process. It depends on Squad kno
 
 ### Reading the MCP template critically
 
-The repository’s `templates/mcp-config.md` is useful as a catalog of familiar server-spec fields and sample integrations, but it contains historical guidance that does not match the current generated path. It describes `.copilot/mcp-config.json` as the CLI location, lists VS Code’s older `copilot.mcp.servers` settings shape, and claims that GitHub MCP is already preconfigured. In the inspected v1.1.0 code, initialization writes the Squad state server to root `.mcp.json`; the SDK can create a sample in `.copilot/mcp-config.json`, but the CLI then moves its authoritative Squad entry to root `.mcp.json` and tombstones the older Squad key.
+The repository’s `templates/mcp-config.md` is useful as a catalog of familiar server-spec fields and sample integrations. In 1.1.0 it still named `.copilot/mcp-config.json` as the repository-level location, which no longer matched what `init` wrote. The v2.0.0 template is corrected: it names root `.mcp.json` first, says that Copilot CLI does not read a project-level `.copilot/mcp-config.json`, gives VS Code’s `servers` key, and lists the files the other hosts read. The code agrees. Initialization writes the Squad state server to root `.mcp.json`; the SDK can create a sample in `.copilot/mcp-config.json`, but the CLI keeps its authoritative Squad entry in root `.mcp.json` and tombstones any older Squad key in the sample.
 
 The template’s examples also refer to packages and command lines that are not validated by the template itself. A displayed package name is not proof that the package is published, maintained, or the official integration for a service. Check the source’s current official instructions, required permissions, and package provenance before executing it. Treat the VS Code example as illustrative rather than guaranteed current UI terminology.
 
@@ -286,11 +315,11 @@ When documentation and generated files disagree, inspect the output produced by 
 
 ## Summary
 
-MCP extends a Copilot session with external operations, but the host—not Squad’s routing engine—owns configuration loading and server lifecycle. In Squad v1.1.0, the CLI’s state bridge is written into project-root `.mcp.json`; non-interactive subprocesses controlled by Squad explicitly pass that file along with the required consent behavior. Frontmatter mode is an alternative for compatible harnesses, but its CLI help and output behavior should be checked because the published guidance and observed code path are not perfectly aligned. Keep credentials external, review server executables, and diagnose MCP at the host boundary before changing Squad team instructions.
+MCP extends a Copilot session with external operations, but the host—not Squad’s routing engine—owns configuration loading and server lifecycle. In Squad v2.0.0, the CLI’s state bridge is written into project-root `.mcp.json` as a call to the committed `.squad/squad.mjs` launcher, so the same entry works on every clone. Non-interactive subprocesses controlled by Squad explicitly pass that file, and the caller’s permission flags decide consent. Frontmatter mode is an alternative for compatible harnesses, but its CLI help and output behavior should be checked because the published guidance and observed code path are not perfectly aligned. Keep credentials external, review server executables, and diagnose MCP at the host boundary before changing Squad team instructions.
 
 ## Exercises
 
-1. Compare `.mcp.json` with `.copilot/mcp-config.json` in an initialized project. Identify which `squad_state` entry is authoritative in the current CLI and what happens to a stale legacy entry.
+1. Compare `.mcp.json` with `.copilot/mcp-config.json` in an initialized project. Identify which file Copilot CLI actually reads, which `squad_state` entry is authoritative, what command that entry runs, and what happens to a stale legacy entry.
 2. Write a review checklist for a proposed MCP server that will be committed to a team repository. Include command provenance, version pinning, credentials, tool scope, and host compatibility.
 3. Explain why adding `--yolo` alone is insufficient to guarantee that a non-interactive Copilot CLI process loads workspace MCP configuration.
 4. Test `squad init --mcp-frontmatter` in a disposable repository. Compare the resulting agent frontmatter and root `.mcp.json` with the help text and document the exact installed version and observed behavior.
@@ -300,14 +329,14 @@ MCP extends a Copilot session with external operations, but the host—not Squad
 1. What role does the MCP host play between an agent and an external service?
 2. Does configuring a GitHub MCP server create a new Squad agent? Why or why not?
 3. In the current Squad CLI flow, which file contains the generated `squad_state` server entry?
-4. What two flags does Squad prepend for its managed non-interactive Copilot subprocess, and what distinct problem does each address?
+4. Which flag does Squad prepend for its managed non-interactive Copilot subprocess, and why does it no longer add `--yolo` alongside it?
 5. Why should an MCP configuration’s executable and environment be reviewed as security-sensitive?
 6. What must be verified before choosing agent-frontmatter MCP configuration?
 7. A tool name is visible but calls fail. Name two layers to inspect beyond MCP config discovery.
 
 ## Further Reading
 
-- [MCP Setup Guide for Squad](https://bradygaster.github.io/squad/docs/features/mcp/)
-- [MCP Frontmatter](https://bradygaster.github.io/squad/docs/features/mcp-frontmatter/)
-- [Copilot CLI Non-Interactive MCP Trust Gate](https://bradygaster.github.io/squad/docs/features/copilot-mcp-trust/)
-- [`templates/mcp-config.md`](https://github.com/bradygaster/squad/blob/v1.1.0/templates/mcp-config.md)
+- [MCP Setup Guide for Squad](https://github.github.com/squad/docs/features/mcp/)
+- [MCP Frontmatter](https://github.github.com/squad/docs/features/mcp-frontmatter/)
+- [Copilot CLI Non-Interactive MCP Trust Gate](https://github.github.com/squad/docs/features/copilot-mcp-trust/)
+- [`templates/mcp-config.md`](https://github.com/github/squad/blob/v2.0.0/templates/mcp-config.md)

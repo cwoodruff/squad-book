@@ -5,12 +5,13 @@ series-index: 1
 subtitle: "AI Agent Teams for Any Project — From First Session to Everyday Practice"
 author: "Chris Woodruff"
 lang: en-US
+edition: "Second Edition"
 rights: "Text © 2026 Chris Woodruff, CC BY 4.0. Code samples MIT. Squad is © Brady Gaster and contributors (MIT)."
-description: "Volume 1 of an in-depth, hands-on guide to the Squad multi-agent coordination system: installation, first sessions, daily workflows, memory and skills, governance, and adoption playbooks. Targets Squad v1.1.0."
-subject: "Software development; AI agents; GitHub Copilot"
+description: "Second Edition, updated for Squad 2.0. Volume 1 of an in-depth, hands-on guide to the Squad multi-agent coordination system: installation, first sessions, daily workflows, memory and skills, governance, and adoption playbooks. Targets Squad v2.0.0."
+subject: "Software development; AI agents; GitHub Copilot; Claude Code"
 identifier:
   - scheme: UUID
-    text: urn:uuid:7d1c1a52-3b4e-4b1e-9b8e-5a9a2f0c5e13
+    text: urn:uuid:70e2a141-a56d-4692-80f6-b359f61276ef
 toc-depth: 1
 css: styles/epub.css
 cover-image: book/images/cover-vol1.png

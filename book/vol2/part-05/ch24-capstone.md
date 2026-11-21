@@ -13,7 +13,7 @@
 
 ## Hands-On: A Thin, Verified Path to Production
 
-This chapter brings together the companion progression rather than introducing a new Squad feature. It assumes you have worked through Chapters 2–3 (Volume 1) and have the Tasktrack starter in a Git repository. Part IV (Chapters 18–22) has already introduced the Squad 2.0 preview; the core production path here stays on Squad v1.1.0, with an optional multi-host extension at the end. The task is to prepare one small feature—due dates and tags are the continuing example—through planning, issue execution, review, packaging, and release readiness.
+This chapter brings together the companion progression rather than introducing a new Squad feature. It assumes you have worked through Chapters 2–3 (Volume 1) and have the Tasktrack starter in a Git repository. The production path runs on Squad v2.0.0 with the GitHub Copilot host, the default that plain `squad init` sets up. Part IV (Chapters 18–22) showed how the same team projects into other hosts, and Stage 8 ends with an optional step that does that for Tasktrack. The task is to prepare one small feature (due dates and tags are the continuing example) through planning, issue execution, review, packaging, and release readiness.
 
 Do the stages in order, but keep the work intentionally small. An end-to-end capstone is not a request to build every possible production feature. We will preserve Tasktrack's documented zero-dependency design unless a deliberate decision changes it. We will also distinguish the app's CI and container from Squad's own CLI workflows: Squad coordinates and records work; it does not silently deploy your application.
 
@@ -22,7 +22,7 @@ In this walkthrough, assume:
 - You copied `sample/` to a separate `~/tasktrack` directory and are working there.
 - Node.js 22.18 or later is available; the starter runs TypeScript directly with Node's built-in type stripping.
 - You can use GitHub CLI (`gh`) and have permission to create a repository, issues, and pull requests.
-- Squad v1.1.0 is installed and the Copilot interface you use is authenticated.
+- Squad v2.0.0 is installed (`npm install -g @bradygaster/squad-cli`, where `latest` is now 2.0.0) and the Copilot interface you use is authenticated.
 - `main` is Tasktrack's default branch. The dev-first branch policy explained in Chapter 25 applies to contributions to Squad itself, not automatically to every user's application repository.
 
 ```mermaid
@@ -95,7 +95,7 @@ gh issue create --title "Add optional task due dates" \
 
 The sample label is illustrative. Create it in the repository first if it does not exist, and use the exact label vocabulary in your routing configuration. Inspect the issue in GitHub and make sure its body is specific enough to work without guessing. Chapter 7 (Volume 1) covers the full GitHub issue lifecycle, status labels, and pull request workflow.
 
-A safe first pass is observational: ask the team or run the installed CLI's scan without enabling execution, inspect what it selected, and only then allow agents to begin. For the actual v1.1.0 CLI loop, the relevant command and flags are:
+A safe first pass is observational: ask the team or run the installed CLI's scan without enabling execution, inspect what it selected, and only then allow agents to begin. For the actual v2.0.0 CLI loop, the relevant command and flags are:
 
 ```bash
 squad triage --interval 10
@@ -129,7 +129,7 @@ sequenceDiagram
 
 ## Stage 3: Write a PRD Before Broad Work
 
-One small issue is useful for verifying the integration. A feature spanning API, UI, data, and migration deserves a brief planning checkpoint. In the conversational interface, ask the coordinator to use PRD mode as described in Chapter 10 (Volume 1). Do not invent a `squad prd` CLI command: the installed v1.1.0 command help does not list one.
+One small issue is useful for verifying the integration. A feature spanning API, UI, data, and migration deserves a brief planning checkpoint. In the conversational interface, ask the coordinator to use PRD mode as described in Chapter 10 (Volume 1). Do not invent a `squad prd` CLI command: the installed v2.0.0 command help does not list one.
 
 For Tasktrack's “due dates and tags” increment, the PRD should answer:
 
@@ -185,18 +185,18 @@ Use branch protection or repository settings for required CI and human review if
 
 ## Stage 5: Enable the State MCP and Select a Backend
 
-Squad v1.1.0's `squad init` configures a project `.mcp.json` entry for the `squad_state` server. Inspect the managed entry and preserve any unrelated MCP servers or user-owned settings. The server is a local stdio process launched by the Copilot client; it is not an HTTP endpoint to expose to the internet. It gives the client tools backed by Squad's runtime state provider.
+Squad v2.0.0's `squad init` configures a project-root `.mcp.json` entry for the `squad_state` server. Inspect the managed entry and preserve any unrelated MCP servers or user-owned settings. The server is a local stdio process launched by the Copilot client; it is not an HTTP endpoint to expose to the internet. It gives the client tools backed by Squad's runtime state provider.
 
-The entry typically references the `squad` executable and `state-mcp` argument, but the generated launcher may be version-pinned or otherwise vary with the installed distribution. Treat `.mcp.json` as generated configuration: inspect it, and rerun `squad doctor` if the client cannot initialize the server. Do not paste credentials into the MCP config or start `squad state-mcp` manually as if it were an interactive command; it waits for the protocol over standard input/output.
+With an npm-installed CLI, the entry runs `node` on the committed `.squad/squad.mjs` launcher with the `state-mcp` argument, so the same entry works on every clone; a standalone install writes a bare `squad state-mcp`. Commit `.squad/squad.mjs` with the rest of `.squad/`. Chapter 1 explains how the launcher finds a CLI. Treat `.mcp.json` as generated configuration: inspect it, and rerun `squad doctor` if the client cannot initialize the server. Do not paste credentials into the MCP config or start `squad state-mcp` manually as if it were an interactive command; it waits for the protocol over standard input/output.
 
-Choose a backend according to how Tasktrack collaborators need to share state. The default local backend is the simplest place to begin. If you want state isolated from the source branch, the v1.1.0 CLI offers `orphan` and `two-layer` options. For example, migrate after you have committed the starter and confirmed the remote:
+Choose a backend according to how Tasktrack collaborators need to share state. The default local backend is the simplest place to begin. If you want state isolated from the source branch, the v2.0.0 CLI offers `orphan` and `two-layer` options. For example, migrate after you have committed the starter and confirmed the remote:
 
 ```bash
 squad upgrade --state-backend two-layer
 squad health --json
 ```
 
-The command's purpose is to configure/migrate the backend, not to change Tasktrack's application storage. Review the resulting `.squad/config.json` and the health report. The `two-layer` backend uses the Squad state branch together with Git notes for its layered storage behavior; `orphan` stores state on the separate `squad-state` branch. The project needs a Git repository, and remote sharing requires pushing the relevant refs/notes through the configured sync path. Verify Chapter 2 for backend semantics and recovery details before adopting one for a team.
+The command's purpose is to configure/migrate the backend, not to change Tasktrack's application storage. Review the resulting `.squad/config.json` and the health report. The `two-layer` backend uses the Squad state branch together with Git notes for its layered storage behavior; `orphan` stores state on the separate `squad-state` branch. The project needs a Git repository, and remote sharing requires pushing the relevant refs/notes through the configured sync path. The migration is transactional: it moves the state, including governed memory and the decision inbox, in one commit, and refuses to overwrite differing files. Casting and routing stay on the source branch. Read Chapter 2 for backend semantics and recovery details before adopting one for a team.
 
 Do not treat “two-layer” as a backup policy. A state backend affects where Squad state lives; you still need access controls, retention, recovery tests, and a decision about which history belongs in the shared project. Check that state does not contain secrets, private prompts, or customer data before syncing it.
 
@@ -262,7 +262,7 @@ Expected result: the API logs that it is listening on port 3000, and `/health` r
 
 ## Stage 8: Observe Squad Work and the Running Service
 
-Observability should answer a question. For this capstone, observe Squad CLI operations locally using the v1.1.0 OpenTelemetry path from Chapter 9. Start the Aspire dashboard in a terminal:
+Observability should answer a question. For this capstone, observe Squad CLI operations locally using the OpenTelemetry path from Chapter 9. Start the Aspire dashboard in a terminal:
 
 ```bash
 squad aspire --docker
@@ -280,6 +280,26 @@ Open `http://localhost:18888` and inspect traces and metrics. The Aspire dashboa
 This measures Squad's own CLI behavior, not Tasktrack's HTTP request latency. The starter API does not include an OpenTelemetry dependency or request tracing. Keep the distinction explicit: for the capstone's app-level operational signal, the `/health` endpoint and container logs are basic checks; production service metrics, tracing, alerting, and authenticated export require a separately designed application instrumentation and collector path. Do not imply that Squad's spans magically cover Tasktrack requests.
 
 Define a small operations checklist: the API health check must pass, the container must restart according to the host's policy, logs must not include secrets or task content unnecessarily, and an operator must know where to inspect deployment health. Add a production OTel pipeline only after selecting the host, receiver, privacy policy, and data retention. Chapter 9 explains export configuration and data-handling constraints.
+
+### Optional: Project Tasktrack into a Second Host
+
+If someone on the team works in another AI host, project the same Tasktrack team into it now, before the release gate, so the second host is tested on the code you are about to ship. This step is optional. Claude Code is the example here because it is the most complete second host in v2.0.0 (Appendix H); any client slug from Chapter 19 works the same way.
+
+Commit your work first so the projection lands as one reviewable change, then preview it and apply it:
+
+```bash
+git status --short
+squad client add claude --dry-run
+squad client add claude
+squad client list
+git status --short
+```
+
+Expected result: the dry run names the host it would project and writes nothing. The real run prints one line per file. It adds the Claude Code coordinator (`.claude/agents/squad.md`), a member subagent for each roster entry under `.claude/agents/`, the skills under `.claude/skills/`, `.claude/settings.json` with its permission list, and `CLAUDE.md`, and it updates `.gitignore` and `.squad/config.json`. The Copilot files and `.mcp.json` are not touched, and `squad client list` now reports `claude` as projected. The `.squad/` team, routing and decisions stay as they were: both hosts read the same team. Commit the result on its own, then start Claude Code in the repository with `claude --agent squad --mcp-config .mcp.json` and ask the coordinator who is on the team and what the current Squad state health is. You should get the same roster you see in Copilot. Claude Code needs its own sign-in, and its first run asks you to trust the folder.
+
+To back out, revert that one commit; Chapter 19 describes the full removal routes.
+
+**Copilot-only fallback:** skip this step. Nothing later in the chapter depends on a second host, and Tasktrack's Copilot files, `.mcp.json` and team are complete on their own.
 
 ## Stage 9: Release Deliberately
 
@@ -323,6 +343,7 @@ The book describes these comparison tags; the sample does not create them for yo
 | `.squad/routing.md` | Routes areas or labels to the appropriate agents | Check rules against actual paths and GitHub labels |
 | `.squad/config.json` → `stateBackend` | Selects the Squad state backend | `squad health --json`; inspect configured value |
 | `.mcp.json` → `mcpServers.squad_state` | Client launch specification for the Squad state MCP | Inspect the managed entry; verify the client initializes it |
+| `squad client add <list>` / `squad client list` | Optional: projects the team into another host (Stage 8) | Run with `--dry-run` first; commit the projection on its own |
 | `squad triage --interval <minutes>` | Polls for eligible issue work | Run observationally first; Ctrl+C stops foreground process |
 | `squad triage --execute` | Enables agent execution on selected work | Use only after reviewing scope and permissions |
 | `squad triage --max-concurrent N` / `--timeout N` | Bounds concurrent issues and issue duration | Start with low concurrency and a reasonable timeout |
@@ -333,7 +354,7 @@ The book describes these comparison tags; the sample does not create them for yo
 
 ## Under the Hood
 
-In v1.1.0, `packages/squad-cli/src/cli/core/init.ts` parses `--state-backend` and writes the canonical backend choice into `.squad/config.json`. For `orphan` and `two-layer`, initialization can create a `squad-state` branch using Git plumbing without checking that branch out. The same initialization path installs synchronization hooks where appropriate. This explains why state-backend setup is distinct from Tasktrack's application database.
+In v2.0.0, `packages/squad-cli/src/cli/core/init.ts` parses `--state-backend` and writes the canonical backend choice into `.squad/config.json`. For `orphan` and `two-layer`, initialization can create a `squad-state` branch using Git plumbing without checking that branch out. The same initialization path installs synchronization hooks where appropriate. This explains why state-backend setup is distinct from Tasktrack's application database.
 
 The state MCP entry point is `packages/squad-cli/src/cli/commands/state-mcp.ts`. It creates a runtime `ToolRegistry` using the resolved Squad state and exposes tools over the Model Context Protocol's stdio transport. The registered names include `squad_decide`, state read/write/append/list/delete/health operations, and memory operations. The managed `.mcp.json` writer is `packages/squad-cli/src/cli/core/mcp-root.ts`; it preserves other server entries and user-owned settings while refreshing Squad's launch command and arguments. That is why the generated file should be inspected rather than replaced wholesale.
 
@@ -358,10 +379,6 @@ Tasktrack's `sample/api/src/server.ts` reads `PORT` with a default of 3000, crea
 
 The capstone has turned a starter repository into a managed delivery path: Squad initializes the team, routing connects work to owners, GitHub issues bound the backlog, Ralph/triage processes eligible work, PRD mode clarifies cross-cutting scope, and explicit review gates protect merge authority. MCP exposes local Squad state through a client-launched stdio server; a selected state backend governs persistence. Tasktrack's own CI tests the application, its Docker image packages the API, and Aspire helps observe Squad CLI telemetry. A release still requires an approved application deployment path and a human decision.
 
-### Optional: Going multi-host with 2.0
-
-Part IV has already covered the preview architecture, host setup, state boundary, and upgrade procedure. As an optional extension to this stable single-host path, project the same Tasktrack team into another supported AI host with `squad upgrade --client <list>`. This preserves the shared `.squad/` team while generating host-specific coordinator and MCP configuration; use Chapter 22 for migration checks and Chapter 19 for the client walkthrough.
-
 ## Exercises
 
 1. Adapt the issue in this chapter to add tags instead of due dates. Specify tag validation, API behavior, compatibility, and at least three acceptance tests.
@@ -374,7 +391,7 @@ Part IV has already covered the preview architecture, host setup, state boundary
 
 1. What does `squad init` add to a project, and what should you inspect afterward?
 2. What is the effect of `--execute` in `squad triage`?
-3. Is PRD mode a `squad` CLI command in v1.1.0?
+3. Is PRD mode a `squad` CLI command in v2.0.0?
 4. What process launches the `squad_state` MCP server, and what transport does it use?
 5. Does changing `stateBackend` change Tasktrack's own persistence layer?
 6. Why does the sample CI workflow omit `npm install`?
@@ -390,5 +407,5 @@ Part IV has already covered the preview architecture, host setup, state boundary
 - Chapter 7: Containers, Cloud Hosting, and Deployment Modes
 - Chapter 8: CI/CD and Release
 - Chapter 9: Observability
-- [Squad v1.1.0 CLI source](https://github.com/bradygaster/squad/tree/v1.1.0/packages/squad-cli/src/cli/)
+- [Squad v2.0.0 CLI source](https://github.com/github/squad/tree/v2.0.0/packages/squad-cli/src/cli/)
 - Tasktrack companion README: `sample/README.md` in the book repository.

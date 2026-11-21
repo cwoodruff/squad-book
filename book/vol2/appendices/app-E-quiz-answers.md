@@ -7,7 +7,7 @@ This appendix collects the answers to the chapter quizzes in this volume (Chapte
 1. The MCP host reads server configuration, starts or connects to servers, exposes their advertised tools to the model, and mediates calls and responses.
 2. No. It contributes tools to the Copilot host. A Squad agent is an agent identity with a charter and work context; an MCP server is a tool provider.
 3. The repository-root `.mcp.json` contains the CLI-generated `squad_state` entry.
-4. `--additional-mcp-config @<path>` explicitly loads the project file; `--yolo` suppresses per-tool consent prompts in the non-interactive flow. They solve different problems and both have security implications.
+4. `--additional-mcp-config @<path>`, which explicitly loads the project file past the non-interactive trust gate. Squad 1.1.0 also added `--yolo`, but that overrode tool restrictions the caller had set (issue #2139), so v2.0.0 keeps MCP loading independent of permissions. Consent flags now come from the caller (`squad loop` and `squad watch --execute` default to `--yolo` only when no `--copilot-flags` are given).
 5. The host can execute the configured program with the provided environment. That grants code execution and access to any credentials or permissions inherited by the process.
 6. Confirm that the target harness consumes frontmatter MCP configuration, that its schema matches the emitted `mcpServers` shape, and that its runtime correctly resolves the command, arguments, credentials, and tools.
 7. Check server startup and protocol compatibility, credentials/service authorization, tool arguments, active backend/repository resolution, and whether the operation is allowed. Tool registration does not guarantee successful service calls.
@@ -32,7 +32,6 @@ This appendix collects the answers to the chapter quizzes in this volume (Chapte
 5. The schema allows `prs` as an accepted metadata value, but current `delegateCommand` requires `issues` and only constructs an issue-create call.
 6. A SubSquad partitions work within a repository via labels, optional folder scopes, and workflow selection. A separate peer Squad has its own repo/backlog and is discovered through a manifest; it retains independent ownership and governance.
 7. It provides bundled scripts and a `mesh.json`-based pull/publish pattern using Git and/or HTTP. It is asynchronous/eventually consistent, not real-time messaging or a transactional distributed store.
-8. `multi-squad.ts` selects among named personal Squad state directories under the global config root. It does not discover or delegate work to peer repositories; peer discovery is handled by manifests and the cross-squad runtime module.
 
 ## Chapter 4: Portability, Export/Import, and Inheritance
 
@@ -40,8 +39,8 @@ This appendix collects the answers to the chapter quizzes in this volume (Chapte
 2. It archives the current `.squad/` directory with a timestamped suffix and replaces the active team with imported state. It is not a merge.
 3. No. The exporter includes histories and warns the operator to review the content. History splitting happens during import and is not guaranteed sanitization.
 4. Local directory/path, Git repository, and JSON export file. Sync validates a local path; validates that an export file exists; or pulls/reclones the cached Git source and updates sync metadata. It does not merge policy or refresh the contents of an export snapshot.
-5. No. It returns separately named upstream result records and a context summary. It does not itself enforce later-wins/local-wins policy.
-6. It is described in documentation, but absent from the installed v1.1.0 CLI help and not found as a matching implementation in the inspected source. Treat as unverified/preview, not a working stable command.
+5. The local `.squad/` wins; after it, the earlier upstream declaration wins and the first match is kept. The 1.x upstream guide said later entries override earlier ones; v2.0.0 reverses that, so a 1.x `upstream.json` ordered for the old rule must be reversed.
+6. It is described in documentation, but it is not shipped in v2.0.0: the CLI help has no `export agent` subcommand and the source has no matching implementation. Treat it as documented intent, not a working command.
 7. No. The documented agent artifact compiles coordinator behavior and explicitly omits live state such as decisions, histories and skills. Use a snapshot or ordinary versioned state files when preserving that information is required.
 
 ## Chapter 5: Clients, Hosts, and Programmatic Sessions
@@ -96,7 +95,7 @@ This appendix collects the answers to the chapter quizzes in this volume (Chapte
 ## Chapter 10: Troubleshooting and Disaster Recovery
 
 1. No. Git can restore only content represented in the index, commits, or another backup.
-2. A running pod proves that Kubernetes started a process. A ready worker also needs working authentication, routing, state access, and any required scaler/queue path; v1.1.0 does not provide a built-in HTTP readiness endpoint for all of that.
+2. A running pod proves that Kubernetes started a process. A ready worker also needs working authentication, routing, state access, and any required scaler/queue path; v2.0.0 does not provide a built-in HTTP readiness endpoint for all of that.
 3. The runtime has no built-in `/healthz` or `/readyz` HTTP endpoint that confirms GitHub connectivity/readiness.
 4. No. A longer grace period gives a process more time to exit but does not guarantee checkpointing; the documented runtime does not checkpoint in-flight tasks before shutdown.
 5. Streaming usage history: 1,000 FIFO events. Telemetry collector queue: 500 FIFO events.
@@ -109,7 +108,7 @@ This appendix collects the answers to the chapter quizzes in this volume (Chapte
 2. It shields Squad code from direct dependence on upstream Copilot session/client types and translates options/events as required.
 3. Normalized work-item and pull-request operations, including listing/getting/creating work items, labels/tags, assignments, comments, branches, PR creation, and merging.
 4. No. The function is exported by the SDK, but the inspected `SquadCoordinator.handleMessage()` path does not invoke it. A caller must wire it in for it to govern that path.
-5. The v1.1.0 checkout contains no `docs/specification/adr-001*` documents and no verifiable explicit Squad 2.0 design statement. It does not establish a future design contract.
+5. Client (local UX, auth bootstrap, host event parsing, transport adaptation), control and broker (conversation identity, sequencing, capabilities, approvals, routing, durable history) and execution (workers, tool execution, checkpoints, retries). The ADR is an accepted draft baseline and says the code wins where they disagree; it also still states that the backend bridge bundles no execution harness, which v2.0.0's experimental harnesses have overtaken, so verify against `packages/squad-sdk/src/backend/types.ts` and the harness code.
 6. The SDK root entry point is designed as a side-effect-free public API; the CLI executable and its interactive shell live in the separate CLI package.
 
 ## Chapter 12: Inside the Coordinator
@@ -153,6 +152,7 @@ This appendix collects the answers to the chapter quizzes in this volume (Chapte
 5. `squad_route` needs host dependencies to create a real agent session. Without the fan-out dependency getter and required collaborators it returns a failure instead of claiming it dispatched work.
 6. `HookPipeline` uses `action: 'allow' | 'block' | 'modify'` and `modifiedArguments`; a session `onPreToolUse` callback uses the adapter's permission fields such as `permissionDecision`, `modifiedArgs`, and `additionalContext`. They are different types and must be wired at their respective integration points.
 7. The helper targets email-like strings only, can miss other sensitive data, and does not protect data that is logged or transmitted outside its post-tool result path. It is one transform, not a complete privacy control.
+8. Plugin context is injected only when an agent is spawned through the SDK's `AgentLifecycleManager.spawnAgent()`. The coordinator's spawn prompt (in Copilot CLI or any other host) does not read `.squad/plugins/runtime.json`, and neither do the interactive shell, `squad watch` or `squad loop`. Fixes: name the plugin's installed file in the request, add a pointer to that file in the relevant charter or skill, or spawn the agent from your own SDK code through `spawnAgent()`.
 
 ## Chapter 16: Building Autonomous and Resilient Agents
 
@@ -173,40 +173,40 @@ This appendix collects the answers to the chapter quizzes in this volume (Chapte
 5. Examples include canonical snapshot digest and compare-before-mutate behavior, API-version evidence, idempotent retries, provider-drift handling, precedence for simultaneous conditions, or sanitized deterministic transcripts.
 6. A JSON schema validates that fields have the expected shape. It cannot authenticate an actor, prove that a provider identity is genuine, or evaluate whether the authority basis and policy actually permitted the operation.
 7. `state-memory-requirements-v0.1.md` is informative and non-claimable. It separates state-authority promotion from memory-classification/provider-dispatch promotion.
-8. `client-harness-adapters`, `client-backend-decoupling`, and `ADR-001` are not present in the v1.1.0 specification tree covered by this chapter.
+8. At-least-once delivery: an unexpired claim excludes other holders, but a crash, clock skew beyond `skewMarginMs`, a suspended holder or a deleted claim can still produce a duplicate run. Effects must therefore be idempotent, for example deterministic `squad/{issue}-{slug}` branch names, a check for an already-open pull request, and marker-keyed comments. Killing a fenced agent does not roll back what it already pushed.
 
 ## Chapter 18: Squad 2.0: What Changed and Why
 
 1. One repository-owned `.squad/` team can be used through multiple host-native integrations without keeping separate, drifting team definitions. Host files are projections, while the roster and charters stay shared.
 2. **Client plane:** host configuration, UI/event adaptation, and dispatch. **Control/broker plane:** conversation identity, ordering, approvals, capabilities, cancellation, and durable history. **Execution plane:** workers, tools, checkpoints, retries, and task execution.
 3. Intersection ensures a capability is effective only if the host offers it, the backend supports it, and policy permits it. A union would incorrectly claim a feature when any necessary layer lacks it or disallows it.
-4. No. The bridge exposes the backend tools only when started with `--experimental-backend` or `SQUAD_EXPERIMENTAL_BACKEND=1`; `SQUAD_BACKEND_URL` by itself does not enable them. The bundled bridge has no execution harness, so it is not a turnkey hosted agent runtime.
+4. The bridge exposes the backend tools only when started with `--experimental-backend` or `SQUAD_EXPERIMENTAL_BACKEND=1`; `SQUAD_BACKEND_URL` by itself does not enable them. They execute a turn only when a harness is registered: the bridge registers `ClaudeAgentSdkHarness` when the optional `@anthropic-ai/claude-agent-sdk` peer is installed, and `CopilotSdkHarness` only when `SQUAD_BACKEND_HARNESSES` lists it (`none` turns both off). With no harness, health and negotiate report `executionAvailable: false` and `squad_backend_send_message` refuses. All of it is experimental in v2.0.0, and there is no bundled remote server.
 5. Squad no longer finds or falls back to a profile-level personal/global team; resolution is project-local, walking from the current directory through parents and respecting repository boundaries. Run `squad init` in the project or use `--team-root <path>` where supported to select an explicit team root.
 6. Local project configuration wins; then earlier upstream entries win over later entries. Run `squad upstream sync` after upgrading and reorder configured sources if you relied on the prior later-wins behavior.
 7. Run `squad roster add rai` (or preview it with `--dry-run`). Upgrades preserve `team.md`; the explicit command inserts the optional built-in row and records a verified backup and provenance so later removal can target only its own change.
-8. No. Epochs are cooperative, client-asserted fencing values that reject stale writers, but any caller able to present a larger value can take over. They have no broker-issued holder identity or expiry and are not an authentication/authorization boundary.
+8. No. ADR-001 describes epochs as cooperative, client-asserted fencing values that reject stale writers, but any caller able to present a larger value can take over. They have no broker-issued holder identity or expiry and are not an authentication/authorization boundary.
 
 ## Chapter 19: Using Squad Across Clients
 
 1. Seven host coordinators can point at one `.squad/` team; it does not create seven rosters.
 2. It adds Claude and Codex to the requested set, refreshes them, and also refreshes any configured host such as Copilot.
-3. `squad client list` (also `ls`) and `squad client add <list> [--dry-run]` are defined. There is no `squad client remove` subcommand in this preview.
-4. Claude needs the project `.mcp.json` explicitly passed as `--mcp-config .mcp.json`; a headless `claude -p` invocation without it may lack the state tools.
+3. `squad client list` (also `ls`) and `squad client add <list> [--dry-run]` and `squad client sync [--dry-run]` are defined. There is no `squad client remove` subcommand in 2.0.0.
+4. With the full projection, Claude needs the project `.mcp.json` explicitly passed as `--mcp-config .mcp.json` (or a prior approval for the project); a headless `claude -p` invocation without it may lack the state tools. In plugin mode the plugin serves `squad_state`, so no approval or `--mcp-config` is needed, and `.claude/settings.json` disables the `.mcp.json` copy through `disabledMcpjsonServers`.
 5. `cursor-agent mcp enable squad_state`.
 6. A full path in Codex home configuration; the guide warns against an 8.3-style short path.
-7. Google Antigravity. Quota is per model, and `--model` selects an alternate.
+7. The folder is not trusted yet. Claude Code applies project allow rules only after you accept the trust prompt on the first interactive `claude` run there, and it ignores them in headless runs in an untrusted folder. (Also check that `claudePermissions` is not `"off"`.)
 8. Record runtime decisions with `squad_decide`; edit the static `.squad/routing.md` as a workspace file (or use the relevant Squad CLI workflow).
 
 ## Chapter 20: Host Projections, Client Adapters, and Capability Negotiation
 
 1. The implemented `HostProjection` has synchronous `project(ctx)`. `createClientAdapter({ host, ctx, runtime? })` constructs the runtime facade. The draft's illustrative projection SPI differs from that implemented interface.
-2. The token describes resuming a transcript/event subscription from a cursor. It is declared across the seven hosts and is not a product selector.
+2. No. Under ADR-003 (option C) the non-Copilot digests are complete on their own and tell the model not to read `.github/agents/squad.agent.md` for instructions; `coreCoordinatorProtocol` does not read the file either. The edit reaches Copilot only. Put cross-host policy in `.squad/` files.
 3. An omitted policy list supplies no restriction in the local helper; an explicit empty array removes every token. The same distinction applies to backend lists.
 4. No. Without a binding, the facade uses absent restrictions and returns the advertisement as its effective list. Runtime submission still throws `AdapterUnboundError`, and no backend authorization took place.
-5. The coordinator reads the selected member's charter and includes it in that specialist's delegation prompt. Projection embeds the coordinator digest and dispatch instructions, not a compile-time copy of every charter.
+5. On most hosts, the coordinator reads the selected member's charter and includes it in that specialist's delegation prompt. Projection embeds the coordinator digest and dispatch instructions, not a compile-time copy of every charter. Claude Code differs: each member has a generated subagent file that tells it to read its own charter, so the coordinator spawns it by `subagent_type` and passes only the task and context. The member file carries the charter inline only for a project linked to a team repository.
 6. Pass remaining hosts as the third `keep` argument: `uninstallClients(['claude'], ctx, ['copilot'])`. Persisted client configuration must be reconciled separately if intended.
 7. Expected-failure tests establish that a required projected coordinator section is missing. They validate the gap rather than validating successful feature execution. Support status and evidence strength are independent axes.
-8. `/clients` preserves the same host adapter exports and runtime references as a deprecated alias. It does not create another registry, implement another backend, add execution harnesses, or re-export the older session client classes supplied by `/client`.
+8. Only `squad lockout reject` and `squad lockout status` (plus `squad cast` and `squad client sync`), as `squad …` and through the committed launcher. A rejection only adds a restriction and status only reads. `assign`, `submit`, `approve` and `override` move a lockout toward release, so they still prompt: an agent should not be able to clear a lockout on its own.
 
 ## Chapter 21: The State MCP Boundary, Runtime Upstreams, and the Experimental Backend
 
@@ -215,18 +215,19 @@ This appendix collects the answers to the chapter quizzes in this volume (Chapte
 3. The local skill wins, then the earliest declared upstream. Upstreams are processed in declared order and each source's nested sources follow depth-first, with a default maximum depth of three.
 4. No. Session resolution reads already materialized local paths, Git clones, or export files. `squad upstream sync` explicitly refreshes Git clones and validates local/export sources; there is no implicit network fetch at startup.
 5. The process must receive `--experimental-backend` or `SQUAD_EXPERIMENTAL_BACKEND=1`. The URL selects a backend only after opt-in; by itself it must not expose tools or route a token.
-6. It implements `submit`, `subscribe`, `cancel`, `respondApproval`, and `describe`. With no harness, the bridge reports an empty harness list and `executionAvailable: false`; send-message refuses as unavailable.
-7. Examples: approval hashes are opaque and supplied by the harness rather than broker-computed; epochs are client-asserted rather than broker-issued lease tokens; cursors are unsigned; conversations are whole-file snapshots; there is no bundled execution harness; remote DurableSquad Phase 2 approval/lease coordination is pending.
+6. It implements `submit`, `subscribe`, `cancel`, `respondApproval`, and `describe`. v2.0.0 ships two experimental harnesses, `ClaudeAgentSdkHarness` (`claude-agent-sdk`) and `CopilotSdkHarness` (`copilot-sdk`). With no harness registered, the bridge reports an empty harness list and `executionAvailable: false`; send-message refuses as unavailable. The Claude harness registers only when its optional SDK and an API credential are present; `copilot-sdk` only when listed in `SQUAD_BACKEND_HARNESSES`.
+7. Examples: approval hashes are opaque and supplied by the harness rather than broker-computed; epochs are client-asserted rather than broker-issued lease tokens; cursors are unsigned; conversations are whole-file snapshots; the only harnesses are experimental and keep pending approvals in memory; remote DurableSquad Phase 2 approval/lease coordination is pending; profile promotion is pending.
+8. `SQUAD_CLI`, then the repository's `node_modules/@bradygaster/squad-cli`, then `squad` on PATH, then the CLI that last ran `squad init` or `squad upgrade` on this machine; any of the last three older than the version that wrote the launcher is skipped. It falls back to the exact-version `npx` package only when `SQUAD_ALLOW_NPX=1`, because that downloads and runs code; otherwise it fails with install instructions.
 
-## Chapter 22: Upgrading to Squad 2.0 and the Road Ahead
+## Chapter 22: Migrating from Squad 1.x to Squad 2.0
 
-1. `latest` remains on Squad 1.1.0.
+1. `@bradygaster/squad-cli@latest`, which resolves to Squad 2.0.0 since the 2.0.0 release (CHANGELOG date 2026-11-18).
 2. No. Self-upgrade installs only the CLI package. Run `squad upgrade` separately in each project.
 3. The registry must be empty and have no meaningful prior cast history; every specialist roster row must resolve to one existing charter folder, and the team must state a universe. If any fact is missing or ambiguous, the backfill fails closed.
 4. It lists records that could not be normalized and their reasons. It does not mean a partial registry was committed; the repair refuses the whole operation.
 5. `squad health` performs stronger semantic routing-reference validation. `squad doctor` checks routing-file presence and casting-pair consistency.
 6. Earlier entries win.
-7. No. `uninstallClients()` removes generated client projections only; it is not a package downgrade or project rollback.
+7. No. `uninstallClients()` removes generated client projections only; it is not a package downgrade or project rollback. A rollback must also remove what the first 2.0 upgrade added, such as `.squad/squad.mjs`, the launcher-based `squad_state` entry in `.mcp.json`, the `.squad/backend/` ignore line, the refreshed templates and any host projections; restoring the pre-upgrade commit does this.
 8. Restore the project files and state to the 1.1.0 baseline first, then install the 1.1.0 CLI and validate the restored project.
 
 ## Chapter 23: Patterns, Anti-Patterns, and the Cookbook
@@ -243,8 +244,8 @@ This appendix collects the answers to the chapter quizzes in this volume (Chapte
 
 1. It creates a Squad project layout and default agent/workflow scaffolding. Inspect Git status and generated files, then use diagnostics such as `squad doctor` and `squad health` to verify setup.
 2. It enables triage to spawn agents to work on selected issues; it should be explicitly enabled after reviewing scope and selection.
-3. No. PRD mode is invoked through the conversational workflow described in Chapter 10 (Volume 1); the v1.1.0 CLI help does not list a `squad prd` command.
-4. The Copilot client launches the local `squad state-mcp` process through `.mcp.json`; it uses MCP over standard input/output (stdio).
+3. No. PRD mode is invoked through the conversational workflow described in Chapter 10 (Volume 1); the v2.0.0 CLI help does not list a `squad prd` command.
+4. The Copilot client launches it from the `squad_state` entry in `.mcp.json`, which runs `squad state-mcp` through the committed `.squad/squad.mjs` launcher (or a bare `squad state-mcp` for a standalone install); it uses MCP over standard input/output (stdio).
 5. No. It configures where Squad state is stored. Tasktrack's API data store is separate.
 6. The baseline companion project has no npm dependencies or lockfile. The tests use Node's built-in test runner.
 7. No. Aspire observes telemetry emitted by the configured Squad CLI/SDK instrumentation. Tasktrack's HTTP API needs its own instrumentation to emit application request telemetry.
@@ -259,4 +260,4 @@ This appendix collects the answers to the chapter quizzes in this volume (Chapte
 5. No. Insider is an npm prerelease channel, published by a workflow from `dev`.
 6. `.github/workflows/squad-promote.yml`.
 7. Examples include reproducible issue reports, documentation, code review, discussion support, deployment case studies, and videos.
-8. Because the docs-site guide and root v1.1.0 package scripts differ. Verify commands against `package.json` and the CI workflow before following or documenting them.
+8. Because the docs-site guide and root v2.0.0 package scripts differ. Verify commands against `package.json` and the CI workflow before following or documenting them.

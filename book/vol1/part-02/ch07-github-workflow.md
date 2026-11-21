@@ -8,7 +8,7 @@
 - Connect Squad to a repository and use the backlog-to-PR lifecycle without confusing prompts with CLI commands.
 - Design issue templates that capture context and acceptance criteria before work starts.
 - Use Squad's namespaced labels as a lightweight triage vocabulary, and understand which automation depends on installed workflows.
-- Decide when a GitHub Projects board adds value and what Squad v1.1.0 can and cannot synchronize.
+- Decide when a GitHub Projects board adds value and what Squad v2.0.0 can and cannot synchronize.
 - Follow a representative issue-driven workflow and understand the more structured agentic-SDLC demo.
 
 ## Start with a Work Item, Not a Chat Transcript
@@ -161,9 +161,9 @@ The diagram is a useful mental model, not an automatic state machine in every in
 
 GitHub Projects is valuable when a team needs a view across issues, pull requests, milestones, or multiple repositories. Start by deciding what a board should answer: “What is ready?”, “Where are reviews stuck?”, or “What belongs in the next release?” Prefer a small number of columns and a single canonical signal for each state. If labels are your canonical signal, document how columns map to labels; if a Project's Status field is canonical, make clear who updates it.
 
-The Project-board feature notes describe a board as a projection of labels, with example columns Backlog, Needs Research, Ready, In Progress, and Done. Those descriptions include planned or aspirational operations—creating a board automatically, bidirectional drag-and-drop synchronization, arbitrary custom-field mappings, and webhook-driven state changes. They are not all part of Squad v1.1.0's stable board implementation.
+The Project-board feature notes describe a board as a projection of labels, with example columns Backlog, Needs Research, Ready, In Progress, and Done. Those descriptions include planned or aspirational operations—creating a board automatically, bidirectional drag-and-drop synchronization, arbitrary custom-field mappings, and webhook-driven state changes. They are not all part of Squad v2.0.0's board implementation.
 
-In v1.1.0, `squad watch --board` enables an optional board lifecycle capability. It uses `gh project` to inspect items and can reconcile certain issue/Status mismatches; execution-mode transitions can add an issue to a project and attempt to set a status such as In Progress or Done. The capability is best-effort, assumes an accessible project and compatible Status field, and does not create a complete board for you. It does not implement the docs' general bidirectional drag-to-label workflow or arbitrary mapping from `priority:*` labels to custom Project fields. The simplest way to verify your environment is to inspect the board and run a small test on a non-production issue before enabling this capability broadly.
+In v2.0.0, `squad watch --board` enables an optional board lifecycle capability. It uses `gh project` to inspect items and can reconcile certain issue/Status mismatches; execution-mode transitions can add an issue to a project and attempt to set a status such as In Progress or Done. The capability is best-effort, assumes an accessible project and compatible Status field, and does not create a complete board for you. It does not implement the docs' general bidirectional drag-to-label workflow or arbitrary mapping from `priority:*` labels to custom Project fields. The simplest way to verify your environment is to inspect the board and run a small test on a non-production issue before enabling this capability broadly.
 
 Project access may require the `project` scope for your `gh` authentication. The docs suggest `gh auth refresh -s project`, followed by `gh auth status`. You can manage Projects manually with `gh project` commands as well. If a board is not essential, skip it: an accurate issue list and disciplined labels are more useful than a visually elaborate board that agents and humans do not keep in sync.
 
@@ -189,7 +189,7 @@ The assigned agentic-SDLC walkthrough is a presenter-led demonstration of a larg
 
 The walkthrough's example starts by casting a squad, opens a root intent issue, and uses issue-comment slash commands such as `/squad research`, `/squad triage`, and `/squad plan program`. Later steps accept scope and implementation, validate dependencies and traceability, and activate generated work items. The demo describes the issue as a living status tracker and calls out a “Next Steps” chain, so a person can see the current phase and what approval is needed next.
 
-> **Preview:** The walkthrough assumes a GitHub Agentic Workflows (`gh-aw`) setup with dispatcher, implementation worker, and advisory reviewer workflows. Those workflows are not equivalent to the baseline Squad `gh` issue adapter. Treat its slash-command sequence, automatic generated hierarchy, and lifecycle tracker as demo-specific integration behavior; verify that your repository has the required workflows and schemas before presenting those commands as executable.
+> **Note:** The walkthrough assumes a GitHub Agentic Workflows (`gh-aw`) setup with dispatcher, implementation worker, and advisory reviewer workflows. Those workflows are not equivalent to the baseline Squad `gh` issue adapter. Treat its slash-command sequence, automatic generated hierarchy, and lifecycle tracker as demo-specific integration behavior; verify that your repository has the required workflows and schemas before presenting those commands as executable.
 
 The safety boundary is important: planning comments remain proposals; activation is the point at which the walkthrough says real issues are created. Keep humans involved in scope acceptance, security-sensitive changes, and merge decisions. If you use this flow, verify generated links, dependencies, labels, and milestones after activation. Structured artifacts improve traceability but do not guarantee that a proposal is complete or that an implementation is correct.
 
@@ -262,7 +262,7 @@ This exercise adds a GitHub issue form and one small backlog item to the Tasktra
 
 ## Configuration Reference
 
-| Item | Location or command | What it controls | v1.1.0 note |
+| Item | Location or command | What it controls | v2.0.0 note |
 |---|---|---|---|
 | Issue source | `.squad/team.md` / team context | Which repository Squad should inspect for work | Confirm it points to the intended repo |
 | GitHub CLI authentication | `gh auth login`, `gh auth status` | CLI credentials used by the GitHub adapter | Ensure required repository/project access |
@@ -297,14 +297,14 @@ The board capability lives in `packages/squad-cli/src/cli/commands/watch/capabil
 
 ## Summary
 
-GitHub issues give Squad's work a durable, reviewable home. Write a clear outcome and acceptance criteria, use templates to make good intake easier, and keep the label vocabulary small enough for people to apply consistently. The base `squad` label places open work in the v1.1.0 watch scan; member labels and routing rules help triage it. A Projects board can help visualize work, but its synchronization is narrower than some feature notes suggest. The ordinary issue workflow and the gh-aw agentic-SDLC demo are distinct paths, and both should retain human review and repository safeguards.
+GitHub issues give Squad's work a durable, reviewable home. Write a clear outcome and acceptance criteria, use templates to make good intake easier, and keep the label vocabulary small enough for people to apply consistently. The base `squad` label places open work in the watch scan; member labels and routing rules help triage it. A Projects board can help visualize work, but its synchronization is narrower than some feature notes suggest. The ordinary issue workflow and the gh-aw agentic-SDLC demo are distinct paths, and both should retain human review and repository safeguards.
 
 ## Exercises
 
 1. Improve the due-date issue from the Hands-On section. Add a concrete example request and response, one explicit non-goal, and a testable error criterion. Explain how each addition reduces ambiguity.
 2. Design a bug-report issue form for Tasktrack. Include fields for reproduction steps, expected behavior, actual behavior, and Node.js version. Decide which fields must be required and justify the choice.
 3. Propose a minimal label set for a two-agent Tasktrack team. Include one label in each workflow namespace and explain which labels are conventions versus operational inputs for `squad watch`.
-4. A teammate assumes dragging an issue into “Ready” automatically applies `go:yes`. Explain which workflow or integration would need to exist for that behavior, and name the stable v1.1.0 board capability's actual boundary.
+4. A teammate assumes dragging an issue into “Ready” automatically applies `go:yes`. Explain which workflow or integration would need to exist for that behavior, and name the v2.0.0 board capability's actual boundary.
 5. Compare a one-sentence user request with a structured issue. List the information you would preserve in the issue before asking an agent to start.
 
 ## Quiz
@@ -313,17 +313,17 @@ GitHub issues give Squad's work a durable, reviewable home. Write a clear outcom
 2. Are `.github/ISSUE_TEMPLATE/*.yml` files interpreted by Squad or by GitHub?
 3. Name two fields that make acceptance criteria useful to a reviewer.
 4. Does the namespaced label convention enforce exclusivity without a workflow?
-5. What work does the v1.1.0 `--board` capability attempt, and what does it not promise?
+5. What work does the v2.0.0 `--board` capability attempt, and what does it not promise?
 6. What additional integration does the agentic-SDLC walkthrough assume?
 7. Does an issue number automatically isolate simultaneous agent work into separate working directories?
 
 ## Further Reading
 
-- [GitHub Workflow concept](https://bradygaster.github.io/squad/docs/concepts/github-workflow/)
-- [GitHub Issues Mode](https://bradygaster.github.io/squad/docs/features/github-issues/)
-- [Issue Templates](https://bradygaster.github.io/squad/docs/features/issue-templates/)
-- [Label Taxonomy](https://bradygaster.github.io/squad/docs/features/labels/)
-- [Project Boards](https://bradygaster.github.io/squad/docs/features/project-boards/)
-- [Issue-Driven Development scenario](https://bradygaster.github.io/squad/docs/scenarios/issue-driven-dev/)
-- [GitHub Issues Walkthrough](https://bradygaster.github.io/squad/docs/tour-github-issues/)
-- [Agentic SDLC demo walkthrough](https://github.com/bradygaster/squad/blob/v1.1.0/docs/demo-agentic-sdlc-walkthrough.md)
+- [GitHub Workflow concept](https://github.github.com/squad/docs/concepts/github-workflow/)
+- [GitHub Issues Mode](https://github.github.com/squad/docs/features/github-issues/)
+- [Issue Templates](https://github.github.com/squad/docs/features/issue-templates/)
+- [Label Taxonomy](https://github.github.com/squad/docs/features/labels/)
+- [Project Boards](https://github.github.com/squad/docs/features/project-boards/)
+- [Issue-Driven Development scenario](https://github.github.com/squad/docs/scenarios/issue-driven-dev/)
+- [GitHub Issues Walkthrough](https://github.github.com/squad/docs/tour-github-issues/)
+- [Agentic SDLC demo walkthrough](https://github.com/github/squad/blob/v2.0.0/docs/demo-agentic-sdlc-walkthrough.md)

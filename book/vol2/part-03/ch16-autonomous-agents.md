@@ -7,7 +7,7 @@
 - Design an autonomous worker as a bounded task loop with explicit assignment, execution, coordination, reporting, and shutdown behavior.
 - Tell a deterministic SDK demonstration from an agent that actually invokes a model and changes files.
 - Make long-running work recoverable through durable task state, idempotency, leases, budgets, timeouts, and observable failure paths.
-- Understand what resilience primitives ship in Squad v1.1.0 and what the separate resilient-agent guide describes but the code does not implement.
+- Understand what resilience primitives ship in Squad v2.0.0 and what the separate resilient-agent guide describes but the code does not implement.
 - Embed a Squad team as a Microsoft Agent Framework `AIAgent` through the repository's `Squad.Agents.AI` .NET integration.
 - Choose between the CLI, TypeScript SDK, and .NET adapter based on the host application's requirements.
 
@@ -97,9 +97,9 @@ Use both per-task and per-run budgets. Cap the number of tasks, concurrent agent
 
 Track structured events with task ID, agent identity, attempt, duration, result class, model, token use, and estimated cost. Keep sensitive task content and credentials out of metric labels. Traces help connect a queue claim to an agent dispatch and a tool call; metrics show rates and queue health over time; logs preserve diagnostics. A successful response is not proof that the intended specialist actually ran—observe dispatch events or spans as well as output.
 
-## What “Resilience” Means in Squad v1.1.0
+## What “Resilience” Means in Squad v2.0.0
 
-The guide named “Building resilient agents” describes a generic breaker with `failureThreshold`, `successThreshold`, `timeWindow`, `initialBackoff`, and `maxBackoff`, including persistence across process restarts and an import from `@squad/resilience`. Those claims do not match the v1.1.0 source. The repository has no `@squad/resilience` package, no corresponding `resilience.circuitBreaker` config, and no generic persisted service breaker with that option set. Do not copy the JSON or import statement as if it were a supported v1.1.0 API.
+The guide named “Building resilient agents” describes a generic breaker with `failureThreshold`, `successThreshold`, `timeWindow`, `initialBackoff`, and `maxBackoff`, including persistence across process restarts and an import from `@squad/resilience`. Those claims do not match the v2.0.0 source. The repository has no `@squad/resilience` package, no corresponding `resilience.circuitBreaker` config, and no generic persisted service breaker with that option set. Do not copy the JSON or import statement as if it were a supported v2.0.0 API.
 
 There are real, narrower resilience mechanisms in the repository:
 
@@ -109,9 +109,9 @@ There are real, narrower resilience mechanisms in the repository:
 - `PredictiveCircuitBreaker` and related quota helpers in the Ralph rate-limiting module are a separate rate-limit forecasting/scheduling feature. The predictor uses the first and latest samples to estimate depletion; despite some comments and guide wording, it is not a general linear-regression breaker for arbitrary downstream calls.
 - `SquadClient` and session-management components provide connection/session lifecycle behavior covered in Chapter 14; apply their documented boundaries rather than assuming they make your whole worker durable.
 
-The reliable v1.1.0 guidance is therefore architectural: add application-level retry, state, timeout, circuit-breaker, and queue policy where your worker needs it; use SDK mechanisms only for the specific state or rate-limit scope they implement.
+The reliable v2.0.0 guidance is therefore architectural: add application-level retry, state, timeout, circuit-breaker, and queue policy where your worker needs it; use SDK mechanisms only for the specific state or rate-limit scope they implement.
 
-> **Preview:** The generic persisted circuit-breaker configuration and `@squad/resilience` example in the guide are not available in the v1.1.0 source. Treat them as unverified/forward-looking documentation, not stable API. Verify the package and API in a later tagged source before adopting them.
+> **Warning:** The generic persisted circuit-breaker configuration and `@squad/resilience` example in the guide are not shipped in v2.0.0: no package or code in the v2.0.0 tree implements them, and only the guide page mentions them. Treat them as unverified documentation, not stable API.
 
 ## Integrate a Squad Team with Microsoft Agent Framework
 
@@ -142,7 +142,7 @@ The adapter launches the Copilot CLI as a subprocess. The CLI must be installed 
 
 ### Permission configuration is a production decision
 
-The current `SquadAgent` config uses `PermissionHandler.ApproveAll` for the Copilot SDK permission request and passes `--allow-all` to the CLI unless the host already supplied one of the explicit permission-opening flags. The `ConfigureSession` callback can replace the SDK permission handler and other session settings. This behavior is convenient for local demos and trusted automated pipelines, but it is a broad grant of shell, filesystem, and URL permissions.
+The current `SquadAgent` config uses `PermissionHandler.ApproveAll` for the Copilot SDK permission request and passes `--allow-all` to the CLI unless the host already supplied one of the explicit permission-opening flags. That flag (and `--agent squad`) is injected only when `CliPath` points at a full Copilot CLI. With `CliPath` unset, the SDK launches its bundled `copilot-runtime` host, which rejects interactive-CLI flags, so `SquadAgent` instead selects the coordinator through session config discovery (`EnableConfigDiscovery = true`, `Agent = "Squad"`) and sets `RequestExtensions = false`; any `CliArgs` you add are still passed verbatim, so use only flags that runtime accepts. The `ConfigureSession` callback can replace the SDK permission handler and other session settings. This behavior is convenient for local demos and trusted automated pipelines, but it is a broad grant of shell, filesystem, and URL permissions.
 
 > **Warning:** Do not expose the default `ApproveAll` setup to an untrusted tenant or public endpoint. In production, decide which tools, paths, and URLs are needed; supply a restrictive `OnPermissionRequest` policy through `ConfigureSession`, review CLI permission flags, and run the process with operating-system privileges limited to the intended workspace. The session callback cannot undo a CLI-level permission grant by itself.
 
@@ -172,7 +172,7 @@ Compare your work with the companion tags `v2-ch16-start` and `v2-ch16-end` when
 
 ## Configuration Reference
 
-| Concern | v1.1.0 source or pattern | Scope and caveat |
+| Concern | v2.0.0 source or pattern | Scope and caveat |
 |---|---|---|
 | Task and queue states | Application-owned model | Persist status, attempt count, claim/lease, and checkpoint in the queue, not only in a prompt |
 | Task/agent loop | `CastingEngine`, routing helpers, or your own worker | The autonomous sample is simulated and sequential |
@@ -181,7 +181,7 @@ Compare your work with the companion tags `v2-ch16-start` and `v2-ch16-end` when
 | Telemetry | `TelemetryCollector`; `initSquadTelemetry()` when configured | Respect consent, data minimization, and exporter shutdown |
 | Git backend retry | SDK `state-backend.ts` | Three retries after the initial try; 100 ms exponential base, 2 s cap |
 | Git state circuit breaker | SDK `CircuitBreaker` | Five consecutive failures; 30 s cooldown; in-memory and scoped to Git operations |
-| General downstream breaker | Application-owned unless a later release documents it | The guide's `@squad/resilience` import/config is not present in v1.1.0 |
+| General downstream breaker | Application-owned unless a later release documents it | The guide's `@squad/resilience` import/config is not present in v2.0.0 |
 | .NET target frameworks | `Squad.Agents.AI.csproj` | `net8.0`, `net9.0`, and `net10.0`; source version is `1.0.0` |
 | Default .NET DI lifetime | `AddSquadAgent()` | Scoped; overloads accept another `ServiceLifetime` |
 | .NET team root | `SquadAgentOptions.SquadFolderPath` | Required when resolving the agent; configure explicitly or through connection string |
@@ -216,7 +216,7 @@ public static IServiceCollection AddSquadAgent(
 - **Retries make an outage worse:** classify errors, set a retry ceiling, use jitter, and open a dependency-specific circuit when repeated calls are failing.
 - **The agent claims it delegated work:** inspect actual spawn events or trace spans. The autonomous sample only logs some route examples; it does not call the route tool.
 - **Cost output looks precise:** the sample generates synthetic token counts and costs with `Math.random()`. Treat its report as demonstration data.
-- **`@squad/resilience` cannot be resolved:** that package/API is not present in the v1.1.0 source. Do not add a dependency based on the guide; use documented SDK features or implement application-specific controls.
+- **`@squad/resilience` cannot be resolved:** that package/API is not present in the v2.0.0 source. Do not add a dependency based on the guide; use documented SDK features or implement application-specific controls.
 - **NuGet package cannot be restored:** the repository source declares package version `1.0.0`, but source versioning is not proof that the package is published or reachable in your feed. Follow the repository's local pack instructions or verify the actual NuGet feed.
 - **Copilot CLI runtime is not found:** check CLI installation/PATH, package version, RID-specific native artifacts, and the container's architecture. Use `CliPath` when the executable location is known.
 - **Authentication fails:** sign in to the Copilot CLI for local development or use a secure supported token provider. Never embed credentials in the sample or image.
@@ -228,7 +228,7 @@ public static IServiceCollection AddSquadAgent(
 - Autonomy requires explicit task state, finite budgets, and safe recovery behavior—not just a loop.
 - The SDK autonomous-pipeline sample is a deterministic demonstration of casting, matching, streaming, cost, and telemetry; it does not perform live model work or durable queue orchestration.
 - Resilience requires idempotency, bounded retries, timeouts, leases, checkpoints, and terminal failure handling around your actual side effects.
-- v1.1.0 has retry and a circuit breaker for Git-backed state operations, but not the generic persisted `@squad/resilience` API described by one guide.
+- v2.0.0 has retry and a circuit breaker for Git-backed state operations, but not the generic persisted `@squad/resilience` API described by one guide.
 - `Squad.Agents.AI` bridges a Squad team into Microsoft Agent Framework's `AIAgent`; MAF owns its durable workflow checkpoint semantics.
 - Review permission defaults carefully: the current .NET adapter opens broad CLI permissions unless you deliberately override them.
 
@@ -245,21 +245,21 @@ public static IServiceCollection AddSquadAgent(
 1. Why is a task queue a better source of truth for autonomous job completion than the agent transcript alone?
 2. What makes a retry safe, and what should the worker do when a timed-out side effect may already have completed?
 3. Does the autonomous-pipeline sample execute real LLM calls for its tasks?
-4. What two default parameters describe the v1.1.0 state-backend circuit breaker, and what is its scope?
+4. What two default parameters describe the v2.0.0 state-backend circuit breaker, and what is its scope?
 5. Where does durable workflow checkpoint/restore behavior come from in the `Squad.Agents.AI` integration?
 6. What broad permission behavior should a production .NET host override or independently constrain?
 7. How do you verify that a specialist was truly dispatched rather than merely mentioned in output?
 
 ## Further Reading
 
-- [Build an autonomous agent](https://bradygaster.github.io/squad/docs/guide/build-autonomous-agent/)
-- [Building resilient agents](https://bradygaster.github.io/squad/docs/guide/building-resilient-agents/)
-- [Microsoft Agent Framework integration](https://bradygaster.github.io/squad/docs/guide/agent-framework-integration/)
-- [SDK integration reference](https://bradygaster.github.io/squad/docs/reference/integration/)
-- [`samples/autonomous-pipeline/`](https://github.com/bradygaster/squad/tree/v1.1.0/samples/autonomous-pipeline)
-- [`packages/squad-sdk/src/state-backend.ts`](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-sdk/src/state-backend.ts)
-- [`packages/squad-sdk/src/ralph/rate-limiting.ts`](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-sdk/src/ralph/rate-limiting.ts)
-- [`src/Squad.Agents.AI/README.md`](https://github.com/bradygaster/squad/blob/v1.1.0/src/Squad.Agents.AI/README.md)
-- [`src/Squad.Agents.AI/SquadAgent.cs`](https://github.com/bradygaster/squad/blob/v1.1.0/src/Squad.Agents.AI/SquadAgent.cs)
-- [`src/Squad.Agents.AI/SquadAgentOptions.cs`](https://github.com/bradygaster/squad/blob/v1.1.0/src/Squad.Agents.AI/SquadAgentOptions.cs)
-- [`src/Squad.Agents.AI/SquadServiceCollectionExtensions.cs`](https://github.com/bradygaster/squad/blob/v1.1.0/src/Squad.Agents.AI/SquadServiceCollectionExtensions.cs)
+- [Build an autonomous agent](https://github.github.com/squad/docs/guide/build-autonomous-agent/)
+- [Building resilient agents](https://github.github.com/squad/docs/guide/building-resilient-agents/)
+- [Microsoft Agent Framework integration](https://github.github.com/squad/docs/guide/agent-framework-integration/)
+- [SDK integration reference](https://github.github.com/squad/docs/reference/integration/)
+- [`samples/autonomous-pipeline/`](https://github.com/github/squad/tree/v2.0.0/samples/autonomous-pipeline)
+- [`packages/squad-sdk/src/state-backend.ts`](https://github.com/github/squad/blob/v2.0.0/packages/squad-sdk/src/state-backend.ts)
+- [`packages/squad-sdk/src/ralph/rate-limiting.ts`](https://github.com/github/squad/blob/v2.0.0/packages/squad-sdk/src/ralph/rate-limiting.ts)
+- [`src/Squad.Agents.AI/README.md`](https://github.com/github/squad/blob/v2.0.0/src/Squad.Agents.AI/README.md)
+- [`src/Squad.Agents.AI/SquadAgent.cs`](https://github.com/github/squad/blob/v2.0.0/src/Squad.Agents.AI/SquadAgent.cs)
+- [`src/Squad.Agents.AI/SquadAgentOptions.cs`](https://github.com/github/squad/blob/v2.0.0/src/Squad.Agents.AI/SquadAgentOptions.cs)
+- [`src/Squad.Agents.AI/SquadServiceCollectionExtensions.cs`](https://github.com/github/squad/blob/v2.0.0/src/Squad.Agents.AI/SquadServiceCollectionExtensions.cs)

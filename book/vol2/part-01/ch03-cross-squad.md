@@ -4,14 +4,16 @@
 
 ## What You'll Learn
 
-- Distinguish peer-squad discovery and issue delegation from upstream inheritance, SubSquads, personal multi-squad selection, and export/import.
+- Distinguish peer-squad discovery and issue delegation from upstream inheritance, SubSquads, and export/import.
 - Publish a valid `.squad/manifest.json` and register local peers with `squad registry`.
 - Trace `squad discover` and `squad delegate` through the SDK’s manifest functions to GitHub issue creation.
 - Design cross-squad boundaries around an explicit work contract, ownership, authentication, and completion feedback.
 - Understand the distributed-mesh skill’s pull-based model and the limits of Git/HTTP synchronization.
 - Use SubSquads to partition work within one project without mistaking a label filter for an independent Squad.
 
-> **Preview (Squad 2.0):** Personal squads and global mode were removed. Squad now resolves the project `.squad/` tree (or an explicitly supplied team root); it no longer discovers or reads a personal/global profile squad. Copy any still-needed material into a project team manually. See Chapter 18 and the [2.0 release notes](https://github.com/bradygaster/squad/blob/v2.0.0-preview.2/docs/src/content/docs/whatsnew.md).
+Every squad in this chapter is a project squad: Squad resolves the `.squad/` tree of the current project (or a team root you pass with `--team-root` or `SQUAD_TEAM_ROOT`), so “several squads” always means several projects or partitions of one.
+
+> **Note:** Changed in Squad 2.0: personal squads and global mode (`squad personal`, `--global`) were removed, along with the SDK’s `multi-squad.ts` registry of named personal squads. Copy anything you still need from a personal squad into a project team by hand. See Chapter 22 and the [2.0 release notes](https://github.com/github/squad/blob/v2.0.0/docs/src/content/docs/whatsnew.md).
 
 ## Why Coordinate at the Squad Boundary?
 
@@ -24,7 +26,7 @@ That contract needs at least four things:
 3. **An acceptance boundary:** what kind of request the peer agrees to receive.
 4. **A durable handoff artifact:** an issue or other tracked record with context and acceptance criteria.
 
-In v1.1.0, the core cross-squad CLI flow is intentionally modest: publish a manifest, discover configured peers, and create a labeled GitHub issue in a target repository. This is asynchronous work intake—not remote agent execution, shared memory, or a distributed RPC protocol.
+In v2.0.0, the core cross-squad CLI flow is intentionally modest: publish a manifest, discover configured peers, and create a labeled GitHub issue in a target repository. This is asynchronous work intake—not remote agent execution, shared memory, or a distributed RPC protocol.
 
 ```mermaid
 flowchart LR
@@ -105,7 +107,7 @@ Labels should support receiving-side triage rather than encode every detail. Pre
 
 The SDK exports helpers for constructing `gh` arguments and parsing issue status, but the inspected CLI command currently implements issue creation only. A manifest can declare `prs` as an accepted type, yet `squad delegate` rejects targets that do not accept `issues` and always uses `gh issue create`. Do not advertise PR delegation as active just because the schema can list `prs`.
 
-> **Note:** The assigned cross-squad guides mention `squad delegate remove`, `--file` delegation, PR creation, automatic completion notification, capability-based routing, and a local discovery cache. Those details are not implemented by the v1.1.0 `cross-squad.ts` command path inspected here. The verified CLI accepts a squad name and description and creates a GitHub issue.
+> **Note:** The assigned cross-squad guides mention `squad delegate remove`, `--file` delegation, PR creation, automatic completion notification, capability-based routing, and a local discovery cache. Those details are not implemented by the v2.0.0 `cross-squad.ts` command path inspected here. The verified CLI accepts a squad name and description and creates a GitHub issue.
 
 
 ## Ownership, Feedback, and Failure Handling
@@ -129,15 +131,12 @@ Capability design should be concrete and maintainable. A term such as `backend` 
 | Ask a peer repository to take bounded work | Manifest + discover/delegate | Issue contract and routing labels | Does not run the peer’s agent or share live memory. |
 | Reuse organization policy downward | Upstream module | Skills, policy, selected knowledge as read-only inheritance | Does not create a peer work request. |
 | Partition issue work inside one repository | SubSquads | Label/folder/workflow scope | Does not create fully separate team state or repo ownership. |
-| Select among personal squads on one machine | SDK multi-squad module | Which global personal `.squad/` directory is active | Not cross-repository discovery or remote delegation. |
 | Transfer trained knowledge once | Export/import or manual skill cherry-pick | Snapshot of configuration/knowledge | Not continuous synchronization. |
 | Coordinate current status across repositories/machines | Distributed-mesh skill pattern | Published summaries/state files after sync | Not real-time messaging, RPC, or transactional shared state. |
 
-### Personal multiple squads
+### Several watchers on one squad
 
-`packages/squad-sdk/src/multi-squad.ts` implements a global registry of named personal squads. It keeps `squads.json` under the platform-specific global Squad root and stores squad directories under `squads/<name>/`. The resolution order is explicit function argument, `SQUAD_NAME`, the `active` field, then `default`; legacy `~/.squad` is registered as `default` when migration is needed. The module provides `createSquad`, `listSquads`, `switchSquad`, `deleteSquad`, and path resolution.
-
-This mechanism is about a user’s personal Squad configuration, not the peer manifest network. It is also important to distinguish implementation from supported public surface: the inspected `packages/squad-sdk/src/index.ts` does not re-export `multi-squad.ts`, and the CLI help does not expose a matching `squad multi-squad` command. Treat it as internal SDK implementation unless your application imports the module through a supported package subpath or a later release documents it.
+One more case looks like “multiple squads” but is not. Several machines can run `squad watch` against the same project squad, for example two build agents draining one backlog. That is still one team with one `.squad/`. What keeps the watchers from picking up the same issue is a work claim (`squad watch --claims git-ref`, off by default), which Chapter 9 (Volume 1) and the ADR-002 discussion in Chapter 17 explain. Reach for claims when you want more throughput from one team, and for peer delegation when the work belongs to a different team.
 
 ### Export/import is a snapshot
 
@@ -161,7 +160,7 @@ sequenceDiagram
 
 The method is intentionally eventual and pull-based. It does not require persistent agents, a broker, or real-time event delivery. Each squad owns its own directory; that write partitioning is the main conflict-avoidance mechanism. A reader should treat synced summaries as potentially stale, include timestamps or revision identifiers, and confirm critical dependencies with the peer’s canonical system.
 
-In v1.1.0, the distributed mesh appears as an installable skill with bundled Bash and PowerShell sync scripts. It is a recipe for producing `mesh.json` and configuring Git/HTTP synchronization, not the same thing as the core cross-squad CLI protocol. Bash prerequisites include Git and `jq`; the PowerShell script is described as requiring Git. Cross-organization HTTP sources should be public or otherwise accessible to the sync process; the skill does not create authentication, authorization, or a federation service for you.
+In v2.0.0, the distributed mesh appears as an installable skill with bundled Bash and PowerShell sync scripts. It is a recipe for producing `mesh.json` and configuring Git/HTTP synchronization, not the same thing as the core cross-squad CLI protocol. Bash prerequisites include Git and `jq`; the PowerShell script is described as requiring Git. Cross-organization HTTP sources should be public or otherwise accessible to the sync process; the skill does not create authentication, authorization, or a federation service for you.
 
 Use the mesh only for data that is safe and useful to publish. Do not mirror full agent transcripts or secrets into a shared state repo. Keep the state summary deliberately small: current work, decisions that affect peers, interface changes, known blockers, timestamps, and links to canonical issues. A mesh state repository is a rendezvous store, not necessarily a Squad project or an authoritative data model.
 
@@ -266,14 +265,13 @@ Expected result: the root Squad can discover the web capability while retaining 
 | `.squad/workstreams.json` | SubSquad config | `workstreams`, `defaultWorkflow`; each entry needs `name`, `labelFilter`. |
 | `SQUAD_TEAM` | Select active SubSquad | Takes precedence over `.squad-workstream`. |
 | `.squad-workstream` | Local SubSquad selector | Gitignored activation marker written by `squad subsquads activate`. |
-| Global `squads.json` | Named personal Squads | Used by SDK `multi-squad.ts`; distinct from repo peer registry. |
 | `mesh.json` | Distributed-mesh skill output | Skill pattern and scripts, not core cross-squad CLI config. |
 
 ## Under the Hood
 
 `packages/squad-sdk/src/runtime/cross-squad.ts` validates and reads manifests, discovers from upstream and registry sources, deduplicates by name, formats the table, and builds `gh issue create` argument arrays. `packages/squad-cli/src/cli/commands/cross-squad.ts` handles user-facing validation and executes `gh` with `execFile`, so the issue body and title are passed as arguments rather than interpolated into a shell command string. The operation still trusts manifest content and current process credentials; inspect the destination and request before delegating.
 
-`packages/squad-sdk/src/multi-squad.ts` is a different facility for global named personal squads. `packages/squad-sdk/src/sharing/` contains snapshot-oriented export/import and related sharing utilities; those do not establish continuous peer sync. `packages/squad-sdk/src/streams/` resolves SubSquad selection from configuration and local/environment selectors. Meanwhile, the mesh skill lives under `packages/squad-sdk/templates/skills/distributed-mesh/` with prebuilt sync scripts.
+`packages/squad-sdk/src/sharing/` contains snapshot-oriented export/import and related sharing utilities; those do not establish continuous peer sync. `packages/squad-sdk/src/streams/` resolves SubSquad selection from configuration and local/environment selectors. Meanwhile, the mesh skill lives under `packages/squad-sdk/templates/skills/distributed-mesh/` with prebuilt sync scripts.
 
 The manifest registry is intentionally small. The SDK’s `buildDelegationArgs()` adds a standard label if missing and appends each custom label as a separate `--label` option. The CLI then requires `accepts` to contain `issues` before invoking GitHub CLI. A capability field is descriptive today: it is displayed but not used to auto-select a target.
 
@@ -292,13 +290,13 @@ The manifest registry is intentionally small. The SDK’s `buildDelegationArgs()
 
 ## Summary
 
-Cross-squad collaboration works best when every handoff has a clear destination, acceptance contract, bounded scope, and return path. Squad v1.1.0’s manifest + registry + `discover`/`delegate` flow supports discovery and GitHub issue creation; it does not remotely execute another Squad or automatically share its memory. SubSquads divide work within one project, named personal Squads select local state, export/import moves snapshots, and the distributed-mesh skill publishes summaries across machines. These mechanisms complement one another but solve distinct problems—choose the smallest one that matches the required ownership and consistency model.
+Cross-squad collaboration works best when every handoff has a clear destination, acceptance contract, bounded scope, and return path. Squad v2.0.0’s manifest + registry + `discover`/`delegate` flow supports discovery and GitHub issue creation; it does not remotely execute another Squad or automatically share its memory. SubSquads divide work within one project, export/import moves snapshots, and the distributed-mesh skill publishes summaries across machines. These mechanisms complement one another but solve distinct problems—choose the smallest one that matches the required ownership and consistency model.
 
 ## Exercises
 
 1. Design a manifest for a platform Squad that accepts only issues about Kubernetes and observability. Identify which facts the current CLI validates and which require your own policy checks.
 2. Trace the exact steps from `squad delegate` to a new GitHub issue. List the local, remote, and authentication preconditions.
-3. For each of these needs, choose peer delegation, upstream inheritance, SubSquads, personal multi-squad selection, export/import, or mesh: (a) a one-time transfer of a testing skill; (b) a cross-repo service request; (c) two issue queues in one monorepo; (d) current CI status visible to a squad in another org.
+3. For each of these needs, choose peer delegation, upstream inheritance, SubSquads, export/import, or mesh: (a) a one-time transfer of a testing skill; (b) a cross-repo service request; (c) two issue queues in one monorepo; (d) current CI status visible to a squad in another org.
 4. Explain why a mesh should publish a small summary rather than complete agent histories. Include consistency and information exposure in your answer.
 5. Create a SubSquad definition for the Tasktrack `api/` and `web/` folders. State how `SQUAD_TEAM`, `.squad-workstream`, and the one-entry auto-selection rule affect which partition is active.
 
@@ -311,16 +309,14 @@ Cross-squad collaboration works best when every handoff has a clear destination,
 5. Why does `accepts: ["prs"]` not guarantee that a pull request can be delegated?
 6. How is a SubSquad different from a separate peer Squad?
 7. What does the distributed-mesh skill add, and what consistency model should readers expect?
-8. What does `multi-squad.ts` manage, and why should you not confuse it with peer discovery?
 
 ## Further Reading
 
-- [Cross-Squad Orchestration](https://github.com/bradygaster/squad/blob/v1.1.0/docs/features/cross-squad-orchestration.md)
-- [Cross-Squad Discover & Delegate](https://bradygaster.github.io/squad/docs/features/cross-squad-discover/)
-- [Distributed Mesh](https://bradygaster.github.io/squad/docs/features/distributed-mesh/)
-- [Multiple Squads Scenario](https://bradygaster.github.io/squad/docs/scenarios/multiple-squads/)
-- [`packages/squad-sdk/src/runtime/cross-squad.ts`](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-sdk/src/runtime/cross-squad.ts)
-- [`packages/squad-sdk/src/multi-squad.ts`](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-sdk/src/multi-squad.ts)
-- [`packages/squad-sdk/src/sharing/`](https://github.com/bradygaster/squad/tree/v1.1.0/packages/squad-sdk/src/sharing)
-- [`packages/squad-sdk/src/streams/`](https://github.com/bradygaster/squad/tree/v1.1.0/packages/squad-sdk/src/streams)
-- [`packages/squad-sdk/templates/skills/distributed-mesh/`](https://github.com/bradygaster/squad/tree/v1.1.0/packages/squad-sdk/templates/skills/distributed-mesh)
+- [Cross-Squad Orchestration](https://github.com/github/squad/blob/v2.0.0/docs/features/cross-squad-orchestration.md)
+- [Cross-Squad Discover & Delegate](https://github.github.com/squad/docs/features/cross-squad-discover/)
+- [Distributed Mesh](https://github.github.com/squad/docs/features/distributed-mesh/)
+- [Multiple Squads Scenario](https://github.github.com/squad/docs/scenarios/multiple-squads/)
+- [`packages/squad-sdk/src/runtime/cross-squad.ts`](https://github.com/github/squad/blob/v2.0.0/packages/squad-sdk/src/runtime/cross-squad.ts)
+- [`packages/squad-sdk/src/sharing/`](https://github.com/github/squad/tree/v2.0.0/packages/squad-sdk/src/sharing)
+- [`packages/squad-sdk/src/streams/`](https://github.com/github/squad/tree/v2.0.0/packages/squad-sdk/src/streams)
+- [`packages/squad-sdk/templates/skills/distributed-mesh/`](https://github.com/github/squad/tree/v2.0.0/packages/squad-sdk/templates/skills/distributed-mesh)

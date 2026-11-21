@@ -95,16 +95,16 @@ Plan the migration from [old system] to [new system]. Inventory callers, data fo
 ### SDK extension
 
 ```text
-Add an SDK extension that [behavior] using the public v1.1.0 API. Before coding, inspect exported types and examples; do not rely on private runtime modules. Include a usage example, API-level tests, and an error-path test. Keep host-specific behavior behind an adapter and state any compatibility limits.
+Add an SDK extension that [behavior] using the public v2.0.0 API. Before coding, inspect exported types and examples; do not rely on private runtime modules. Include a usage example, API-level tests, and an error-path test. Keep host-specific behavior behind an adapter and state any compatibility limits.
 ```
 
 ## Prompt finishing checklist
 
 Before sending a large request, name the repository and desired outcome; list measurable acceptance criteria; identify files or APIs that must not change; specify whether the team should plan, implement, or only review; separate independent work from dependent decisions; state who may approve labels, merges, and releases; request evidence (tests, commands, source paths) and uncertainties; and choose a stop condition so parallel workers do not expand scope indefinitely.
 
-## Squad 2.0 (Preview): Multi-Host Prompts
+## Multi-Host Prompts
 
-> **Preview:** These prompts target Squad `v2.0.0-preview.2`. Host support varies, so each prompt asks Squad to report and respect actual capabilities instead of assuming parity.
+Squad 2.0 projects one team into several hosts (Volume 2, Part IV). Host support varies, so each prompt below asks Squad to report and respect actual capabilities instead of assuming parity.
 
 ### Project the same team to two hosts
 
@@ -122,4 +122,16 @@ Implement [bounded feature] using the shared Squad team in this repository. Befo
 
 ```text
 Compare the configured Copilot and [second host] projections for this project. Check the generated coordinator and MCP files, then use the Squad 2.0 host feature matrix to identify which of [specific capability] is supported, degraded, unsupported, or merely untested on each. Do not modify either projection. Separate static/test evidence from live-host evidence and list the safest fallback for the unsupported case.
+```
+
+### Cast the team in Claude Code
+
+```text
+Cast a team for this repository from .squad/team.md and the project context: propose names and roles, wait for my approval, then add each member with `squad cast --name <name> --role <role>`. Do not hand-write charters or edit .squad/casting/. If a cast is denied, stop and tell me what to allow instead of retrying variants. When you finish, run `squad client sync` so the Claude member subagents match the roster, and show me the updated team.md.
+```
+
+### Watch the team work
+
+```text
+Run this task with the team: [bounded task]. Dispatch members for independent parts in parallel where the work allows it, and keep the reviewer gate. I will watch the run with `squad dashboard` (or `/squad:dashboard`), so name each member you dispatch and say why. At the end, list each member's result and anything still waiting for my sign-off.
 ```

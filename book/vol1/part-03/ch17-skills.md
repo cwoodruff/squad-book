@@ -8,7 +8,7 @@
 - Author a focused `tasktrack-api-conventions` skill with frontmatter and concrete examples grounded in the companion project.
 - Discover and match skills through the SDK’s loader, `SkillRegistry`, and pluggable local/GitHub sources.
 - Apply confidence metadata carefully and distinguish it from a confidence engine that automatically validates the skill.
-- Assess the v1.1.0 skill-security and marketplace surfaces, including important gaps between documentation and shipped code.
+- Assess the v2.0.0 skill-security and marketplace surfaces, including important gaps between documentation and shipped code.
 
 ## A Skill Is a Reusable Technique
 
@@ -51,7 +51,7 @@ In the current SDK loader, the content that becomes `SkillDefinition.content` is
 
 ### Keep the frontmatter parser in mind
 
-`parseFrontmatter()` normalizes line endings, expects opening and closing `---` delimiters, and parses the first colon on each frontmatter line. Inline arrays such as `[api, route, endpoint]` are split on commas. This is intentionally a small YAML-like parser, not a complete YAML implementation: do not rely on nested objects, multiline YAML values, quoted-comma arrays, or full YAML escaping. Keep values simple and test the file through the same loader your runtime uses.
+`parseFrontmatter()` normalizes line endings, expects opening and closing `---` delimiters, and parses the first colon on each frontmatter line. Inline arrays such as `[api, route, endpoint]` are split on commas. Since 2.0 it also reads YAML block sequences (a key with an empty value followed by `  - item` lines) and strips one pair of matching quotes from scalars and array items, so `name: "Tasktrack API"` and `triggers:` with a `- api` list both work. It is still a small YAML-like parser, not a complete YAML implementation: do not rely on nested objects, multiline YAML values, commas inside quoted array items, or full YAML escaping. Keep values simple and test the file through the same loader your runtime uses.
 
 If the frontmatter is missing, the body remains the raw content and metadata stays empty. A skill with a body can still be parsed: its id becomes the fallback name, domain becomes `general`, and triggers/roles become empty lists. A blank body returns no `SkillDefinition`. The directory loader looks for child directories containing exactly `SKILL.md`; it skips missing or malformed entries rather than failing the entire scan. Treat “skipped” as a discovery problem to investigate, not proof that the file is valid.
 
@@ -109,9 +109,11 @@ This second view emphasizes that matching produces a ranked suggestion. It does 
 
 This source registry and `SkillRegistry` have different jobs. The source registry resolves where the material comes from. The skill registry holds already parsed definitions and computes simple relevance matches. Neither one is a complete cloud marketplace or an automatic organization-wide policy system.
 
-### Paths differ across v1.1.0 integrations
+### Paths differ across v2.0.0 integrations
 
-Path conventions are not fully uniform in the v1.1.0 source. The docs describe `.copilot/skills/{name}/SKILL.md`; the SDK local source also prefers `.copilot/skills/`, with legacy `.squad/skills/` fallback. But the current Squad templates and upgrade migration use `.github/skills/` for Squad-owned prompt skills. The APM-oriented `squad skill` CLI reads and writes lowercase `skill.md` under `.copilot/skills/` (or `.squad/skills/` fallback). Therefore, do not assume that a file in one convention will automatically be discovered by every other integration. Follow the specific tool’s expected path and filename, and check the initialized project for its actual convention.
+Path conventions are not fully uniform in the v2.0.0 source. The docs describe `.copilot/skills/{name}/SKILL.md`; the SDK local source also prefers `.copilot/skills/`, with legacy `.squad/skills/` fallback. But the current Squad templates and upgrade migration use `.github/skills/` for Squad-owned prompt skills. The APM-oriented `squad skill` CLI reads and writes lowercase `skill.md` under `.copilot/skills/` (or `.squad/skills/` fallback). Therefore, do not assume that a file in one convention will automatically be discovered by every other integration. Follow the specific tool’s expected path and filename, and check the initialized project for its actual convention.
+
+If your project also uses Claude Code, Squad projects its template skills into `.claude/skills/<name>/SKILL.md` for that host, skipping any template that a team skill of the same name overrides. That changes where Claude Code discovers the skills, not what they are allowed to do. This volume stays on the Copilot path; Chapter 20 (Volume 2) covers the Claude projection.
 
 ## Skills, Marketplace, and Safety
 
@@ -123,7 +125,7 @@ The SDK’s `GitHubSkillSource` makes the trust boundary concrete. It depends on
 
 ### The skill security scanner: verify the implementation
 
-The documentation page titled “Skill Security Scanner” describes `scripts/security-review.mjs --scope skills` and `--file` modes that scan Markdown skills for embedded secrets, download-and-execute commands, and privilege escalation. That interface and behavior are not present in the v1.1.0 source. The stable script accepts a base ref and head ref, examines changed lines in a pull request diff, and reports several general security categories; it has no `--scope skills` or `--file` option and its documented script exit behavior is informational. It does not scan every installed skill file as the docs page describes.
+The documentation page titled “Skill Security Scanner” describes `scripts/security-review.mjs --scope skills` and `--file` modes that scan Markdown skills for embedded secrets, download-and-execute commands, and privilege escalation. That interface and behavior are not present in the v2.0.0 source. The stable script accepts a base ref and head ref, examines changed lines in a pull request diff, and reports several general security categories; it has no `--scope skills` or `--file` option and its documented script exit behavior is informational. It does not scan every installed skill file as the docs page describes.
 
 The SDK’s `marketplace/security.ts` is also not a skill-Markdown scanner. It validates **remote agent definitions** using seven rules: prompt-injection patterns and suspicious tool requests can block; potential PII in a charter, broad permission language, unknown source, missing charter, and excessive tools produce warnings. Its `quarantineAgent()` removes selected patterns from an agent charter and strips suspicious tool names. Those rules do not provide comprehensive skill security, and they should not be applied as if they were a validator for executable skill scripts.
 
@@ -131,9 +133,9 @@ A related runtime boundary is more important than a reassuring scanner name: `Sk
 
 ### Marketplace modules are SDK building blocks, not a production storefront
 
-The marketplace feature page describes a broad ecosystem—export/import, agent repositories, versions, caching, browse/install, and security. The v1.1.0 SDK’s exported `marketplace` module is more limited and should be read as a set of types and reference utilities:
+The marketplace feature page describes a broad ecosystem—export/import, agent repositories, versions, caching, browse/install, and security. The v2.0.0 SDK’s exported `marketplace` module is more limited and should be read as a set of types and reference utilities:
 
-| Module | What the v1.1.0 source does | Important limit |
+| Module | What the v2.0.0 source does | Important limit |
 |---|---|---|
 | `marketplace/index.ts` | Exports manifest types, browser, backend, packaging, security, and extension adapter APIs | Exporting an API does not imply a hosted service |
 | `schema.ts` | Filters, sorts, paginates, and validates entries | Query is simple substring/category/tag matching |
@@ -145,11 +147,11 @@ The marketplace feature page describes a broad ecosystem—export/import, agent 
 
 `MarketplaceManifest` contains name, version, description, author, repository, categories, tags, icon, screenshots, and a pricing object. Categories include productivity, development, testing, devops, documentation, security, and other. Manifest validation checks slug/version shape and required fields, with warnings for short descriptions or empty tags/screenshots. `MarketplaceBrowser.search()` delegates to schema search, where sorting can use downloads, rating, name, or recent update, and pagination is bounded to 1–100 results per page. `MarketplaceBackend.publishEntry()` rejects duplicate ids and invalid entries and stores accepted entries in memory; it does not upload to a real marketplace.
 
-The docs mention `AgentCache`, TTL constants, and semantic-version helpers such as `parseSemVer()` and `bumpVersion()`. Those identifiers do not appear in the v1.1.0 `packages/squad-sdk/src/marketplace/` module. Similarly, examples using `browser.search({ text, category, sort: 'downloads' })` do not match the shipped query schema, which uses `query`, category, tags, sort, page, and perPage. Treat these docs as broader or newer roadmap material, not as stable release API. The actual marketplace module exports and generated types are the authority for code targeting the tag.
+The docs mention `AgentCache`, TTL constants, and semantic-version helpers such as `parseSemVer()` and `bumpVersion()`. Those identifiers do not appear in the v2.0.0 `packages/squad-sdk/src/marketplace/` module. Similarly, examples using `browser.search({ text, category, sort: 'downloads' })` do not match the shipped query schema, which uses `query`, category, tags, sort, page, and perPage. Treat these docs as broader or newer roadmap material, not as stable release API. The actual marketplace module exports and generated types are the authority for code targeting the tag.
 
 ### Do not conflate marketplace types with CLI installation
 
-There are multiple distribution ideas in the repository. The `squad skill` CLI provides an APM-oriented `publish`, `install`, and `list` implementation, although `squad skill --help` in v1.1.0 does not provide detailed subcommand help. It uses `apm.yml` and GitHub CLI access for repository-based installation. Its skills use lowercase `skill.md` under `.copilot/skills/` or the legacy `.squad/skills/` path. Its `publish` command emits a manifest; it does not host or publish directly to an APM registry.
+There are multiple distribution ideas in the repository. The `squad skill` CLI provides an APM-oriented `publish`, `install`, and `list` implementation, although `squad skill --help` in v2.0.0 does not provide detailed subcommand help. It uses `apm.yml` and GitHub CLI access for repository-based installation. Its skills use lowercase `skill.md` under `.copilot/skills/` or the legacy `.squad/skills/` path. Its `publish` command emits a manifest; it does not host or publish directly to an APM registry.
 
 The separate `squad plugin marketplace add|remove|list|browse` command registers GitHub repository sources for plugins, then browses top-level directories. That plugin marketplace registry is not the SDK’s typed `MarketplaceBrowser`, and it is not the skill-security scanner. Know which surface your task is using before assuming a skill can be installed from a marketplace with one unified command.
 
@@ -238,7 +240,7 @@ After an architecture change, ask the relevant specialist to re-check the skill�
 | SDK local discovery path | `.copilot/skills/{name}/SKILL.md`, fallback `.squad/skills/` | `LocalSkillSource` selects `.copilot/skills/` if that directory exists |
 | SDK directory loader | A directory with child folders containing `SKILL.md` | Caller supplies the directory; the loader does not enforce one fixed project path |
 | APM CLI skill file | `.copilot/skills/{name}/skill.md` or `.squad/skills/{name}/skill.md` | Lowercase filename in the CLI implementation |
-| Frontmatter arrays | `triggers: [api, route]` / `roles: [backend]` | Simple comma-separated inline list; no full YAML support |
+| Frontmatter arrays | `triggers: [api, route]` / `roles: [backend]`, or a block sequence of `- item` lines | Inline lists split on commas; block sequences and quoted values parse since 2.0; no full YAML support |
 | Registry trigger score | +0.5 per hit, capped at 0.7 | Case-insensitive substring matching |
 | Registry role score | +0.3 on case-insensitive role match | Only if a task already has a trigger or role match |
 | `confidence` | `low`, `medium`, `high` convention | No automatic progression in `SkillRegistry` |
@@ -266,17 +268,17 @@ export interface SkillDefinition {
 
 The repository also has a distinct executable skill-script mechanism. `skill-script-loader.ts` scans backend `scripts/` directories, maps filenames to `squad_*` tool names, verifies that each module exports a default function, obtains the tool schema, and wraps calls with telemetry. It optionally imports `lifecycle.js` for `init` and `dispose` hooks. Path containment checks constrain the resolved skill directory to the project or team root, but do not sandbox trusted code after it has loaded.
 
-The marketplace implementation is exported through `packages/squad-sdk/src/marketplace/index.ts`, which re-exports `MarketplaceBrowser`, `MarketplaceBackend`, schema search/validation, package utilities, security helpers, and extension adapters. Read the implementation files when targeting v1.1.0: the fetcher and in-memory backend are extension seams, not evidence that a remote catalog or package installer is deployed.
+The marketplace implementation is exported through `packages/squad-sdk/src/marketplace/index.ts`, which re-exports `MarketplaceBrowser`, `MarketplaceBackend`, schema search/validation, package utilities, security helpers, and extension adapters. Read the implementation files when targeting v2.0.0: the fetcher and in-memory backend are extension seams, not evidence that a remote catalog or package installer is deployed.
 
 ## Pitfalls and Troubleshooting
 
 - **Making a skill too broad:** split reusable patterns by task domain so triggers remain meaningful and the body stays maintainable.
 - **Assuming the registry is an LLM matcher:** matching is deterministic keyword substring plus role affinity; ambiguous cases require better triggers or explicit loading.
 - **Assuming confidence is enforced:** `confidence` can be documented in frontmatter, but the registry neither validates it nor promotes it automatically.
-- **Using complex YAML:** the loader parses a small subset. Keep frontmatter simple, arrays inline, and the body non-empty.
-- **Using the wrong case or path:** SDK `SKILL.md`, APM CLI `skill.md`, templates `.github/skills`, and local source `.copilot/skills` differ in v1.1.0. Test the consumer that will load the skill.
+- **Using complex YAML:** the loader parses a small subset (inline arrays, block sequences, quoted scalars). Keep frontmatter simple, avoid nesting, and keep the body non-empty.
+- **Using the wrong case or path:** SDK `SKILL.md`, APM CLI `skill.md`, templates `.github/skills`, and local source `.copilot/skills` differ in v2.0.0. Test the consumer that will load the skill.
 - **Assuming malformed files fail loudly:** directory scans skip unreadable/malformed files; confirm the loaded count and inspect the path.
-- **Copying marketplace examples verbatim:** several documented APIs and options do not exist in the v1.1.0 marketplace source. Verify types and exports before integrating.
+- **Copying marketplace examples verbatim:** several documented APIs and options do not exist in the v2.0.0 marketplace source. Verify types and exports before integrating.
 - **Calling `MarketplaceBrowser.install()` an installer:** it requests package bytes and reports metadata but does not deploy them.
 - **Trusting a “security scanner” label:** the skill scanner docs’ flags and checks are not present in stable code. The general PR scanner and remote-agent validator are different tools with different inputs.
 - **Loading executable handlers from unknown sources:** handler scripts run as code with process trust; markdown review alone is insufficient.
@@ -285,14 +287,14 @@ The marketplace implementation is exported through `packages/squad-sdk/src/marke
 
 ## Summary
 
-A good skill is focused, evidence-based, and easy for the right task to discover. `SKILL.md` frontmatter gives the SDK simple triggers and role affinity; the registry scores those hints deterministically and exposes the body for loading. Confidence is a convention, not an automatic proof process. Squad v1.1.0 has several skill and marketplace integrations, but their paths and capabilities differ: template skills, SDK discovery, APM CLI files, plugin marketplace registration, and typed marketplace modules are not one interchangeable system. Validate the specific loader, review executable scripts as code, and do not rely on scanner or storefront behavior that the tagged source does not implement.
+A good skill is focused, evidence-based, and easy for the right task to discover. `SKILL.md` frontmatter gives the SDK simple triggers and role affinity; the registry scores those hints deterministically and exposes the body for loading. Confidence is a convention, not an automatic proof process. Squad v2.0.0 has several skill and marketplace integrations, but their paths and capabilities differ: template skills, SDK discovery, APM CLI files, plugin marketplace registration, and typed marketplace modules are not one interchangeable system. Validate the specific loader, review executable scripts as code, and do not rely on scanner or storefront behavior that the tagged source does not implement.
 
 ## Exercises
 
 1. **Tighten discovery.** Choose five task phrases for the Tasktrack skill. Pick triggers that cover the task without matching unrelated conversations; explain how substring matching could create a false positive.
 2. **Author a skill.** Write a new `SKILL.md` for a test-only convention. Include simple frontmatter, two role affinities, three triggers, and a body that points to the source of truth.
 3. **Score a match.** Given a skill with triggers `[api, status, endpoint]` and roles `[backend, tester]`, calculate its score for task “Update the status endpoint” and role `backend` using the registry algorithm.
-4. **Audit the release surface.** Identify three differences between the skills/marketplace docs and the v1.1.0 implementation. For each, state which source you would trust when writing a program.
+4. **Audit the release surface.** Identify three differences between the skills/marketplace docs and the v2.0.0 implementation. For each, state which source you would trust when writing a program.
 5. **Security review.** Explain why scanning Markdown for suspicious commands does not establish that a skill’s `scripts/` directory is safe. List two review measures for executable skill handlers.
 
 ## Quiz
@@ -307,6 +309,6 @@ A good skill is focused, evidence-based, and easy for the right task to discover
 
 ## Further Reading
 
-- [Skills system](https://bradygaster.github.io/squad/docs/features/skills/)
-- [Skill security scanner](https://bradygaster.github.io/squad/docs/features/skill-security-scanner/)
-- [Marketplace guide](https://bradygaster.github.io/squad/docs/features/marketplace/)
+- [Skills system](https://github.github.com/squad/docs/features/skills/)
+- [Skill security scanner](https://github.github.com/squad/docs/features/skill-security-scanner/)
+- [Marketplace guide](https://github.github.com/squad/docs/features/marketplace/)

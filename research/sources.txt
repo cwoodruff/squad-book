@@ -1,4 +1,5 @@
 docs/README.md
+docs/SQUAD-2.0-OVERVIEW.md
 docs/_internal/specs/memory-format.md
 docs/_internal/specs/platform-adapter-prd.md
 docs/_internal/specs/streams-prd.md
@@ -13,10 +14,15 @@ docs/features/watch-next-gen.md
 docs/migration/teams-async-adapter.md
 docs/open-issue-runtime-identity-beacon.md
 docs/specification/README.md
+docs/specification/adr-001-client-control-execution-boundary.md
+docs/specification/adr-002-work-claims-and-external-queues.md
+docs/specification/adr-003-host-neutral-canonical-coordinator.md
 docs/specification/artifact-inventory.md
 docs/specification/automation-v0.1.md
 docs/specification/ceremony-v0.1.md
 docs/specification/charter-v0.1.md
+docs/specification/client-backend-decoupling-v0.2.md
+docs/specification/client-harness-adapters-v0.2.md
 docs/specification/configuration-casting-v0.1.md
 docs/specification/coordination-handoff-v0.1.md
 docs/specification/core-v0.1.md
@@ -35,14 +41,15 @@ docs/src/content/docs/concepts/github-workflow.md
 docs/src/content/docs/concepts/memory-and-knowledge.md
 docs/src/content/docs/concepts/parallel-work.md
 docs/src/content/docs/concepts/portability.md
+docs/src/content/docs/concepts/squad-2-0-architecture.md
 docs/src/content/docs/concepts/what-is-squad.md
 docs/src/content/docs/concepts/your-team.md
 docs/src/content/docs/cookbook/recipes.md
 docs/src/content/docs/features/built-in-roles.md
 docs/src/content/docs/features/capability-routing.md
 docs/src/content/docs/features/ceremonies.md
+docs/src/content/docs/features/claude-code-plugin.md
 docs/src/content/docs/features/cleanup.md
-docs/src/content/docs/features/consult-mode.md
 docs/src/content/docs/features/context-hygiene.md
 docs/src/content/docs/features/coordinator-as-agent-export.md
 docs/src/content/docs/features/copilot-coding-agent.md
@@ -117,7 +124,6 @@ docs/src/content/docs/guide/extensibility.md
 docs/src/content/docs/guide/faq.md
 docs/src/content/docs/guide/gh-aw.md
 docs/src/content/docs/guide/github-auth-setup.md
-docs/src/content/docs/guide/personal-squad.md
 docs/src/content/docs/guide/sample-prompts.md
 docs/src/content/docs/guide/shell.md
 docs/src/content/docs/guide/tips-and-tricks.md
@@ -129,6 +135,7 @@ docs/src/content/docs/reference/config.md
 docs/src/content/docs/reference/container-image.md
 docs/src/content/docs/reference/coordinator-restraint.md
 docs/src/content/docs/reference/glossary.md
+docs/src/content/docs/reference/host-feature-matrix.md
 docs/src/content/docs/reference/integration.md
 docs/src/content/docs/reference/plugin-security.md
 docs/src/content/docs/reference/result-persistence.md
@@ -151,6 +158,7 @@ docs/src/content/docs/scenarios/large-codebase.md
 docs/src/content/docs/scenarios/mid-project.md
 docs/src/content/docs/scenarios/monorepo.md
 docs/src/content/docs/scenarios/multi-codespace.md
+docs/src/content/docs/scenarios/multi-machine-watch.md
 docs/src/content/docs/scenarios/multiple-squads.md
 docs/src/content/docs/scenarios/new-project.md
 docs/src/content/docs/scenarios/open-source.md
@@ -167,9 +175,12 @@ docs/src/content/docs/scenarios/team-portability.md
 docs/src/content/docs/scenarios/team-state-storage.md
 docs/src/content/docs/scenarios/troubleshooting.md
 docs/src/content/docs/scenarios/upgrading.md
+docs/src/content/docs/scenarios/using-squad-across-clients.md
 docs/src/content/docs/sdk-first-mode.md
 docs/src/content/docs/tips-and-tricks.md
 docs/src/content/docs/tour-first-session.md
 docs/src/content/docs/tour-github-issues.md
 docs/src/content/docs/tour-gitlab-issues.md
 docs/src/content/docs/whatsnew.md
+docs/tutorials/durable-backend-and-custom-harness.md
+docs/tutorials/multi-client-quickstart.md

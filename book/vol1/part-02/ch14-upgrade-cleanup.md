@@ -11,7 +11,9 @@
 - Plan a safe upgrade and migration for a working Tasktrack squad.
 - Migrate an old `.ai-team/` project and recognize when a very old on-disk format requires manual recovery or reinitialization.
 
-> **Preview (Squad 2.0):** Project upgrades can also add or refresh host projections with `squad upgrade --client <list>` (including `all`); `squad init --client <list>` selects them for a new project. To try the preview, switch the CLI to the `insider` channel, then review the project diff and migration guidance in Chapter 22 (Volume 2). See the [2.0 release notes](https://github.com/bradygaster/squad/blob/v2.0.0-preview.2/docs/src/content/docs/whatsnew.md).
+This chapter covers routine upgrades within Squad 2.x: moving from one 2.x release to the next, refreshing the files Squad owns, and keeping a long-running squad tidy. A project upgrade also refreshes every host listed in `.squad/config.json`, and `squad upgrade --client <list>` (including `all`) adds hosts to an existing project, just as `squad init --client <list>` selects them for a new one. Tasktrack stays on the default Copilot host.
+
+> **Note:** Changed in Squad 2.0: if you are coming from Squad 1.x, read Chapter 22 (Volume 2) before you upgrade. It covers the removed features, the new launcher in `.mcp.json`, and how to roll back. The rest of this chapter assumes a project that is already on 2.x.
 
 ## Cleanup Is a Scheduled Housekeeping Capability
 
@@ -52,7 +54,7 @@ The two options are positive numbers: `everyNRounds` controls cadence and `maxAg
 
 A filename that does not begin with a parseable date is not classified as old and is left in place. The code uses the date in the filename rather than filesystem modification time. If an old file is pruned, the implementation removes it; it does not move it to `logs/archive/YYYY-MM/` or another archive directory. An inbox warning is a nudge to review and merge the pending decision, not a decision merge.
 
-> **Warning:** The cleanup feature page says old logs are archived and presents `squad logs archive` as a manual option. The v1.1.0 implementation instead deletes matching old entries, and the shipped CLI has no `squad logs archive` handler. Treat the cleanup capability as deletion, keep independent backups of logs you need, and do not infer a recoverable archive from the documentation.
+> **Warning:** The cleanup feature page says old logs are archived and presents `squad logs archive` as a manual option. The v2.0.0 implementation instead deletes matching old entries, and the shipped CLI has no `squad logs archive` handler. Treat the cleanup capability as deletion, keep independent backups of logs you need, and do not infer a recoverable archive from the documentation.
 
 ```mermaid
 flowchart TD
@@ -74,32 +76,36 @@ The word *upgrade* can refer to the CLI executable installed on your machine or 
 
 | Operation | Command | What changes |
 |---|---|---|
-| CLI self-upgrade | `squad upgrade --self` | Installs a newer `@bradygaster/squad-cli` package globally using npm, pnpm, or Yarn |
+| CLI self-upgrade | `squad upgrade --self` | Installs a newer `@bradygaster/squad-cli` package globally using npm, pnpm, or Yarn, on the channel you already use |
 | Project upgrade | `squad upgrade` | Refreshes the coordinator, managed templates, selected built-in skills, workflows, and applicable migrations in the current repository |
-| Preview project upgrade | `squad upgrade --dry-run` | Describes the repository upgrade without applying it (except that separately combined flags can perform work first) |
+| Preview project upgrade | `squad upgrade --dry-run` | Reports exactly which files a real run would write, and writes nothing (`--migrate-directory` still runs first if you combine them) |
+| Preview self-upgrade | `squad upgrade --self --dry-run` | Prints the install command it would run; installs nothing (2.0 CLIs only; a 1.1.0 CLI installs) |
 
-A new CLI binary does not automatically mean that every repository has been upgraded. Run `squad upgrade` from each project whose managed files should be refreshed. The v1.1.0 implementation of `--self` installs the package and asks you to restart the terminal; on successful self-upgrade it returns before running the project upgrade.
+A new CLI binary does not automatically mean that every repository has been upgraded. Run `squad upgrade` from each project whose managed files should be refreshed. The v2.0.0 implementation of `--self` installs the package and asks you to restart the terminal; on successful self-upgrade it returns before running the project upgrade.
 
-> **Note:** The assigned self-upgrade feature page says the CLI self-upgrade automatically refreshes repository templates. That is not what the v1.1.0 command dispatcher does. It prints a restart instruction and returns. Run `squad upgrade` separately from the project root when you want to update that repository. The documented `--skip-repo-upgrade` example is not an implemented flag in v1.1.0; because self-upgrade does not run a repository upgrade in the first place, there is nothing to skip.
+> **Note:** The assigned self-upgrade feature page says the CLI self-upgrade automatically refreshes repository templates. That is not what the v2.0.0 command dispatcher does. It prints a restart instruction and returns. Run `squad upgrade` separately from the project root when you want to update that repository.
 
 ### Self-upgrade and release channels
 
 The package manager choice comes from the current process's `npm_execpath` or `npm_config_user_agent`. If those environment values identify pnpm or Yarn, the CLI selects that manager; otherwise it falls back to npm. This is not a detection based on a lock file in the current directory. The install targets are:
 
 ```bash
-squad upgrade --self          # @bradygaster/squad-cli@latest
-squad upgrade --self --insider # @bradygaster/squad-cli@insider
+squad upgrade --self --dry-run  # 2.0 CLI: print the command; install nothing
+squad upgrade --self            # follow the installed channel
+squad upgrade --self --insider  # force @bradygaster/squad-cli@insider
 ```
+
+Self-upgrade follows the channel you already have. A stable install (`2.0.0`) upgrades from `@latest`; a prerelease install (a version such as `2.1.0-preview.1` or `2.1.0-insider.3`) upgrades from `@insider`. `--insider` forces the insider tag. Before it installs anything, the CLI resolves the tag and refuses a downgrade: if the tag points at a version older than the one you have, it stops with "Refusing to downgrade" and asks you to pass `--force` (or, from `@latest`, `--insider` to stay on the prerelease channel). `--dry-run` prints the package manager, the target version and the exact install command, then exits without installing.
 
 Stable is the ordinary choice. Insider is a prerelease channel for testing; use it only when you want the unreleased build and accept that it can change more rapidly. Self-upgrade runs a global add/install command and may fail if your global package directory is not writable. The CLI reports a failure and exits nonzero rather than claiming success. For permission errors, prefer fixing the package manager's global prefix or using a Node version manager over running an entire tool as root.
 
-`--insider` by itself is not a project-upgrade channel: the CLI warns that it only applies with `--self` and ignores it for a repository upgrade. The `--force` flag bypasses the repository's already-current version shortcut; it is not an alternate package-manager mechanism. The `selfUpgradeCli` options include `force`, but the self-install implementation does not use it to change the package install command.
+`--insider` by itself is not a project-upgrade channel: the CLI warns that it only applies with `--self` and ignores it for a repository upgrade. For a project upgrade, `--force` bypasses the repository's already-current version shortcut and re-processes every file. With `--self`, `--force` is what allows a downgrade; it does not change the package-manager command.
 
-Do not treat `--dry-run` as a universal dry-run across every combination. The dispatcher performs `--migrate-directory` before invoking the repository dry-run path. It also invokes the self-installer whenever `--self` is present; the self-install function has no dry-run option. Use `squad upgrade --dry-run` by itself to preview the project upgrade. Don't combine it with mutating flags expecting them to be simulated.
+Do not treat `--dry-run` as a universal dry-run across every combination. The dispatcher still performs `--migrate-directory` before it reaches the repository dry-run path, so that rename is real. On a 2.0 CLI, `--self --dry-run` is safe: it previews the install and returns. A 1.1.0 CLI ignores `--dry-run` with `--self` and installs `@bradygaster/squad-cli@latest`; check the target with `npm view @bradygaster/squad-cli dist-tags` instead (Chapter 22 (Volume 2)). Use `squad upgrade --dry-run` by itself to preview the project upgrade, and don't combine it with `--migrate-directory` expecting the rename to be simulated.
 
 ## What a Project Upgrade Preserves and Overwrites
 
-The upgrade implementation uses a template manifest to classify shipped files as Squad-owned or user-owned. It also has custom handling for the coordinator, workflows, and Copilot instructions. Read the actual diff; never assume that the word “upgrade” means either “replace the whole `.squad/` directory” or “preserve every edited template.”
+The upgrade implementation uses a template manifest to classify shipped files as Squad-owned or user-owned. It also has custom handling for the coordinator, workflows, and Copilot instructions. In Squad 2.0 the upgrade is content-aware: it compares each Squad-owned file with the new template (ignoring line endings) and writes only files that would change, so running it twice in a row writes nothing the second time. `squad upgrade --help` spells out the boundary. The Squad-owned set is `.github/agents/squad.agent.md`, `.github/skills/*`, `.github/workflows/squad-*.yml`, `.squad/templates/**` and the flat `.squad/casting-*.json` template copies. Never touched are `team.md`, `routing.md`, decisions, `agents/*/history.md`, the casting registry and history pair, `config.json` and `.ai-team/`. Read the actual diff; never assume that the word “upgrade” means either “replace the whole `.squad/` directory” or “preserve every edited template.”
 
 ### Files it refreshes
 
@@ -112,7 +118,7 @@ A normal project upgrade can refresh the following Squad-owned artifacts from th
 - `.github/copilot-instructions.md`'s Squad-managed block when the team enables Copilot coding agent support.
 - Infrastructure files and missing scaffold items handled by ensure checks.
 
-The manifest is authoritative for the specific built-in file list. Built-in skills are refreshed and a warning is printed if a skill differs from its shipped template; the warning is not a backup. Coordinator and workflow customization receive a `.local-backup` file before replacement if the normalized content differs. The backup has a fixed name and can be overwritten by a later upgrade, so move a backup you need before upgrading again. The dry-run path checks whether the coordinator would need a backup but does not inspect customized workflows for backup warnings.
+The manifest is authoritative for the specific built-in file list. Squad decides that a file is **customized** when it differs from both the new template and the version Squad last shipped; those last-shipped hashes live in `.squad/templates/.shipped-manifest.json`, which `squad init` and each upgrade record. A customized file, whether a built-in skill, a workflow or the coordinator, is copied to `<file>.local-backup` first, and the backup is read back and verified before the original is overwritten; if the backup cannot be verified, that file is left alone and reported. A file that still matches what Squad shipped is replaced silently. One exception: a customized `.github/workflows/squad-ci.yml` is treated as yours and preserved unchanged, because that is where you put your build and test commands. The backup has a fixed name, so a later upgrade of the same customized file writes a new one; move a backup you need before upgrading again. The dry run uses the same plan, so it lists the files that would be overwritten, created, backed up or preserved.
 
 The Copilot instructions path is special: Squad merges or replaces its marked managed block while preserving user content outside that block. If the file contains only user-authored instructions and no Squad markers, the managed block is appended instead of replacing all content. Newline-only changes are normalized so a different CRLF/LF style alone does not force a rewrite.
 
@@ -127,9 +133,13 @@ Supported legacy casting state is preflighted and migrated before the managed co
 | User state / knowledge | `team.md`, decisions, agent charters, `history.md` | Preserved; not replaced as a package template |
 | User-owned manifest templates | `routing.md`, `ceremonies.md`, `ralph-instructions.md`, identity notes | Create if missing; keep existing files |
 | Squad-managed templates | `.squad/templates/*` and manifest-managed defaults | Replaced with current shipped versions |
-| Built-in Squad skills | Manifest-listed `.github/skills/*/SKILL.md` | Refreshed; customized versions warned about but not automatically backed up |
-| Coordinator / managed workflows | `.github/agents/squad.agent.md`, `.github/workflows/squad-*.yml` | Refreshed; local differences backed up to `.local-backup` |
+| Built-in Squad skills | Manifest-listed `.github/skills/*/SKILL.md` | Refreshed; customized versions backed up to a verified `.local-backup` first |
+| Coordinator / managed workflows | `.github/agents/squad.agent.md`, `.github/workflows/squad-*.yml` | Refreshed; local differences backed up to `.local-backup`; a customized `squad-ci.yml` is preserved |
+| Never touched | `team.md`, `routing.md`, decisions, `agents/*/history.md`, casting registry/history, `config.json`, `.ai-team/` | Left as they are |
+| Host projections | Files for each host in `config.json` `clients[]` | Refreshed on every upgrade; `--client <list>` adds hosts |
 | Copilot instructions | `.github/copilot-instructions.md` | Squad block updated while user-authored material is retained |
+
+If your project has more hosts than Copilot, a plain `squad upgrade` refreshes every client listed in `clients[]` and keeps your other MCP servers, formatting and line endings in the shared config files. Between upgrades, `squad client sync` refreshes the configured hosts' files on its own (for example after you change `routing.md`), and `squad client list` shows which hosts are configured. Tasktrack has no extra hosts, so neither command changes anything here.
 
 Some generated scaffolding is ensured only when missing. The important distinction is ownership plus destination, not simply whether a file lives under `.squad/`. A custom skill stored alongside Squad's built-in skills may be treated differently from a manifest-listed built-in skill. Check whether the installed version lists it as Squad-managed before making a local customization.
 
@@ -145,7 +155,7 @@ Use the following sequence for the Tasktrack repo after you have completed the p
    squad upgrade --dry-run
    ```
 
-   Review the source version and target version, the coordinator check, and the managed-file list. The preview is not a complete custom-workflow audit; inspect edited `.github/workflows/` files yourself.
+   Review the source version and target version, the coordinator check, and the managed-file list. The dry run lists the same files a real run would write, back up or preserve, so a customized workflow shows up there.
 
 4. **Apply the CLI update only if you intend to change the global tool.** For example:
 
@@ -170,12 +180,17 @@ This workflow makes rollback manageable. A migration can change file names, conf
 
 ## Migrations: What They Change
 
-A project upgrade runs version-based migrations after refreshing managed files. The v1.1.0 migration runner contains steps for older format transitions, including:
+A project upgrade runs version-based migrations after refreshing managed files. The v2.0.0 migration runner contains steps for older format transitions, including:
 
 - Creating `.squad/skills/` for the older v0.2.0 step.
 - Creating `.squad/plugins/` for the v0.4.0 step.
 - Scrubbing email addresses from Squad state as a privacy migration at v0.5.0.
 - Copying legacy `.squad/skills/<name>/` skills into `.copilot/skills/` at v0.9.0, without overwriting an existing destination.
+
+Two more repairs run in Squad 2.0 before the managed files are refreshed, in a real run and in `--dry-run`:
+
+- **Casting repair.** A hand-edited or empty `.squad/casting/registry.json` is normalized record by record. An empty registry is backfilled from `team.md` when each specialist maps to a provable `.squad/agents/<id>/charter.md` folder. The originals are archived under `.squad/casting/handwritten-archive-<sha256>/`. An entry that cannot be proven stops the upgrade with the exact entries and a `squad cast --name <Name> --role "<Role>"` fix.
+- **`teamRoot` normalization.** An obsolete `teamRoot` that older versions left in `.squad/config.json` pointing outside the project is removed, with a one-line message. A `teamRoot` that points at another team repository (dual-root mode) is left alone.
 
 Migrations are selected by the installed version recorded in the coordinator and the CLI's current package version. An “already up to date” project can still run missing migration or ensure logic. A migration may therefore be relevant even when the version label appears current; read the output and the source path it touched.
 
@@ -183,7 +198,7 @@ For supported legacy casting state, the upgrading guide describes a more careful
 
 ## Migrating from `.ai-team/` and Older Releases
 
-The state directory used to be named `.ai-team/`; current projects use `.squad/`. The v1.1.0 CLI still includes a directory migration path, and normal upgrade detects a legacy directory and prints a deprecation warning. The directory is not automatically renamed just because you installed a new CLI.
+The state directory used to be named `.ai-team/`; current projects use `.squad/`. The v2.0.0 CLI still includes a directory migration path, and normal upgrade detects a legacy directory and prints a deprecation warning. The directory is not automatically renamed just because you installed a new CLI.
 
 For the explicit legacy-directory migration, first back up the repository and then run:
 
@@ -193,7 +208,7 @@ squad upgrade --migrate-directory
 
 The migration refuses if there is no `.ai-team/` directory or if `.squad/` already exists. It renames `.ai-team/` to `.squad/`, rewrites `.ai-team/` references in `.gitignore` and `.gitattributes` if those files exist, scrubs email addresses from migrated state, and moves `.ai-team-templates/` into `.squad/templates/` if present. The upgrade dispatcher then continues into the normal project refresh. Review the complete diff, because the email scrub and rename alter tracked files. The old directory name and new directory name must not both be present: the code avoids guessing which is authoritative.
 
-The migration command also exposes the directory move as `squad migrate --from ai-team`; it performs the same operation and then tells you how to proceed with an SDK-first migration. For projects already on a compatible v0.8.x-or-later format, the published migration guide says that a package update should not require deleting and reinitializing `.squad/`. The CLI package name used by the v1.1.0 self-updater is `@bradygaster/squad-cli`.
+The migration command also exposes the directory move as `squad migrate --from ai-team`; it performs the same operation and then tells you how to proceed with an SDK-first migration. For projects already on a compatible v0.8.x-or-later format, the published migration guide says that a package update should not require deleting and reinitializing `.squad/`. The CLI package name used by the v2.0.0 self-updater is still `@bradygaster/squad-cli`.
 
 A jump from the old v0.5.4 beta format is different. The migration guide describes that on-disk structure as incompatible with current releases. Back up the old directory, initialize a current Squad state structure, and manually bring across only the knowledge you have reviewed—team members, custom charters, decisions, routing, skills, and useful history. Do not copy obsolete templates or casting artifacts blindly into a new structure. The old guides contain examples and package aliases that span multiple releases; confirm a package name or command against your target release before using it.
 
@@ -236,7 +251,7 @@ This exercise rehearses a repository upgrade on the Tasktrack project created ea
    squad upgrade --dry-run
    ```
 
-   Expected result: the CLI describes the coordinator and managed resources it would refresh. It does not show every possible customized-workflow backup, so inspect workflows separately.
+   Expected result: the CLI lists the Squad-owned files it would overwrite, create, back up to `.local-backup` or preserve. On a project that is already current it reports that the squad-owned files are up to date.
 
 4. Apply the repository upgrade:
 
@@ -244,7 +259,7 @@ This exercise rehearses a repository upgrade on the Tasktrack project created ea
    squad upgrade
    ```
 
-   Expected result: the coordinator and managed templates are refreshed; your `team.md`, decisions, agent histories, and existing user-owned templates remain. If the CLI reports a built-in skill customization, compare it with your backup because the warning itself does not preserve that edit.
+   Expected result: the coordinator and managed templates are refreshed; your `team.md`, decisions, agent histories, and existing user-owned templates remain. If the CLI reports a `.local-backup`, compare that backup with the new file and carry your edit forward deliberately.
 
 5. Verify the app and repo:
 
@@ -265,10 +280,14 @@ This exercise rehearses a repository upgrade on the Tasktrack project created ea
 | `watch.cleanup.everyNRounds` | `.squad/config.json` | `10` | Cleanup runs on round 1 and then each Nth round |
 | `watch.cleanup.maxAgeDays` | `.squad/config.json` | `30` | Removes date-stamped log entries older than the threshold |
 | `--cleanup` | `squad watch` | Opt-in | Enables the cleanup capability for that watch invocation |
-| `squad upgrade --self` | CLI package | `@latest` | Installs globally via detected npm/pnpm/Yarn manager; asks you to restart |
+| `squad upgrade --self` | CLI package | Follows installed channel (`@latest` or `@insider`) | Installs globally via detected npm/pnpm/Yarn manager; refuses a downgrade; asks you to restart |
+| `--dry-run` | With `--self` | Off | Prints the install command and target version; installs nothing |
 | `--insider` | With `--self` | `@insider` | Selects the insider package tag; ignored for project upgrades |
-| `--force` | `squad upgrade` | Off | Bypasses the repository's already-current shortcut and refreshes managed resources |
-| `--dry-run` | `squad upgrade` | Off | Previews repository file updates and casting preflight; avoid combining with mutating flags |
+| `--force` | `squad upgrade` | Off | Bypasses the repository's already-current shortcut and re-processes all files; with `--self`, allows a downgrade |
+| `--dry-run` | `squad upgrade` | Off | Lists the files a real run would write, back up or preserve, plus casting preflight; writes nothing |
+| `--client <list>` | `squad upgrade` | Configured hosts only | Adds hosts (`copilot`, `claude`, `kiro`, `opencode`, `cursor`, `codex`, `antigravity`, `all`) to `clients[]` and projects them |
+| `squad client sync [--dry-run]` | Configured hosts | None | Refreshes every configured host's projected files without a full upgrade |
+| `.squad/templates/.shipped-manifest.json` | Project | Written by init and upgrade | Hashes of what Squad last shipped; used to tell your edits from template revisions |
 | `--migrate-directory` | `squad upgrade` | Off | Renames legacy `.ai-team/` to `.squad/`, then continues regular upgrade |
 | `--state-backend TYPE` | `squad upgrade` | Backend-specific | Runs project upgrade and then the requested state-backend migration |
 | `SQUAD_HOME` | Process environment | Home default | Can change Squad's global data directory; it is also respected by Teams token storage |
@@ -277,9 +296,9 @@ This exercise rehearses a repository upgrade on the Tasktrack project created ea
 
 The command dispatcher for `upgrade` is in `packages/squad-cli/src/cli-entry.ts`. It separates `--self`, `--insider`, `--migrate-directory`, `--dry-run`, and state-backend migration. It handles the directory rename first, attempts self-upgrade when requested, and returns after a successful self-only operation. This dispatch order is the decisive evidence that self-upgrade does not automatically apply a project template update and that a combined dry-run flag does not make every earlier operation harmless.
 
-`packages/squad-cli/src/cli/core/upgrade.ts` implements the repository update. It detects the current squad directory, reads the installed coordinator version, validates legacy casting state, compares versions, and iterates `TEMPLATE_MANIFEST`. The `overwriteOnUpgrade` field documents ownership. Managed files are copied; user-owned files are created only if they do not exist. Workflow files use `writeWorkflowFile()`, which backs up custom content. The coordinator backup compares normalized content after removing the release stamp and generated team-capabilities block so generated differences alone do not look like a manual edit.
+`packages/squad-cli/src/cli/core/upgrade.ts` implements the repository update. It detects the current squad directory, reads the installed coordinator version, validates legacy casting state, compares versions, and iterates `TEMPLATE_MANIFEST`. The `overwriteOnUpgrade` field documents ownership. `collectSquadOwnedCandidates()` gathers every Squad-owned file (manifest entries, workflows and the full `.squad/templates/` mirror), and `packages/squad-cli/src/cli/core/squad-owned-files.ts` plans and applies them: it compares content with line endings ignored, decides what is customized from the shipped manifest, writes and verifies each `.local-backup` before overwriting, and preserves a customized `squad-ci.yml`. User-owned files are created only if they do not exist. The coordinator backup compares normalized content after removing the release stamp and generated team-capabilities block so generated differences alone do not look like a manual edit.
 
-The same file contains `selfUpgradeCli()`. It chooses the package manager from process environment, constructs the global package install command, runs it, and throws on failure. `packages/squad-cli/src/cli/core/templates.ts` is the manifest source of truth. `packages/squad-cli/src/cli/core/managed-file.ts` handles newline-preserving writes and the marked merge for `.github/copilot-instructions.md`.
+The same file contains `selfUpgradeCli()`. It chooses the package manager from process environment, picks the tag with `detectSelfUpgradeTag()` (a prerelease version follows `insider`, anything else `latest`), resolves that tag's version and refuses a downgrade unless `force` is set, prints the command and returns on `dryRun`, and otherwise runs the global install and throws on failure. `packages/squad-cli/src/cli/core/templates.ts` is the manifest source of truth. `packages/squad-cli/src/cli/core/managed-file.ts` handles newline-preserving writes and the marked merge for `.github/copilot-instructions.md`.
 
 Cleanup is implemented in `packages/squad-cli/src/cli/commands/watch/capabilities/cleanup.ts`; the registry is created in the watch capability barrel, while `watch/index.ts` preflights enabled capabilities and runs the `housekeeping` phase. Its `safeDelete()` calls recursive `rmSync()`. The age helper parses only the date prefix of filenames; no archive move is performed. This detail is why the cleanup page's archive description should not be used as evidence of recoverability.
 
@@ -288,8 +307,9 @@ The legacy `.ai-team/` rename is in `packages/squad-cli/src/cli/core/migrate-dir
 ## Pitfalls and Troubleshooting
 
 - **I upgraded the CLI but this repo still has old templates.** Self-upgrade changes the global package only. Run `squad upgrade` from the repository root as a separate step.
-- **A customization vanished.** Check the `.local-backup` beside the coordinator or workflow. Built-in skill differences are warned about but not automatically backed up; use version control or your own backup to restore them.
-- **The dry run says one thing but the workflow changed.** The preview does not report every workflow customization. Inspect `.github/workflows/` and local backups yourself.
+- **A customization vanished.** Check the `.local-backup` beside the coordinator, workflow or built-in skill. Squad writes one for any Squad-owned file that differed from both the new template and the version it last shipped. A later upgrade of the same customized file replaces that backup, so keep version control as your real safety net.
+- **Self-upgrade says "Refusing to downgrade".** The channel tag points at an older version than the one you have, which happens when you installed a prerelease and then ask for `@latest`. Stay on the prerelease channel with `--insider`, or pass `--force` only if you really want the older build.
+- **My `squad-ci.yml` edits survived but other workflows were refreshed.** That is deliberate. A customized `squad-ci.yml` is user-owned; other `squad-*.yml` workflows are Squad-owned and get a `.local-backup` when you have changed them.
 - **An “already current” project still changed.** Upgrade can still run missing migrations and ensure checks and can refresh managed files even when the version stamp matches.
 - **Cleanup removed a log I wanted.** The code prunes dated files rather than archiving them. Restore from version control or an independent backup, and reduce or disable cleanup until you have a retention plan.
 - **Cleanup did not run.** It is opt-in. Enable the capability with `--cleanup` or configure `watch.cleanup`; `--execute` alone is not the switch.
@@ -297,7 +317,7 @@ The legacy `.ai-team/` rename is in `packages/squad-cli/src/cli/core/migrate-dir
 - **`squad upgrade --migrate-directory` refuses.** It needs `.ai-team/` and refuses if `.squad/` already exists. Back up and resolve the two-directory state rather than renaming over either one.
 - **An old casting migration is refused.** Do not invent missing IDs, universes, timestamps, or assignment membership. Preserve originals and recover evidence from the version that created them.
 - **An old v0.5.4 state is not accepted.** Treat it as a format migration, not a routine in-place template update. Preserve a backup, initialize current state, and manually migrate reviewed knowledge.
-- **`--dry-run` was combined with other options.** The rename and self-install paths occur before the project preview; rerun only the standalone dry-run after recovering from any accidental operation.
+- **`--dry-run` was combined with `--migrate-directory`.** The rename runs before the project preview, so it really happened. Review the rename, then rerun the standalone dry run.
 
 ## Summary
 
@@ -305,7 +325,8 @@ The legacy `.ai-team/` rename is in `packages/squad-cli/src/cli/core/migrate-dir
 - Old matching logs are pruned, not archived; stale inbox files only trigger warnings.
 - `squad upgrade --self` updates the global CLI package. `squad upgrade` separately refreshes one repository.
 - Project upgrades preserve team knowledge and existing user-owned files, but refresh managed templates, built-in skills, coordinator, workflows, and eligible migration artifacts.
-- Coordinator and workflow customizations get fixed-path backups; customized built-in skills are warned about but not automatically backed up.
+- The project upgrade is content-aware: a customized Squad-owned file (coordinator, workflow or built-in skill) gets a verified `.local-backup` before it is overwritten, a customized `squad-ci.yml` is preserved, and `team.md`, `routing.md`, decisions, histories, casting state and `config.json` are never touched.
+- Self-upgrade follows the installed channel, refuses a downgrade without `--force`, and previews with `--dry-run` on a 2.0 CLI (a 1.1.0 CLI ignores it and installs). Coming from 1.x, read Chapter 22 (Volume 2) first.
 - Use a standalone dry run, back up important state, inspect the diff, test Tasktrack, and only then commit.
 - Old `.ai-team/` projects need an explicit migration. Very old incompatible state should be backed up and migrated deliberately, not deleted casually.
 
@@ -320,17 +341,17 @@ The legacy `.ai-team/` rename is in `packages/squad-cli/src/cli/core/migrate-dir
 ## Quiz
 
 1. Is cleanup enabled by default for a fresh `squad watch` with no capability configuration?
-2. Does cleanup archive old logs under `.squad/logs/archive/` in v1.1.0?
+2. Does cleanup archive old logs under `.squad/logs/archive/` in v2.0.0?
 3. What determines whether an entry in `.squad/log/` is old enough for pruning?
 4. Does successful `squad upgrade --self` also run `squad upgrade` in the current repo?
 5. Which areas are refreshed by a repository upgrade: team histories or manifest-listed Squad-owned templates?
 6. Are customized built-in skills backed up automatically when overwritten?
 7. What two conditions make `squad upgrade --migrate-directory` refuse to rename?
-8. Why is a standalone `squad upgrade --dry-run` safer than combining it with `--migrate-directory` or `--self`?
+8. Why is a standalone `squad upgrade --dry-run` safer than combining it with `--migrate-directory`, and what does `squad upgrade --self --dry-run` do?
 
 ## Further Reading
 
-- [Cleanup Watch](https://bradygaster.github.io/squad/docs/features/cleanup/)
-- [Self Upgrade](https://bradygaster.github.io/squad/docs/features/self-upgrade/)
-- [Migration Guide](https://bradygaster.github.io/squad/docs/get-started/migration/)
-- [Upgrading Squad](https://bradygaster.github.io/squad/docs/scenarios/upgrading/)
+- [Cleanup Watch](https://github.github.com/squad/docs/features/cleanup/)
+- [Self Upgrade](https://github.github.com/squad/docs/features/self-upgrade/)
+- [Migration Guide](https://github.github.com/squad/docs/get-started/migration/)
+- [Upgrading Squad](https://github.github.com/squad/docs/scenarios/upgrading/)

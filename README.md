@@ -1,22 +1,22 @@
 # Mastering Squad
 
-**Status: complete first manuscript.** EPUB structure and source coverage are checked automatically. This is not a claim that every SDK example or cloud deployment has been executed; see `research/VALIDATION.md` for the verification scope.
+**Status: second edition, updated for Squad 2.0.0 (in progress on branch `squad-2.0`).** The first edition, written against Squad v1.1.0, is tagged `book-squad-v1.1.0`. EPUB structure and source coverage are checked automatically. This is not a claim that every SDK example or cloud deployment has been executed; see `research/VALIDATION.md` for the verification scope.
 
 *AI Agent Teams for Any Project — published in two volumes*
 
 | Volume | Title | Parts | Chapters | Output |
 |---|---|---|---|---|
 | 1 | Using Squad | I–IV: Getting Started, Working with Squad Daily, Making Teams Smarter, Adopting Squad | 1–21 | `dist/mastering-squad-vol1.epub` |
-| 2 | Operating and Extending Squad | I–V: Advanced Coordination, Production Operations, Internals and Extension, Looking Ahead: Squad 2.0 (Preview), Mastery | 1–25 | `dist/mastering-squad-vol2.epub` |
+| 2 | Operating and Extending Squad | I–V: Advanced Coordination, Production Operations, Internals and Extension, Squad 2.0: One Team, Many Hosts, Mastery | 1–25 | `dist/mastering-squad-vol2.epub` |
 
 Each volume numbers its parts and chapters from 1; cross-volume references name the volume, for example "Chapter 12 (Volume 2)" or "Volume 2, Part IV". See `research/CHAPTERS.md` for the full manifest.
 
-An in-depth, hands-on book about [Squad](https://github.com/bradygaster/squad), the multi-agent coordination system that works with GitHub Copilot and, as of Squad 2.0, six other AI hosts. All parts except Volume 2, Part IV are written against **Squad v1.1.0** (the stable `latest` release) and take you from your first `squad init` to running squads in production and extending them with the SDK. Volume 2, Part IV covers **Squad 2.0 preview** (`v2.0.0-preview.2`, the `insider` channel): one team projected into GitHub Copilot, Claude Code, Kiro, OpenCode, Cursor, OpenAI Codex, and Google Antigravity.
+An in-depth, hands-on book about [Squad](https://github.com/github/squad) ([docs](https://github.github.com/squad/)), the multi-agent coordination system that works with GitHub Copilot and six other AI hosts. The whole book is written against **Squad v2.0.0** (the stable `latest` release; install `@bradygaster/squad-cli`) and takes you from your first `squad init` to running squads in production and extending them with the SDK. Volume 1 teaches the GitHub Copilot path. Volume 2, Part IV covers one team projected into GitHub Copilot, Claude Code, Kiro, OpenCode, Cursor, OpenAI Codex, and Google Antigravity, and Chapter 22 covers migrating an existing Squad 1.x project to 2.0.
 
 - **2 volumes, 9 parts, 46 chapters** (21 in Volume 1, 25 in Volume 2), with appendices A–F in both volumes (E, Quiz Answers, is generated per volume) and G–J in Volume 2
 - Every chapter starts with a prerequisites line and includes hands-on steps, a configuration reference, an "Under the Hood" source walkthrough, exercises, a quiz, and links to the official docs (Volume 1, Part I uses a lighter beginner template)
 - **Tasktrack**, a companion project your Squad builds throughout the book (`sample/`)
-- All 175 inventoried documentation/specification sources from v1.1.0 are mapped, plus 41 new or changed sources from v2.0.0-preview.2 (`research/sources-2.0.txt`, `research/coverage-2.0.csv`), along with 44 package source modules and root files. `make coverage` checks their references. Citation checks establish traceability, not exhaustive technical correctness.
+- The inventoried documentation and specification sources from v2.0.0 are mapped to chapters (`research/sources.txt`, `research/coverage.csv`), along with package source modules and root files (`research/source-modules.csv`). Final counts are filled in after the 2.0.0 re-inventory. `make coverage` checks their references. Citation checks establish traceability, not exhaustive technical correctness.
 
 ## Repository layout
 

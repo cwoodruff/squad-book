@@ -13,6 +13,6 @@ Read it in order if you are new; if you already use Squad, pick the chapters tha
 - **Chapter 11: Copilot Coding Agent and Remote Control** Delegating to cloud agents and steering remotely.
 - **Chapter 12: Models, Cost, and Rate Limiting** Choosing models and controlling spend.
 - **Chapter 13: Notifications and Team Communication** Keeping humans informed.
-- **Chapter 14: Cleanup, Upgrades, and Migration** Maintaining and upgrading a v1.x setup.
+- **Chapter 14: Cleanup, Upgrades, and Migration** Keeping a Squad 2.x installation tidy and current.
 
 **Tasktrack:** by the end of Part II your squad takes issues, routes and parallelizes work, runs the loop, and you can upgrade it safely.

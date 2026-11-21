@@ -8,7 +8,7 @@
 - Prepare a repository, capability profile, and narrowly scoped issue for a coding-agent handoff.
 - Understand the label-triggered assignment workflow and what evidence does—and does not—prove that Copilot started work.
 - Compare `squad rc`'s browser bridge with `squad start`'s PTY mirror and choose the right interaction model.
-- Trace the remote UI, WebSocket bridge, authentication, rate limiting, and Copilot ACP subprocess in the v1.1.0 source.
+- Trace the remote UI, WebSocket bridge, authentication, rate limiting, and Copilot ACP subprocess in the v2.0.0 source.
 
 ## Two Different Ways to Put Copilot on the Team
 
@@ -106,7 +106,7 @@ The source contains two remote experiences that are easy to collapse into one na
 - **`squad rc`** runs a browser chat bridge. The CLI starts an HTTP/WebSocket server, serves the remote PWA in `packages/squad-cli/src/remote-ui`, and can spawn Copilot CLI in ACP mode as a child process. The browser sends prompts and receives streamed events through the bridge.
 - **`squad start`** runs Copilot in a local pseudo-terminal (PTY) and mirrors the interactive terminal to a remote browser. It is for seeing and operating that same terminal session, not a chat-first ACP UI.
 
-The `rc` command offers `--tunnel`, `--port <n>`, and `--path <dir>`. Port `0` chooses an available port. Tunnel mode requires `devtunnel` installed and authenticated; without tunnel mode the server is local-only. The installed v1.1.0 CLI prints a deprecation warning for `squad rc` and recommends using `gh copilot` directly, so treat this as a version-specific convenience rather than a long-term stable interface. `squad start` supports a local PTY by default and optional tunnel; it needs the optional `node-pty` package. Copilot arguments can be passed through, and a custom `--command` can be used where supported by the command parser. Check `squad start --help` on the installed build before relying on optional flags.
+The `rc` command offers `--tunnel`, `--port <n>`, and `--path <dir>`. Port `0` chooses an available port. Tunnel mode requires `devtunnel` installed and authenticated; without tunnel mode the server is local-only. The installed v2.0.0 CLI still prints a deprecation warning for `squad rc` (as v1.1.0 did) and recommends using `gh copilot` directly, so treat this as a version-specific convenience rather than a long-term stable interface. `squad start` supports a local PTY by default and optional tunnel; it needs the optional `node-pty` package. Copilot arguments can be passed through, and a custom `--command` can be used where supported by the command parser. Check `squad start --help` on the installed build before relying on optional flags.
 
 The architecture is:
 
@@ -135,7 +135,7 @@ The `RemoteBridge` implementation binds its server to `127.0.0.1`. Its session t
 
 These are defense-in-depth measures, not a reason to expose a development machine to untrusted users. Redaction uses patterns and cannot guarantee that every sensitive value is caught. The PWA has broad ability to prompt Copilot, whose tools operate in the repository context. Keep tunnel credentials private, use only a trusted account/device, stop the process when the session is finished, and avoid handling production credentials on a remotely controlled workstation. Do not copy example URLs or session tokens into chat or tickets.
 
-Some details in the remote-control docs overstate or conflate behavior. In source, `squad rc` has ACP passthrough code; `squad start` is the PTY mirror. The remote UI is a browser client, and the SDK files are under `packages/squad-sdk/src/remote/`. Check the implementation rather than assuming every documented mobile key, number of connections, replay setting, expiry behavior, or audit event schema is identical across both commands. The CLI itself deprecates `rc` in v1.1.0.
+Some details in the remote-control docs overstate or conflate behavior. In source, `squad rc` has ACP passthrough code; `squad start` is the PTY mirror. The remote UI is a browser client, and the SDK files are under `packages/squad-sdk/src/remote/`. Check the implementation rather than assuming every documented mobile key, number of connections, replay setting, expiry behavior, or audit event schema is identical across both commands. The CLI itself still marks `rc` as deprecated in v2.0.0.
 
 A quick post-session checklist helps close the loop: verify the bridge process ended, the tunnel is no longer accepting connections, the repository is still on the expected branch, and there are no unreviewed local changes from the remote interaction. If the run changed files, record the resulting commit or PR and share only the information needed for the next reviewer. This turns “I controlled it from my phone” into a reproducible development action rather than an unexplained workstation state.
 
@@ -159,8 +159,8 @@ For a local-only bridge, use the loopback address and a specific port only when 
 | Assignment workflow | `.github/workflows/squad-issue-assign.yml` | Label/dispatch event; owns PAT-backed coding-agent assignment. |
 | Required secret | `COPILOT_ASSIGN_TOKEN` | Classic PAT stored as an Actions repository secret for the workflow. |
 | Work label | `squad:copilot` | Requests coding-agent assignment; do not treat as proof of completion. |
-| RC local port | `squad rc --port <n>` | Default is 0 (ephemeral port) in v1.1.0 code. |
-| RC tunnel | `squad rc --tunnel` | Requires authenticated `devtunnel`; command is deprecated in v1.1.0. |
+| RC local port | `squad rc --port <n>` | Default is 0 (ephemeral port) in v2.0.0 code. |
+| RC tunnel | `squad rc --tunnel` | Requires authenticated `devtunnel`; command is deprecated (still present in v2.0.0). |
 | RC working directory | `squad rc --path <dir>` | Selects the path passed to the command. |
 | PTY mirror | `squad start [--tunnel]` | Requires `node-pty`; see installed help for command and flag support. |
 | SDK bridge | `packages/squad-sdk/src/remote/` | `RemoteBridge`, types, and protocol exports. |
@@ -204,17 +204,17 @@ GitHub Copilot coding agent is an issue-triggered, asynchronous collaborator, no
 3. What secret does automatic assignment require, and what type of token does the docs specify?
 4. Does a green Actions run prove that a Copilot coding session has started?
 5. Which command is ACP/browser chat, and which one mirrors a PTY?
-6. What does `squad rc`'s v1.1.0 CLI warning recommend instead?
+6. What does `squad rc`'s v2.0.0 CLI warning recommend instead?
 7. Why is remote secret redaction not an adequate guarantee for exposing a development environment?
 
 ## Further Reading
 
-- [Copilot Coding Agent](https://bradygaster.github.io/squad/docs/features/copilot-coding-agent/)
-- [Remote Control](https://bradygaster.github.io/squad/docs/features/remote-control/)
-- [squad rc](https://bradygaster.github.io/squad/docs/features/squad-rc/)
-- [Coding agent template](https://github.com/bradygaster/squad/blob/v1.1.0/templates/copilot-agent.md)
-- [Coding agent instructions template](https://github.com/bradygaster/squad/blob/v1.1.0/templates/copilot-instructions.md)
-- [Issue assignment workflow template](https://github.com/bradygaster/squad/blob/v1.1.0/templates/workflows/squad-issue-assign.yml)
-- [Remote UI](https://github.com/bradygaster/squad/tree/v1.1.0/packages/squad-cli/src/remote-ui)
-- [Remote SDK bridge](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-sdk/src/remote/bridge.ts)
-- [Remote protocol](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-sdk/src/remote/protocol.ts)
+- [Copilot Coding Agent](https://github.github.com/squad/docs/features/copilot-coding-agent/)
+- [Remote Control](https://github.github.com/squad/docs/features/remote-control/)
+- [squad rc](https://github.github.com/squad/docs/features/squad-rc/)
+- [Coding agent template](https://github.com/github/squad/blob/v2.0.0/templates/copilot-agent.md)
+- [Coding agent instructions template](https://github.com/github/squad/blob/v2.0.0/templates/copilot-instructions.md)
+- [Issue assignment workflow template](https://github.com/github/squad/blob/v2.0.0/templates/workflows/squad-issue-assign.yml)
+- [Remote UI](https://github.com/github/squad/tree/v2.0.0/packages/squad-cli/src/remote-ui)
+- [Remote SDK bridge](https://github.com/github/squad/blob/v2.0.0/packages/squad-sdk/src/remote/bridge.ts)
+- [Remote protocol](https://github.com/github/squad/blob/v2.0.0/packages/squad-sdk/src/remote/protocol.ts)

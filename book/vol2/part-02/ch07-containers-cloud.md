@@ -4,7 +4,7 @@
 
 ## What You'll Learn
 
-- Explain what the v1.1.0 Squad Dockerfile puts in an image, how it differs from a reference npm-install Dockerfile, and which environment variables the container contract expects.
+- Explain what the v2.0.0 Squad Dockerfile puts in an image, how it differs from a reference npm-install Dockerfile, and which environment variables the container contract expects.
 - Distinguish agent-per-node and squad-per-pod capability lookup, including manifest fallback and the external coordination each mode still needs.
 - Choose between a single container, Azure Container Apps (ACA), and Azure Kubernetes Service (AKS) based on control, operational burden, and scaling needs.
 - Separate Azure workload identity from GitHub authentication and design a safe secret injection path.
@@ -16,7 +16,7 @@
 
 A Squad container packages an agent runtime; it does not make the agent's authority disappear. The container still needs access to a GitHub repository, a Copilot-capable runtime, and persistent state appropriate to the deployment. If the process is started as `squad watch --execute`, the container is configured for unattended work. A production design must therefore answer four separate questions: where does code run, which identity does it use, where does durable state live, and how does an operator stop or update it?
 
-The repository's root `Dockerfile` is the canonical v1.1.0 image in this chapter. It creates a standalone bundle in a builder stage, then copies the bundle into a smaller Node Alpine runtime image. The final image runs as UID 1001, sets `SQUAD_STANDALONE_HOME`, and starts `squad watch --execute`. The token is not baked into the image; it must be injected when the container runs. The runtime still needs the token because Azure identity is not a GitHub API credential.
+The repository's root `Dockerfile` is the canonical v2.0.0 image in this chapter. It creates a standalone bundle in a builder stage, then copies the bundle into a smaller Node Alpine runtime image. The final image runs as UID 1001, sets `SQUAD_STANDALONE_HOME`, and starts `squad watch --execute`. The token is not baked into the image; it must be injected when the container runs. The runtime still needs the token because Azure identity is not a GitHub API credential.
 
 That Dockerfile is intentionally different from the container reference page's example that runs `npm install -g @bradygaster/squad-cli`. The repo build creates the standalone app bundle, including the CLI, SDK, templates, and Copilot CLI platform binary. It avoids requiring the npm registry at runtime. The published image's build should use reviewed source and be pinned to a digest at deployment; `node:22-alpine` is a moving base-image tag and should be digest-pinned in a hardened production build.
 
@@ -30,7 +30,7 @@ flowchart LR
   F --> G["GitHub Issues and repository"]
 ```
 
-A container does not imply a web server. The Squad watcher polls GitHub and does not expose an HTTP endpoint. The v1.1.0 contract has no `/healthz`, `/readyz`, or Squad health port. A Kubernetes HTTP probe will fail because nothing is listening. Container restart policies are the primary liveness mechanism. If local policy insists on a probe, a shallow process-existence check is possible, but it does not prove that the token works, a queue is being read, or an agent is making progress.
+A container does not imply a web server. The Squad watcher polls GitHub and does not expose an HTTP endpoint. The v2.0.0 contract has no `/healthz`, `/readyz`, or Squad health port. A Kubernetes HTTP probe will fail because nothing is listening. Container restart policies are the primary liveness mechanism. If local policy insists on a probe, a shallow process-existence check is possible, but it does not prove that the token works, a queue is being read, or an agent is making progress.
 
 On shutdown, Squad is expected to receive `SIGTERM`, stop accepting new work, drain the active turn, flush state, and exit. Give the pod a termination grace period—60 seconds is the runbook's baseline—and verify the behavior in the actual release before relying on it for long-running work. A forced termination during a turn can still interrupt work; a restart is not a transaction.
 
@@ -75,7 +75,7 @@ The container contract documents these variables:
 | Variable | Meaning | Operational note |
 |---|---|---|
 | `GITHUB_TOKEN` | GitHub PAT or GitHub App token used for the API | Inject at runtime. Scope it to the repositories and operations needed. Azure identity does not replace it. |
-| `SQUAD_DEPLOYMENT_MODE` | Topology mode; default `agent-per-node`, or `squad-per-pod` for concurrent pod instances | Confirm the mode is supported by the exact v1.1.0 code path and choose it deliberately. |
+| `SQUAD_DEPLOYMENT_MODE` | Topology mode; default `agent-per-node`, or `squad-per-pod` for concurrent pod instances | Confirm the mode is supported by the exact v2.0.0 code path and choose it deliberately. |
 | `SQUAD_POD_ID` | Unique pod identifier when using `squad-per-pod` | In Kubernetes, `metadata.name` is a useful unique value. It is not a GitHub identity. |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Optional telemetry collector endpoint | Treat exporter connectivity and payload retention as another data path. |
 | `OTEL_SERVICE_NAME` | Optional reported service name, default `squad-agent` | Use stable, non-secret names for dashboards. |
@@ -116,7 +116,7 @@ At a design level, an ACA deployment needs a registry image, a user-assigned or 
 
 ACA offers built-in HTTP scaling for HTTP request volume. That is not equivalent to scaling a background GitHub issue poller. For queue-depth scaling, the Squad documentation describes an external KEDA scaler that counts issues with selected labels. This usually means a separate scaler service plus a custom scale rule, and it introduces another GitHub API caller and therefore another credential, rate limit, and rotation path. Set minimum replicas according to cold-start tolerance: zero reduces idle capacity but adds a startup delay; one warm replica spends more while idle but can reduce pickup latency.
 
-A one-shot Azure Container Apps Job is a different execution model from a long-running watcher. It can suit event-triggered single tasks, but v1.1.0 does not provide the future `squad --remote` webhook dispatch feature described in the cloud pages. Do not assume the documented future flag is runnable. A Job still needs an authenticated trigger, a bounded task input, token delivery, state strategy, and idempotent retry handling.
+A one-shot Azure Container Apps Job is a different execution model from a long-running watcher. It can suit event-triggered single tasks, but v2.0.0 does not provide the future `squad --remote` webhook dispatch feature described in the cloud pages. Do not assume the documented future flag is runnable. A Job still needs an authenticated trigger, a bounded task input, token delivery, state strategy, and idempotent retry handling.
 
 ## AKS and Kubernetes Controls
 
@@ -138,11 +138,11 @@ The file `templates/keda-scaler.md` is deployment guidance for a separate, commu
 
 KEDA authentication can involve two distinct tokens: the scaler's read-only queue-polling credential and the Squad agent's write-capable GitHub credential. A scaler should usually need only issue/label read access; it does not need to create PRs. Rotate these identities independently. Rate limits matter: a short polling interval across many scaler instances can consume API quota even if every pod is idle.
 
-> **Warning:** The runbook refers to `templates/keda/scaler-deployment.yaml`, but the v1.1.0 repository contains `templates/keda-scaler.md` rather than that manifest. Treat that path as a documentation mismatch. The current checked-in template describes an external project, so you must supply and validate the scaler deployment yourself.
+> **Warning:** The runbook refers to `templates/keda/scaler-deployment.yaml`, but the v2.0.0 repository contains `templates/keda-scaler.md` rather than that manifest. Treat that path as a documentation mismatch. The current checked-in template describes an external project, so you must supply and validate the scaler deployment yourself.
 
 ## Multiple Codespaces and Azure Function Sample
 
-A Codespace is an isolated development environment, not a distributed lock. The multi-Codespace guide describes a shared GitHub repository with separate SubSquads and issue labels: for example, `team:ui`, `team:backend`, and `team:infra`. Each process sets `SQUAD_TEAM` to select its team. In v1.1.0 the resolver reads `.squad/workstreams.json` (older guide examples may call it `.squad/streams.json`), and the CLI exposes `squad subsquads list`, `status`, and `activate`.
+A Codespace is an isolated development environment, not a distributed lock. The multi-Codespace guide describes a shared GitHub repository with separate SubSquads and issue labels: for example, `team:ui`, `team:backend`, and `team:infra`. Each process sets `SQUAD_TEAM` to select its team. In v2.0.0 the resolver reads `.squad/workstreams.json` (older guide examples may call it `.squad/streams.json`), and the CLI exposes `squad subsquads list`, `status`, and `activate`.
 
 Give each SubSquad a narrow issue label and a realistic folder scope. Separate branch-per-issue work reduces collisions; shared files such as package manifests and workflows still need human coordination. `folderScope` and a queue label organize work, but they are not a kernel sandbox or a permission barrier. A process with write access to the whole clone can still modify other files. If strict isolation is required, use repository/branch permissions, separate clones, or a stronger host-level boundary.
 
@@ -231,7 +231,7 @@ Containerizing Squad packages the CLI and its runtime; it does not remove its cr
 
 ## Exercises
 
-1. Explain the difference between the v1.1.0 repo Dockerfile and the container reference page's npm-install example. List one benefit and one trade-off of the standalone bundle.
+1. Explain the difference between the v2.0.0 repo Dockerfile and the container reference page's npm-install example. List one benefit and one trade-off of the standalone bundle.
 2. Draw the credential flow for an AKS pod that reads a GitHub token from Key Vault and then calls GitHub. Label which identity authenticates to each service.
 3. A two-pod worker pool has one GPU node and one CPU-only node. Choose a deployment mode, sketch the two complete capability manifests, explain how `needs:gpu` affects local eligibility, and state how an external scheduler must prevent duplicate claims. Then describe the lookup order when the pod manifest is malformed and when `SQUAD_POD_ID` is unset.
 4. For a queue of 17 issues, a scaler target of 5 issues per pod, minimum 0, and maximum 3, estimate the intended replica count. List at least three reasons the observed count might differ.
@@ -251,14 +251,14 @@ Containerizing Squad packages the CLI and its runtime; it does not remove its cr
 
 ## Further Reading
 
-- [KEDA Autoscaling](https://bradygaster.github.io/squad/docs/features/keda-scaling/)
-- [Container Image — Environment Variable Contract](https://bradygaster.github.io/squad/docs/reference/container-image/)
-- [AKS Deployment Runbook](https://bradygaster.github.io/squad/docs/scenarios/aks-deployment/)
-- [Azure Container Apps Deployment](https://bradygaster.github.io/squad/docs/scenarios/azure-container-apps/)
-- [Multi-Codespace Setup](https://bradygaster.github.io/squad/docs/scenarios/multi-codespace/)
-- [Repository Dockerfile](https://github.com/bradygaster/squad/blob/v1.1.0/Dockerfile)
-- [KEDA scaler guidance template](https://github.com/bradygaster/squad/blob/v1.1.0/templates/keda-scaler.md)
-- [Azure Function sample](https://github.com/bradygaster/squad/tree/v1.1.0/samples/azure-function-squad)
-- [SubSquad resolver](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-sdk/src/streams/resolver.ts)
-- [Deployment capability resolution](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-sdk/src/ralph/capabilities.ts)
-- [Dual-Mode Deployment](https://bradygaster.github.io/squad/docs/features/dual-mode-deployment/)
+- [KEDA Autoscaling](https://github.github.com/squad/docs/features/keda-scaling/)
+- [Container Image — Environment Variable Contract](https://github.github.com/squad/docs/reference/container-image/)
+- [AKS Deployment Runbook](https://github.github.com/squad/docs/scenarios/aks-deployment/)
+- [Azure Container Apps Deployment](https://github.github.com/squad/docs/scenarios/azure-container-apps/)
+- [Multi-Codespace Setup](https://github.github.com/squad/docs/scenarios/multi-codespace/)
+- [Repository Dockerfile](https://github.com/github/squad/blob/v2.0.0/Dockerfile)
+- [KEDA scaler guidance template](https://github.com/github/squad/blob/v2.0.0/templates/keda-scaler.md)
+- [Azure Function sample](https://github.com/github/squad/tree/v2.0.0/samples/azure-function-squad)
+- [SubSquad resolver](https://github.com/github/squad/blob/v2.0.0/packages/squad-sdk/src/streams/resolver.ts)
+- [Deployment capability resolution](https://github.com/github/squad/blob/v2.0.0/packages/squad-sdk/src/ralph/capabilities.ts)
+- [Dual-Mode Deployment](https://github.github.com/squad/docs/features/dual-mode-deployment/)

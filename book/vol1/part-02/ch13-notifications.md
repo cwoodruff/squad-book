@@ -9,7 +9,7 @@
 - Understand the difference between a one-way webhook notification and Squad's bidirectional Teams Graph communication adapter.
 - Configure the Teams adapter for a one-to-one chat or a team channel, including its authentication and token-storage behavior.
 - Migrate SDK callers to the asynchronous communication-adapter factory.
-- Recognize which notification examples are documented workflows and which are not implemented as built-in v1.1.0 CLI commands.
+- Recognize which notification examples are documented workflows and which are not implemented as built-in v2.0.0 CLI commands.
 
 ## Notifications Are a Delivery Design, Not a Single Switch
 
@@ -32,7 +32,7 @@ flowchart LR
   H --> I["Teams Graph / GitHub / ADO / file log"]
 ```
 
-> **Note:** In the v1.1.0 source, `createCommunicationAdapter()` is an SDK factory. It is not a built-in `squad test-notification` command. The notification docs show MCP examples and prompts, but the shipped CLI source does not contain that test command or a bundled `human-notification` skill. Treat those examples as an integration pattern; verify the MCP server and skills available in your own Copilot environment.
+> **Note:** In the v2.0.0 source, `createCommunicationAdapter()` is an SDK factory. It is not a built-in `squad test-notification` command. The notification docs show MCP examples and prompts, but the shipped CLI source does not contain that test command or a bundled `human-notification` skill. Treat those examples as an integration pattern; verify the MCP server and skills available in your own Copilot environment.
 
 ## Ralph's Notification Levels
 
@@ -66,9 +66,9 @@ squad watch --notify-level none
 
 The intended precedence is defaults, then the `watch` config object, then CLI flags. A command-line value should therefore override the saved preference for only that invocation. Valid values are precisely `all`, `important`, and `none`; an unknown spelling is not another supported mode.
 
-### A v1.1.0 implementation caveat
+### A v2.0.0 implementation caveat
 
-There is a discrepancy between the feature page and the v1.1.0 implementation that matters if you are relying on quiet output. The CLI parses `--notify-level` and the config loader stores `watch.notifyLevel`, but the two watch call sites of `reportBoard()` do not pass that setting. `reportBoard()` consequently falls back to `all` when it is called without options. The source also leaves the `WatchConfig` default undefined. In other words, the option is recognized, but the complete watch path does not currently honor it as documented. The same calls omit the reporter's optional `machineName` and `repoName`, so the documented machine/repository attribution is also not wired through those current watch paths.
+There is a discrepancy between the feature page and the v2.0.0 implementation that matters if you are relying on quiet output. The CLI parses `--notify-level` and the config loader stores `watch.notifyLevel`, but the two watch call sites of `reportBoard()` do not pass that setting. `reportBoard()` consequently falls back to `all` when it is called without options. The source also leaves the `WatchConfig` default undefined. In other words, the option is recognized, but the complete watch path does not currently honor it as documented. The same calls omit the reporter's optional `machineName` and `repoName`, so the documented machine/repository attribution is also not wired through those current watch paths.
 
 You can confirm the call chain in `packages/squad-cli/src/cli-entry.ts`, `packages/squad-cli/src/cli/commands/watch/config.ts`, and `packages/squad-cli/src/cli/commands/watch/index.ts`. Until the source is corrected in a release you have verified, don't promise an operations team that `important` or `none` suppresses output. If noise matters, capture the output at the wrapper or log-forwarding layer and test the exact installed version. This is a source-level discrepancy, not an alternative interpretation of the three levels.
 
@@ -78,7 +78,7 @@ Each board header can include the machine hostname and repository name. That att
 
 The notification feature documentation describes a loose coupling between the agent's decision to notify and the delivery service. A skill can teach an agent which circumstances warrant a message; an MCP server provides the concrete tool that sends it. This design can work with a Teams workflow webhook, Discord, Slack, iMessage, or a custom HTTP service, provided the chosen MCP server implements the necessary action and is configured in the Copilot host.
 
-The doc's example triggers are blocked work, a human decision, an error, a completed task, and a review that needs a response. These are useful categories for a notification policy, not a guarantee that every v1.1.0 Squad agent automatically emits such events. A notification should carry just enough context to make it actionable: who needs the person, the reason, the linked issue or PR, and the next step. Avoid sending credentials, secrets, or private task data to a channel that is not approved for it.
+The doc's example triggers are blocked work, a human decision, an error, a completed task, and a review that needs a response. These are useful categories for a notification policy, not a guarantee that every v2.0.0 Squad agent automatically emits such events. A notification should carry just enough context to make it actionable: who needs the person, the reason, the linked issue or PR, and the next step. Avoid sending credentials, secrets, or private task data to a channel that is not approved for it.
 
 For webhook-style delivery, Teams Workflows is recommended over retired Office 365 connectors. The general shape is: create a workflow endpoint, configure a compatible MCP server with that endpoint, register the server in Copilot's MCP configuration, and restart the host so it loads the new configuration. Webhook URLs are bearer-like secrets: keep them out of source control and logs. A webhook notification is generally one-way; a human reply in Teams does not automatically become an agent reply unless the MCP server implements a receive path.
 
@@ -90,7 +90,7 @@ A policy can also control which triggers the MCP service sends, if that service 
 
 A delivery system is only half the design; the other half is deciding what to say and how often. A useful notification answers three questions quickly: **what happened, why does it matter to me, and what should I do next?** A short title can name the urgency or owner; the body can state the blocker or result; a link can take the recipient to the issue, pull request, or run log. Avoid messages that merely say “something happened” and force the human to search the whole conversation.
 
-Treat each notification class as a policy choice. A blocked agent may need a prompt question, while a test failure may need a summary and log link. Completion alerts are useful when the person is away, but sending one for every small subtask can obscure the one alert that requires an answer. “Decision needed” and “blocked” can overlap; decide whether your system should send one combined notification or two. If the external service supports quiet hours, batching, or per-trigger flags, document those at the service boundary and test them there. Squad itself does not provide a universal `NOTIFY_*` policy engine in the v1.1.0 CLI.
+Treat each notification class as a policy choice. A blocked agent may need a prompt question, while a test failure may need a summary and log link. Completion alerts are useful when the person is away, but sending one for every small subtask can obscure the one alert that requires an answer. “Decision needed” and “blocked” can overlap; decide whether your system should send one combined notification or two. If the external service supports quiet hours, batching, or per-trigger flags, document those at the service boundary and test them there. Squad itself does not provide a universal `NOTIFY_*` policy engine in the v2.0.0 CLI.
 
 Think through failure paths too. The notification server might be unavailable, credentials may expire, an endpoint may be rate-limited, or a reply may arrive after the agent has stopped polling. Decide whether the work should pause until a human responds, continue with a safe default, or record the pending question for the next session. A one-way alert cannot make a workflow interactive by itself. A bidirectional adapter can return replies, but your caller still needs to poll, associate each reply with the right task, and decide whether the reply author is authorized to make that decision.
 
@@ -162,7 +162,7 @@ sequenceDiagram
 
 ## Migrating to the Async Teams Adapter
 
-The factory became asynchronous in the SDK v0.10 generation because a Teams adapter can require interactive authentication and network calls. Code written against the older synchronous API must await factory creation. The factory's actual v1.1.0 signature accepts the repository root string and resolves channel selection from config:
+The factory became asynchronous in the SDK v0.10 generation because a Teams adapter can require interactive authentication and network calls. Code written against the older synchronous API must await factory creation. The factory's actual v2.0.0 signature accepts the repository root string and resolves channel selection from config:
 
 ```typescript
 import { createCommunicationAdapter } from '@bradygaster/squad-sdk';
@@ -192,7 +192,7 @@ try {
 
 Only call `logout()` when you intend to sign out and delete this local cached token. It is not required after each message and does not invalidate a token at Microsoft's service. The identity-scoped cache, automatic migration, timeout bounds, and stale-token cleanup are internal hardening; they do not require changes to the caller's TypeScript beyond the async factory and optional logout behavior.
 
-> **Warning:** One assigned Teams doc shows `createCommunicationAdapter({ channel: 'teams' })` and claims an OS credential store. Those examples do not match the v1.1.0 implementation: the factory takes a repository-root string, the supported channel literal is `teams-graph`, and the adapter stores identity-scoped JSON token files under Squad home. Use the source-backed API and configuration shown in this chapter.
+> **Warning:** One assigned Teams doc shows `createCommunicationAdapter({ channel: 'teams' })` and claims an OS credential store. Those examples do not match the v2.0.0 implementation: the factory takes a repository-root string, the supported channel literal is `teams-graph`, and the adapter stores identity-scoped JSON token files under Squad home. Use the source-backed API and configuration shown in this chapter.
 
 ## Hands-On: Prepare Tasktrack for Low-Noise Team Updates
 
@@ -240,7 +240,7 @@ This exercise prepares the Tasktrack workspace you have been evolving since earl
 
    Expected result: the diff shows two independent settings. The `watch` subtree describes Ralph behavior; `communications` describes an SDK adapter. Do not expect `squad watch --notify-level important` to deliver a Teams message, and verify actual output behavior against the CLI version because of the source discrepancy described above.
 
-For a real external notification rather than SDK-driven communication, configure a compatible MCP server in your Copilot host and keep its webhook secret outside version control. The separate notification docs provide examples, but their `test-notification` command is not part of the v1.1.0 CLI.
+For a real external notification rather than SDK-driven communication, configure a compatible MCP server in your Copilot host and keep its webhook secret outside version control. The separate notification docs provide examples, but their `test-notification` command is not part of the v2.0.0 CLI.
 
 ## Configuration Reference
 
@@ -273,7 +273,7 @@ The async migration reference is `docs/migration/teams-async-adapter.md`. Its ra
 
 ## Pitfalls and Troubleshooting
 
-- **The terminal stays noisy despite `important`.** The v1.1.0 watch call sites do not forward the configured level to `reportBoard()`. Confirm the CLI version and treat this as an implementation gap, not a Teams problem.
+- **The terminal stays noisy despite `important`.** The v2.0.0 watch call sites do not forward the configured level to `reportBoard()`. Confirm the CLI version and treat this as an implementation gap, not a Teams problem.
 - **No Teams message appears after editing config.** Configuration selects the adapter; an SDK caller still must create it and call `postUpdate()`. No automatic “every session completion” hook is implied by the config alone.
 - **`recipientUpn: "me"` fails.** Supply an existing `chatId`; the adapter intentionally refuses to pick an arbitrary self-chat.
 - **Channel posts route somewhere unexpected.** Verify that both `teamId` and `channelId` refer to the intended team/channel. With only one of them present, the code does not enter channel mode.
@@ -286,7 +286,7 @@ The async migration reference is `docs/migration/teams-async-adapter.md`. Its ra
 ## Summary
 
 - Ralph's watch levels are about reporting board rounds; they are not delivery channels.
-- MCP-based human notifications depend on a separately configured MCP server and agent instructions. Several examples in the notification docs are not shipped CLI features in v1.1.0.
+- MCP-based human notifications depend on a separately configured MCP server and agent instructions. Several examples in the notification docs are not shipped CLI features in v2.0.0.
 - The SDK's `teams-graph` adapter is bidirectional: it posts through Graph and polls for replies.
 - Teams configuration lives under `.squad/config.json` → `communications.adapterConfig["teams-graph"]`; channel mode needs both IDs.
 - Await `createCommunicationAdapter(repoRoot)`. The older sync form is a breaking-change migration; logout is optional and local-only.
@@ -294,7 +294,7 @@ The async migration reference is `docs/migration/teams-async-adapter.md`. Its ra
 
 ## Exercises
 
-1. A team shares one Ralph log and wants only non-empty board reports. Which level describes that intention, and why should you test it on the target v1.1.0 build before depending on it?
+1. A team shares one Ralph log and wants only non-empty board reports. Which level describes that intention, and why should you test it on the target v2.0.0 build before depending on it?
 2. Design a Teams config for a channel destination. Which IDs must be present, and what thread ID format does the adapter return?
 3. Rewrite this legacy code for the async SDK factory, including safe error handling: `const adapter = createCommunicationAdapter(root); adapter.postUpdate(update);`.
 4. Explain the operational difference between an MCP webhook notification and the `teams-graph` adapter. Give one use case for each.
@@ -304,7 +304,7 @@ The async migration reference is `docs/migration/teams-async-adapter.md`. Its ra
 
 1. Which watch level emits a report even when no work counters are nonzero: `all`, `important`, or `none`?
 2. Does `--notify-level none` configure Teams to stop sending Graph messages?
-3. What is the correct channel literal for the Teams Graph adapter in v1.1.0?
+3. What is the correct channel literal for the Teams Graph adapter in v2.0.0?
 4. Which two settings select a Teams channel rather than a one-to-one chat?
 5. What must a v0.9-era SDK caller change after the factory became async?
 6. Does `logout()` revoke the cached token at Microsoft's service?
@@ -312,8 +312,8 @@ The async migration reference is `docs/migration/teams-async-adapter.md`. Its ra
 
 ## Further Reading
 
-- [Teams Communication Adapter (repository feature note)](https://github.com/bradygaster/squad/blob/v1.1.0/docs/features/teams-adapter.md)
-- [Teams async-adapter migration](https://github.com/bradygaster/squad/blob/v1.1.0/docs/migration/teams-async-adapter.md)
-- [Notification Level](https://bradygaster.github.io/squad/docs/features/notification-level/)
-- [Notifications](https://bradygaster.github.io/squad/docs/features/notifications/)
-- [Microsoft Teams Comms Adapter](https://bradygaster.github.io/squad/docs/features/teams-comms/)
+- [Teams Communication Adapter (repository feature note)](https://github.com/github/squad/blob/v2.0.0/docs/features/teams-adapter.md)
+- [Teams async-adapter migration](https://github.com/github/squad/blob/v2.0.0/docs/migration/teams-async-adapter.md)
+- [Notification Level](https://github.github.com/squad/docs/features/notification-level/)
+- [Notifications](https://github.github.com/squad/docs/features/notifications/)
+- [Microsoft Teams Comms Adapter](https://github.github.com/squad/docs/features/teams-comms/)

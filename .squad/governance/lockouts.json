@@ -1,0 +1,218 @@
+{
+  "version": 1,
+  "subjects": [
+    {
+      "subject": "vol1-2.0-ch04-05-11-12",
+      "paths": [
+        "book/vol1/part-01/ch04-meet-the-team.md",
+        "book/vol1/part-02/ch05-routing.md",
+        "book/vol1/part-02/ch11-coding-agent-remote.md",
+        "book/vol1/part-02/ch12-models-cost.md",
+        "exercises/solutions/vol1/ch05.md"
+      ],
+      "state": "cleared",
+      "lockedAuthors": [
+        "ford"
+      ],
+      "reviewer": "arthur",
+      "reason": "Arthur R1-R6 in research/reviews/vol1-review.md (Copilot sign-off scoping, Fact Checker wording, Ch5 note length + Exercise 4 Copilot-only, rc deprecation v2.0.0, Ch12 v1.1.0 targets); clears when each clearing condition is met and Arthur re-approves",
+      "overrides": [],
+      "updatedAt": "2026-11-21T02:40:58.366Z",
+      "successor": "trillian"
+    },
+    {
+      "subject": "vol2-2.0-ch01-04-12-15-16",
+      "paths": [
+        "book/vol2/part-01/ch01-mcp.md",
+        "book/vol2/part-01/ch04-portability.md",
+        "book/vol2/part-03/ch12-coordinator-internals.md",
+        "book/vol2/part-03/ch15-plugins-hooks.md",
+        "book/vol2/part-03/ch16-autonomous-agents.md"
+      ],
+      "state": "cleared",
+      "lockedAuthors": [
+        "trillian"
+      ],
+      "reviewer": "arthur",
+      "reason": "Arthur R1-R5 in research/reviews/vol2-part1-3-review.md (xref form, duplicate Changed-in-2.0 notice, Rai/Fact Checker optional built-ins, v1.1.0 CLI ref, resilience callout Warning); clears when each clearing condition is met and Arthur re-approves",
+      "overrides": [],
+      "updatedAt": "2026-11-21T02:49:47.985Z",
+      "successor": "ford"
+    },
+    {
+      "subject": "vol2-2.0-ch18-19",
+      "paths": [
+        "book/vol2/part-04/ch18-squad-2-overview.md",
+        "book/vol2/part-04/ch19-across-clients.md"
+      ],
+      "state": "cleared",
+      "lockedAuthors": [
+        "trillian"
+      ],
+      "reviewer": "arthur",
+      "reason": "Arthur R1-R3 in research/reviews/vol2-part4-ch18-19-review.md (Claude member-subagent exception, Rai/Fact Checker cast behaviour, client list after Claude removal); clears when each clearing condition is met and Arthur re-approves",
+      "overrides": [],
+      "updatedAt": "2026-11-21T13:20:02.460Z",
+      "successor": "ford"
+    },
+    {
+      "subject": "vol2-2.0-ch22",
+      "paths": [
+        "book/vol2/part-04/ch22-upgrading-to-2.md"
+      ],
+      "state": "cleared",
+      "lockedAuthors": [
+        "trillian"
+      ],
+      "reviewer": "arthur",
+      "reason": "Arthur R1-R6 in research/reviews/vol2-part4-ch20-22-review.md (1.1.0 npx launch not machine path, Rai/Fact Checker mandatory in 1.1.0, ch02-start tag, xref form, governed memory since 0.12.0, work claims shipped); clears when each clearing condition is met and Arthur re-approves",
+      "overrides": [],
+      "updatedAt": "2026-11-21T13:30:48.500Z",
+      "successor": "ford"
+    },
+    {
+      "subject": "vol2-2.0-ch18-r7",
+      "paths": [
+        "book/vol2/part-04/ch18-squad-2-overview.md"
+      ],
+      "state": "cleared",
+      "lockedAuthors": [
+        "ford"
+      ],
+      "reviewer": "arthur",
+      "reason": "R7 in research/reviews/vol2-part4-ch20-22-review.md: ch18 l.448 still says plain squad cast adds the support table, contradicting l.228; clears when it names squad cast --name/--role and Arthur re-approves",
+      "overrides": [],
+      "updatedAt": "2026-11-21T13:32:37.390Z",
+      "successor": "trillian"
+    },
+    {
+      "subject": "vol2-2.0-ch19-r8",
+      "paths": [
+        "book/vol2/part-04/ch19-across-clients.md"
+      ],
+      "state": "cleared",
+      "lockedAuthors": [
+        "trillian"
+      ],
+      "reviewer": "arthur",
+      "reason": "R8: ch19 l.301 sentence starts lowercase 'it'; clears when it reads 'It' with nothing else changed and Arthur re-approves",
+      "overrides": [],
+      "updatedAt": "2026-11-21T13:34:12.863Z",
+      "successor": "ford"
+    },
+    {
+      "subject": "shared-app-B-r7",
+      "paths": [
+        "book/shared/appendices/app-B-configuration.md"
+      ],
+      "state": "cleared",
+      "lockedAuthors": [
+        "trillian"
+      ],
+      "reviewer": "arthur",
+      "reason": "R7 in research/reviews/shared-appendices-review.md: App B l.98 complete-scan claim misses ComSpec (mcp-probe.ts l.173) and GIT_CONFIG_PARAMETERS (upstream.ts l.79); clears when both are added or the claim is narrowed, and Arthur re-approves",
+      "overrides": [],
+      "updatedAt": "2026-11-21T13:43:02.837Z",
+      "successor": "slartibartfast"
+    },
+    {
+      "subject": "shared-app-ABC-2.0",
+      "paths": [
+        "book/shared/appendices/app-A-cli-reference.md",
+        "book/shared/appendices/app-B-configuration.md",
+        "book/shared/appendices/app-C-glossary.md"
+      ],
+      "state": "cleared",
+      "lockedAuthors": [
+        "ford"
+      ],
+      "reviewer": "arthur",
+      "reason": "Arthur R1-R6 in research/reviews/shared-appendices-review.md (App A no-help list and notes promote, nap decisions archive, plugin-mode files, env vars, App C squad cast and preview channel); clears when each clearing condition is met and Arthur re-approves",
+      "overrides": [],
+      "updatedAt": "2026-11-21T13:43:03.037Z",
+      "successor": "trillian"
+    },
+    {
+      "subject": "build-check-links-2.0",
+      "paths": [
+        "scripts/check-links.sh"
+      ],
+      "state": "cleared",
+      "lockedAuthors": [
+        "slartibartfast"
+      ],
+      "reviewer": "marvin",
+      "reason": "Marvin R1-R2 in research/reviews/build-review.md: check-links.sh checks 1 of 309 links (trailing quote breaks xargs, error ignored, count misreported) and 7 local/placeholder URLs always fail; clears when the script checks every URL, reports accurately, skips or allowlists placeholders, and Marvin re-approves",
+      "overrides": [],
+      "updatedAt": "2026-11-21T13:48:07.230Z",
+      "successor": "arthur"
+    },
+    {
+      "subject": "vol2-2.0-ch22-e2e-l392",
+      "paths": [
+        "book/vol2/part-04/ch22-upgrading-to-2.md"
+      ],
+      "state": "cleared",
+      "lockedAuthors": [
+        "trillian"
+      ],
+      "reviewer": "arthur",
+      "reason": "R1 in research/reviews/e2e-checks.md: ch22 l.392 dropped 'later'; before the upgrade doctor fails the squad_state bridge check; clears when it reads 'After the upgrade, an uncast team adds no doctor warnings or failures…' and Arthur re-approves",
+      "overrides": [],
+      "updatedAt": "2026-11-21T13:49:04.669Z",
+      "successor": "ford"
+    },
+    {
+      "subject": "vol2-2.0-part5-front-appGJ",
+      "paths": [
+        "book/vol2/00-front/01-preface.md",
+        "book/vol2/part-05/ch23-*.md",
+        "book/vol2/part-05/ch25-*.md",
+        "exercises/solutions/vol2/ch25.md",
+        "book/vol2/appendices/app-G-sdk-api.md",
+        "book/vol2/appendices/app-H-feature-matrix.md",
+        "book/vol2/appendices/app-I-spec-cheatsheet.md",
+        "book/vol2/appendices/app-J-version-history.md"
+      ],
+      "state": "cleared",
+      "lockedAuthors": [
+        "trillian"
+      ],
+      "reviewer": "arthur",
+      "reason": "Arthur R1-R6 in research/reviews/vol2-part5-front-appendices-review.md (preface Part IV range, xref form, nonexistent App G symbols, App G raw code/comments/launcher path, App I claude-agent-sdk credential condition, Ch 25 insider publish package managers); clears when each clearing condition is met and Arthur re-approves",
+      "overrides": [],
+      "updatedAt": "2026-11-21T13:50:16.629Z",
+      "successor": "ford"
+    },
+    {
+      "subject": "validation-md-2.0",
+      "paths": [
+        "research/VALIDATION.md"
+      ],
+      "state": "cleared",
+      "lockedAuthors": [
+        "marvin"
+      ],
+      "reviewer": "slartibartfast",
+      "reason": "V1-V3 in research/reviews/inventories-review.md: l.29 link-check scope (book/ and exercises/ only), l.40 record the approved make links run (308 found, 301 checked, 7 skipped, 0 broken), l.43 final Ch 22 fix status; clears when all three are correct and Slartibartfast re-approves",
+      "overrides": [],
+      "updatedAt": "2026-11-21T13:50:41.946Z",
+      "successor": "trillian"
+    },
+    {
+      "subject": "vol2-2.0-ch08-r7",
+      "paths": [
+        "book/vol2/part-02/ch08-cicd-release.md"
+      ],
+      "state": "cleared",
+      "lockedAuthors": [
+        "ford"
+      ],
+      "reviewer": "arthur",
+      "reason": "R7 in research/reviews/vol2-part5-front-appendices-review.md: ch08 l.117 says the v2.0.0 installation page calls npm preview a release-candidate tag; it calls @preview an on-demand prerelease from dev, and only the Homebrew squad-preview cask is described as release candidates; clears when the clause is deleted or made accurate and Arthur re-approves",
+      "overrides": [],
+      "updatedAt": "2026-11-21T13:51:20.899Z",
+      "successor": "trillian"
+    }
+  ]
+}

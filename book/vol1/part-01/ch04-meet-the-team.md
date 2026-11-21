@@ -17,7 +17,7 @@ The coordinator is Squad’s task router and process owner. It is not one more d
 
 For Tasktrack, start with the work the sample actually contains: an in-memory API, a plain browser client, and tests. A small project team might include a lead/architect, an API/backend specialist, a frontend specialist, and a test engineer. Avoid roles for React, Express, a database administrator, or an infrastructure specialist unless the project has grown to need them. You can add a specialist later when there is a recurring body of work for that domain.
 
-Squad’s team-setup guidance describes proposal, review, and confirmation as separate phases. In this v1.1.0 coordinator prompt, Init Mode is deliberately two-phase: phase one proposes the team and pauses for your decision; phase two writes the active roster, charters, routing, and casting state only after you confirm. That pause matters. A roster affects every later task, so first inspect what the proposal assumes about your stack, responsibilities, and approval gates.
+Squad’s team-setup guidance describes proposal, review, and confirmation as separate phases. In the v2.0.0 Copilot coordinator prompt, Init Mode is deliberately two-phase: phase one proposes the team and pauses for your decision; phase two writes the active roster, charters, routing, and casting state only after you confirm. That pause matters. A roster affects every later task, so first inspect what the proposal assumes about your stack, responsibilities, and approval gates.
 
 ```mermaid
 flowchart LR
@@ -52,7 +52,7 @@ The CLI flow wraps this lower-level idea with project-aware setup, registry upda
 
 The live casting state lives in `.squad/casting/`, not in a team member’s history. In a fresh project the registry has no specialist records. After a cast, registry records identify agents, roles, naming universe, and lifecycle status; history records universe use and snapshots. The registry/history pair is written transactionally and validated together. The prompt marks these JSON files as casting-state sources of truth. They are machine-maintained state: do not hand-edit them to add a name when the coordinator or `squad cast` can perform the operation safely.
 
-A key distinction: the copy at `.squad/templates/casting/Futurama.json` is a shipped character data file, while the SDK’s typed v1 `UniverseId` union lists only `usual-suspects`, `oceans-eleven`, and `custom`. The template folder README also says the `casting/` subtree has no known runtime consumer. Treat that JSON as available data, not proof that `Futurama` is selectable through every v1.1.0 casting path.
+A key distinction: the copy at `.squad/templates/casting/Futurama.json` is a shipped character data file, while the SDK’s typed v1 `UniverseId` union lists only `usual-suspects`, `oceans-eleven`, and `custom`. The template folder README also says the `casting/` subtree has no known runtime consumer. Treat that JSON as available data, not proof that `Futurama` is selectable through every v2.0.0 casting path.
 
 ## Charters: What an Agent Is Allowed to Own
 
@@ -69,11 +69,13 @@ A good charter includes exclusions as well as positive ownership. If the fronten
 
 The roster and routing table are linked. The roster says a person/agent exists, its role, its charter path, and status. Routing says which work goes where. A routing row that names a nonexistent agent is broken policy, not a harmless note. When adding an AI specialist, update the charter, team roster, routing, and casting state as one coordinated change; the `squad cast --name <name> --role <role>` command handles these pieces in the CLI path. When retiring a member, move the agent into the alumni location rather than leaving an active route to a missing charter. Human-member rows are different: they do not require an AI charter or history.
 
+A charter can also carry an optional `## Examples` section, placed after the responsibilities (and after an optional `## Model`). Use it for two or three representative requests and the behavior you expect, such as "Add a `GET /tasks/:id` route: change `api/src/app.ts`, add `node:test` cases, no new dependencies." Squad keeps the section when it edits a charter and shows it to the agent, but it never runs the examples or treats them as permissions or as a passing test. Headings that start with `## X-` (for example `## X-squad-host-claude`) are namespaced extensions that tools preserve byte for byte; Chapter 17 (Volume 2) covers the charter specification and Chapter 20 (Volume 2) the host-specific ones.
+
 > **Tip:** Give each specialist one clear “first call” domain. Add secondary collaboration through task-specific coordination rather than making every charter claim ownership of the same files.
 
 ## Built-In Base Roles: The Starting Catalog
 
-The command `squad roles` in the installed v1.1.0 CLI reported **21 base roles**. They are curated charter starting points, not 21 mandatory members. `squad roles --category <name>` filters the catalog, and `squad roles --search <query>` searches it. The base-role option to `squad init --roles` tells the later team-casting flow to use this catalog rather than relying only on fictional-universe role casting. The role’s depth is in its charter: its expertise, approach, voice, and boundaries can be refined for the project.
+The command `squad roles` in the installed v2.0.0 CLI reported **21 base roles**. They are curated charter starting points, not 21 mandatory members. `squad roles --category <name>` filters the catalog, and `squad roles --search <query>` searches it. The base-role option to `squad init --roles` tells the later team-casting flow to use this catalog rather than relying only on fictional-universe role casting. The role’s depth is in its charter: its expertise, approach, voice, and boundaries can be refined for the project.
 
 | Role ID | Title | Useful ownership |
 |---|---|---|
@@ -101,11 +103,21 @@ The command `squad roles` in the installed v1.1.0 CLI reported **21 base roles**
 
 Use a base role when its curated expertise fits; customize the charter when the codebase has important local conventions. Use a custom role when a durable responsibility is genuinely missing from the catalog. In SDK builder syntax, the docs show `useRole('backend', { name: 'kane', expertise: [...] })`; the role remains a starting point, while the project-specific expertise explains what the agent should know in your stack. The built-in catalog is adapted from agency-agents under its stated MIT attribution; do not remove that attribution when describing its origin.
 
-> **Note:** The role documentation’s prose says “20” and its software/business subgroup counts do not match its own rows. I ran `squad roles` from the installed v1.1.0 CLI: it reported 21, with 10 under “Software Development” and 11 under “Business & Operations.” Use the CLI output as the verified count for this release.
+> **Note:** The role documentation’s prose says “20” and its software/business subgroup counts do not match its own rows. I ran `squad roles` from the installed v2.0.0 CLI: it reported 21, with 10 under “Software Development” and 11 under “Business & Operations.” Use the CLI output as the verified count for this release.
 
 ## The Four Built-In Support Identities
 
-A normal project cast does not require you to add the support identities manually. The actual `squad init` run scaffolded four support charters and histories: Scribe, Ralph, Rai, and Fact Checker. The coordinator prompt describes them as mandatory support identities, separate from ordinary specialist registry entries and routing destinations. The team-generation flow can surface them in the active roster, but they are not four more project specialists competing for the same API or UI work.
+A fresh `squad init` scaffolds four support charters and histories: Scribe, Ralph, Rai, and Fact Checker. The Copilot coordinator prompt treats them as built-in support identities, separate from ordinary specialist registry entries and routing destinations, and the first-session cast writes them into the roster alongside your specialists. They are not four more project specialists competing for the same API or UI work.
+
+Scribe and Ralph are always part of the team. Rai and Fact Checker are **optional built-ins** in Squad 2.0. `squad upgrade` never edits `team.md`, so a team that was cast without them (or upgraded from 1.x) does not gain them on its own. Add them explicitly, and preview the change first:
+
+```bash
+squad roster add rai --dry-run
+squad roster add rai            # or fact-checker, or all
+squad roster remove fact-checker
+```
+
+`roster add` prints the exact `team.md` diff before it applies it, and the first add writes a verified backup. `roster remove` (aliases `disable` and `uninstall`) deletes only the rows that `roster add` created. `squad health` reports a Rai or Fact Checker charter that is not on the roster as "available but not configured". When `squad cast --name <Name> --role "<Role>"` adds a member to a `team.md` that lacks the support-agent table, it adds that table too, so Copilot and other hosts list the same team. Plain `squad cast` only shows the roster.
 
 | Identity | Responsibility | How to think about it |
 |---|---|---|
@@ -129,7 +141,9 @@ Add Jordan as security reviewer. Route the production-auth design to Jordan
 for approval before implementation proceeds.
 ```
 
-A review request that merely tags an occasional collaborator on a GitHub pull request does not need a permanent roster entry. Use a human member when the process genuinely requires a pause and an explicit response. You do not need to roster yourself for Squad to know who is driving: the coordinator reads `git config user.name`; listing yourself is an optional formalization.
+A review request that merely tags an occasional collaborator on a GitHub pull request does not need a permanent roster entry. Use a human member when the process genuinely requires a pause and an explicit response. You do not need to roster yourself for Squad to know who is driving: the coordinator reads `git config user.name`; listing yourself is an optional formalization. That name is only a hint about who is at the keyboard. It is never a sign-off.
+
+Squad 2.0 ships `.squad/templates/human-members.md` again, and it spells out a **sign-off gate**. When `team.md`, `routing.md` or a decision says a human must approve a kind of work (a release, a version bump, a tag, a publish, a merge or a deploy), a request to do that work is not the approval. The coordinators Squad generates for the other hosts follow that rule: before the gated step they name the rule and the human, ask, and go ahead only on an explicit yes. The Copilot coordinator is unchanged in 2.0. On Copilot, state the gate in `team.md` or `routing.md` and enforce it with branch protection. Chapter 18 covers review and sign-off gates in depth.
 
 Do not confuse a human roster member with GitHub’s `@copilot` coding agent. The latter is a special integration that works through issue assignment, has no standard agent directory/charter/history, and uses `.github/copilot-instructions.md`. It can appear on the roster, but it does not spawn like a Squad specialist. Init’s non-interactive message says it skipped `@copilot` setup; you can add or enable it separately when your repository and workflow are ready.
 
@@ -137,7 +151,7 @@ Review gates make the distinction concrete. A human can provide business judgmen
 
 ## Presets: Reusable Team Shapes
 
-A preset packages a team’s **agent charters**, not the complete history or knowledge of a project. The installed v1.1.0 CLI supports these operations:
+A preset packages a team’s **agent charters**, not the complete history or knowledge of a project. The installed v2.0.0 CLI supports these operations:
 
 | Command | What it does |
 |---|---|
@@ -149,7 +163,7 @@ A preset packages a team’s **agent charters**, not the complete history or kno
 | `squad preset init [--remote]` | Initializes the presets directory locally or links Squad home to a private GitHub repository. |
 | `squad init --preset <name>` | Creates the normal project scaffold and applies the named preset as part of setup. |
 
-Local presets live under `~/.squad/presets/<name>/` by default (or the configured Squad home), with a `preset.json` manifest and `agents/<name>/charter.md` files. The manifest identifies the preset name, version, description, agents, optional author, and tags. `squad preset init` seeds the bundled starter. For v1.1.0 source verification, the installed SDK contains a built-in `default` preset with lead, reviewer, devrel, security, and docs agents. Do not assume illustrative names such as `backend-team` from an example are installed unless `squad preset list` shows them.
+Local presets live under `~/.squad/presets/<name>/` by default (or the configured Squad home), with a `preset.json` manifest and `agents/<name>/charter.md` files. The manifest identifies the preset name, version, description, agents, optional author, and tags. `squad preset init` seeds the bundled starter. For v2.0.0 source verification, the installed SDK contains a built-in `default` preset with lead, reviewer, devrel, security, and docs agents. Do not assume illustrative names such as `backend-team` from an example are installed unless `squad preset list` shows them.
 
 Applying a preset does more than copy charters. In the current SDK it also merges roster entries and routes and writes casting provenance with a `preset:<name>` universe label. It preserves existing entries and only adds missing ones; `--force` controls overwrite of agent files. This is a distinction from a full backup: presets do not preserve project decisions, routing customizations as a complete snapshot, skills, ceremonies, memory, or casting history. Use `squad export` for the fuller portable snapshot.
 
@@ -227,6 +241,9 @@ On another initialized scratch project, try `squad preset apply tasktrack-starte
 | `.squad/casting/history.json` | Casting history and assignment snapshots. |
 | `.squad/casting/policy.json` | Constraints and defaults for casting operations. |
 | `squad cast --name <name> --role <role>` | Add a project agent through the CLI; `squad hire` is an alias. |
+| `squad roster add\|remove <rai\|fact-checker\|all> [--dry-run]` | Opt the optional built-ins Rai and Fact Checker in or out of `team.md`; prints the diff first. |
+| `.squad/templates/human-members.md` | Reference for human members, including the sign-off gate. |
+| Charter `## Examples` | Optional representative requests; preserved, shown to the agent, never executed. |
 | `squad preset init` | Seed local presets in Squad home. |
 | `squad preset init --remote` | Personal preset home backed by GitHub; requires `gh` auth and can create private `squad-home`. |
 | `squad preset apply <name> [--force]` | Merge agent charter(s), team, routing, and casting provenance; collision behavior is controlled by force. |
@@ -246,14 +263,14 @@ Casting and presets are implemented in `packages/squad-cli/src/cli/core/cast.ts`
 - **Everyone owns the same files.** Narrow each charter to a primary domain and use explicit coordination on shared contracts.
 - **A human is being treated as an agent.** Humans are not spawned and have no charter/history. They are external approval or routing targets; you relay their answer.
 - **An agent is absent from casting records after a manual edit.** Avoid hand-editing just `team.md`; use the coordinator or cast command so roster, charter, routes, and provenance stay aligned.
-- **`fact-checker` looks duplicated.** The base catalog role is available for a curated specialist; the always-on support identity is a separate built-in contract. Decide whether you need a second dedicated specialist rather than blindly adding one.
+- **`fact-checker` looks duplicated.** The base catalog role is available for a curated specialist; the optional built-in support identity is a separate built-in contract. Decide whether you need a second dedicated specialist rather than blindly adding one.
 - **A preset silently skips a same-name agent.** That is the safer default. Inspect the diff; pass `--force` only when replacing existing charters is intended.
-- **Applying a preset changed more than charters.** In v1.1.0 the apply path also merges roster entries, routing, and casting provenance. Review all affected state.
+- **Applying a preset changed more than charters.** In v2.0.0 the apply path also merges roster entries, routing, and casting provenance. Review all affected state.
 - **You expected `backend-team` or `full-stack` to exist.** These names are examples, not guaranteed shipped presets. Use `squad preset list`; source verification found the built-in `default` manifest.
 - **You expect a preset to carry project memory.** It does not. Use `squad export` when decisions, skills, and broader Squad state must travel with the team.
-- **The preset page’s sharing note is stale for v1.1.0.** It describes a formal install flow as a roadmap item, but the verified CLI supports `squad preset install <source>` for GitHub URLs, SSH URLs, and local paths. `preset init --remote` is separate: it backs your own Squad home with a private repo.
+- **The preset page’s sharing note is stale for v2.0.0.** It describes a formal install flow as a roadmap item, but the verified CLI supports `squad preset install <source>` for GitHub URLs, SSH URLs, and local paths. `preset init --remote` is separate: it backs your own Squad home with a private repo.
 - **You run remote preset init casually.** It needs `gh` authentication and may create a private GitHub repo. Choose local init if you do not want that side effect.
-- **The role count in a doc does not match the CLI.** The v1.1.0 command reports 21 roles; some page prose says 20. The verified command is the relevant reference for installed behavior.
+- **The role count in a doc does not match the CLI.** The v2.0.0 command reports 21 roles; some page prose says 20. The verified command is the relevant reference for installed behavior.
 
 ## Summary
 
@@ -272,7 +289,7 @@ Your team now exists, but it only helps if work reaches the right member. Part I
 ## Quiz
 
 1. What is the difference between a specialist’s charter and history?
-2. How many base roles did the installed v1.1.0 `squad roles` command report?
+2. How many base roles did the installed v2.0.0 `squad roles` command report?
 3. Name the four built-in support identities and give one function for each.
 4. What happens if a task routes to a human member?
 5. Does applying a preset capture the project’s decisions and skills?
@@ -281,8 +298,8 @@ Your team now exists, but it only helps if work reaches the right member. Part I
 
 ## Further Reading
 
-- [Team Setup & Init Mode](https://bradygaster.github.io/squad/docs/features/team-setup/)
-- [Built-in Base Roles](https://bradygaster.github.io/squad/docs/features/built-in-roles/)
-- [Human Team Members](https://bradygaster.github.io/squad/docs/features/human-team-members/)
-- [Presets — Curated Agent Collections](https://bradygaster.github.io/squad/docs/features/preset/)
-- [Your Team](https://bradygaster.github.io/squad/docs/concepts/your-team/)
+- [Team Setup & Init Mode](https://github.github.com/squad/docs/features/team-setup/)
+- [Built-in Base Roles](https://github.github.com/squad/docs/features/built-in-roles/)
+- [Human Team Members](https://github.github.com/squad/docs/features/human-team-members/)
+- [Presets — Curated Agent Collections](https://github.github.com/squad/docs/features/preset/)
+- [Your Team](https://github.github.com/squad/docs/concepts/your-team/)

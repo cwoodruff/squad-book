@@ -8,7 +8,7 @@
 - Capture a directive so the team can find it later, while understanding the difference between runtime memory and tracked behavior.
 - Configure and reason about ceremonies: their triggers, timing, participants, facilitator, agenda, enabled state, and cooldown.
 - Use retrospectives to turn failures into decisions and owned follow-up work rather than a blame exercise.
-- Apply strict reviewer lockout after rejection, including reassignment, escalation, artifact scope, and deadlock handling.
+- Apply strict reviewer lockout after rejection, including reassignment, escalation, artifact scope, and deadlock handling, and keep a durable record of it with `squad lockout`.
 - Design governance as layered controls: policy, process, validation, and human authority.
 
 ## Governance Is How a Team Remembers and Decides
@@ -58,11 +58,11 @@ The coordinator's current instruction in `.github/agents/squad.agent.md` disting
 
 Persistence and implementation are separate. If the user says, “Going forward, reject any API change without integration tests,” recording the preference does not add a test gate. The tracked change might be a CI workflow or an explicit test policy in a governing prompt, and should be made by the accountable specialist, validated, and delivered through the repository's normal review flow. The runtime record preserves context; the tracked control changes behavior. Do not silently substitute one for the other.
 
-> **Warning:** The historical directives documentation describes writing timestamped Markdown files into `.squad/decisions/inbox/` and having Scribe merge them into `decisions.md`. The v1.1.0 coordinator prompt now specifies governed runtime memory/state tools and explicitly prohibits creating local or gitignored Markdown proposals as a persistence fallback. Follow the governing prompt and configured backend, not an outdated example.
+> **Warning:** The historical directives documentation describes writing timestamped Markdown files into `.squad/decisions/inbox/` and having Scribe merge them into `decisions.md`. The v2.0.0 coordinator prompt specifies governed runtime memory/state tools and explicitly prohibits creating local or gitignored Markdown proposals as a persistence fallback. Follow the governing prompt and configured backend, not an outdated example.
 
 A usable directive should be easy to retrieve. When asking a team member to follow it, point to the governing location or control rather than relying on an old conversation. If the instruction is already represented by a tracked skill, charter, test, or configuration file, avoid creating a second contradictory copy. When updating a rule, ask whether the user intends to replace the old policy, refine it, or add an exception. Record that relationship rather than leaving two incompatible statements for agents to reconcile.
 
-The directives feature page also describes conflict handling and maintenance: when a new rule contradicts an existing one, ask whether to replace, merge, or skip it; answer “show me the team directives” or ask about a topic to inspect current policy; and remove a rule explicitly when it is no longer wanted. Those are sensible governance operations, but the page's specific claim that Scribe automatically detects semantic overlap and performs an inbox merge should not be assumed for every v1.1.0 backend. Use the configured state interface, make the user's choice explicit, and ensure the tracked control is updated if the behavior itself must change. Avoid leaving both “always do X” and “never do X” in separate stores and expecting agents to infer which is newer.
+The directives feature page also describes conflict handling and maintenance: when a new rule contradicts an existing one, ask whether to replace, merge, or skip it; answer “show me the team directives” or ask about a topic to inspect current policy; and remove a rule explicitly when it is no longer wanted. Those are sensible governance operations, but the page's specific claim that Scribe automatically detects semantic overlap and performs an inbox merge should not be assumed for every v2.0.0 backend. Use the configured state interface, make the user's choice explicit, and ensure the tracked control is updated if the behavior itself must change. Avoid leaving both “always do X” and “never do X” in separate stores and expecting agents to infer which is newer.
 
 Directive scope ranges from coding style and tool choice to workflows, scope limits, and review requirements. State the boundary in the directive: “For the Tasktrack API, use Node's built-in test runner” is easier to apply than “use this runner everywhere.” A rule that says “Lead reviews security changes” should clarify which changes are covered and whether review is advisory or a merge gate.
 
@@ -136,7 +136,7 @@ A user can request a meeting manually, ask Squad to add a ceremony, disable an e
 
 A retrospective is not a verdict on an agent's character. Ask what happened, what evidence supports the explanation, and what process or product change reduces recurrence. Review the timeline; distinguish direct cause from contributing conditions; identify what went well; and create a small number of actionable changes. A useful action includes an owner, a completion condition, and a place to track it.
 
-The ceremonies template also contains a “Retrospective with Enforcement” example: weekly scheduling if no log exists during the previous seven days, with action items turned into GitHub Issues labeled `retro-action`. Treat this as a proposed stronger operating pattern, not assume a hidden enforcement runtime. The template names a `retro-enforcement` skill and a `Test-RetroOverdue` check, but no corresponding skill was present in the inspected v1.1.0 source. The stable CLI does expose opt-in `triage --retro` and configuration-driven retro capability; that is an operational path separate from automatic meeting behavior in the coordinator prompt. Verify the exact installed configuration before promising enforcement.
+The ceremonies template also contains a “Retrospective with Enforcement” example: weekly scheduling if no log exists during the previous seven days, with action items turned into GitHub Issues labeled `retro-action`. Treat this as a proposed stronger operating pattern, not assume a hidden enforcement runtime. The template names a `retro-enforcement` skill and a `Test-RetroOverdue` check. That skill exists in the source at `templates/skills/retro-enforcement/SKILL.md`, but `squad init` does not install it (it is not in the starter-skill manifest), and `Test-RetroOverdue` is a PowerShell function printed in the skill's Markdown, not code that Squad runs. The stable CLI does expose opt-in `triage --retro` and configuration-driven retro capability; that is an operational path separate from automatic meeting behavior in the coordinator prompt. Verify the exact installed configuration before promising enforcement.
 
 ## Reviewer Protocol: Make Rejection Change the Process
 
@@ -172,9 +172,32 @@ Treat those as human-oversight choices, not as changes to reviewer lockout. “S
 
 ### Lockout mechanics and persistence boundaries
 
-The reviewer skill and coordinator prompt define the strict process policy. The SDK also contains a `ReviewerLockoutHook` that can enforce write restrictions in a configured hook pipeline. These are related but distinct implementations. In v1.1.0, the hook maintains an in-memory map from artifact identifiers to agent names; it does not by itself provide the documentation page's claimed durable orchestration-log persistence, issue workflow, user command to unlock a named agent, or approval-driven lifecycle. The hook blocks certain write-tool calls when the path matches an artifact identifier using a simple string-inclusion heuristic. Treat the hook as a programmatic guard available to SDK consumers, not proof that every Squad session automatically installs persistent PR lockouts.
+The reviewer skill and coordinator prompt define the strict process policy. The SDK also contains a `ReviewerLockoutHook` that can enforce write restrictions in a configured hook pipeline. These are related but distinct implementations. In v2.0.0, the hook maintains an in-memory map from artifact identifiers to agent names; it does not by itself provide the documentation page's claimed durable orchestration-log persistence, issue workflow, user command to unlock a named agent, or approval-driven lifecycle. The hook blocks certain write-tool calls when the path matches an artifact identifier using a simple string-inclusion heuristic. Treat the hook as a programmatic guard available to SDK consumers, not proof that every Squad session automatically installs persistent PR lockouts.
 
-The feature page describes lockout as session-persistent in `.squad/orchestration-log/` and clearable by a user prompt such as “Unlock Fenster for issue #42.” The current coordinator skill instead defines strict lockout through the revision cycle and escalation when eligible agents are exhausted; the inspected SDK hook itself has no durable orchestration-log persistence or user-facing unlock command. Do not promise those persistence or unlock details unless the active environment supplies and verifies them. In particular, process-local hook state cannot establish a durable lockout across a session restart.
+The feature page describes lockout as session-persistent in `.squad/orchestration-log/` and clearable by a user prompt such as “Unlock Fenster for issue #42.” The current coordinator skill instead defines strict lockout through the revision cycle and escalation when eligible agents are exhausted; the inspected SDK hook itself has no durable orchestration-log persistence or user-facing unlock command. Do not promise those orchestration-log or chat-unlock details unless the active environment supplies and verifies them. Process-local hook state cannot establish a durable lockout across a session restart. For a durable record, Squad 2.0 adds a separate mechanism, described next.
+
+### Recording lockouts with `squad lockout`
+
+Squad 2.0 adds a durable lockout ledger. `squad lockout` writes `.squad/governance/lockouts.json`, one record per review subject (an issue, PR or artifact name), and each command is one transition:
+
+```bash
+squad lockout reject patch-status-null --author backend --reviewer lead \
+  --reason "PATCH accepts status: null; return 400 and add a test" --paths "api/**"
+squad lockout assign patch-status-null --successor tester
+squad lockout submit patch-status-null --author tester
+squad lockout approve patch-status-null --reviewer lead
+squad lockout status patch-status-null
+```
+
+The record moves from `author-locked` to `revision-assigned`, `revision-submitted` and finally `cleared`. A second rejection adds that revision's author to the locked set instead of replacing it. The CLI refuses the shortcuts this chapter warns about: a reviewer cannot reject their own work, a rejection needs a reason, the successor cannot be a locked-out author or the blocking reviewer, and the reviser cannot approve their own revision. Authors, reviewers and successors are member IDs, the folder names under `.squad/agents/`; replace `backend`, `lead` and `tester` above with your own. When no member with a charter there is left as an eligible successor, the record becomes `deadlocked`, which means escalate. Only the user, or a name listed in `.squad/config.json` under `governance.authorities`, may record `squad lockout override` with a reason. `squad lockout --help` prints no detailed help, so the usage above comes from `packages/squad-cli/src/cli/commands/lockout.ts`.
+
+Know who writes and reads this file. The Copilot coordinator in `.github/agents/squad.agent.md` is unchanged in 2.0: it applies strict lockout as prompt policy and does not call `squad lockout`. In a Copilot project, run the commands yourself when you want a record that survives the session. The record grants or removes no repository permission; it is evidence for people and hooks, not a write barrier.
+
+### Reviewer and sign-off gates on other hosts
+
+The coordinators Squad 2.0 generates for Claude Code, Kiro, OpenCode, Cursor, OpenAI Codex and Google Antigravity tighten two gates. They send every code or test change to a reviewer before calling it done, without being asked; the reviewer is never an author, a known gap against the issue or a recorded decision is a REJECT, and code a reviewer writes needs a different reviewer. They also wait for a human's sign-off: when `team.md`, `routing.md` or a decision says a human must sign off on a kind of work (a release, tag, publish, merge or deploy), a request to do that work is not the sign-off. The coordinator names the rule and the human, asks, and goes ahead only on an explicit yes. The same sign-off rule is written into `.squad/templates/human-members.md`, which ships again in 2.0. The CHANGELOG says Copilot output is unchanged, so on the Copilot path treat both gates as guidance you state in `team.md` and `routing.md`, and enforce merges with branch protection.
+
+In Claude Code, the coordinator also records each lockout transition with `squad lockout`, and opt-in advisory hooks (`"claudeHooks": "advisory"` in `.squad/config.json`, run through `squad hook claude <Event>`) read the ledger and warn a locked-out member who edits the subject's files. The hooks never block a tool call. Chapter 15 (Volume 2) and Chapter 20 (Volume 2) cover them.
 
 ```mermaid
 stateDiagram-v2
@@ -212,9 +235,9 @@ Start from your Tasktrack repository at the end of Chapter 17 (`ch17-start` if y
 2. Ask the coordinator to inspect `.squad/ceremonies.md` and configure a before-work design review for changes where multiple agents modify `api/src/app.ts` or its request/response contract. Keep the agenda short: identify the contract, identify error cases, assign tests. Use the ceremony format in `.squad/templates/ceremony-reference.md` and avoid inventing a CLI ceremony command.
 3. Request an after-work retrospective after the next test failure or rejected review. Ask the facilitator to separate facts, root cause, and follow-up actions. Each follow-up should have an owner and a testable completion criterion.
 4. Run `npm test` from the Tasktrack root. The current baseline should pass. Then ask Squad to propose (not silently apply) a narrowly scoped test addition for malformed JSON or a missing task. Review the change yourself and check it against the directive.
-5. Have a reviewer inspect the resulting artifact. If it is rejected, record which different agent will own the revision. Verify the original author is not assigned as co-author or advisor. If no independent agent fits, escalate rather than weakening the lockout.
+5. Have a reviewer inspect the resulting artifact. If it is rejected, record which different agent will own the revision. Verify the original author is not assigned as co-author or advisor. If no independent agent fits, escalate rather than weakening the lockout. To keep a durable record, run `squad lockout reject` with the rejected author, the reviewer and the reason, then `squad lockout assign` for the new owner, and check `squad lockout status`.
 
-Expected result: a discoverable directive, one appropriately scoped ceremony definition, and a reviewer handoff policy that can be followed without inventing undocumented commands. You should also be able to explain which safeguards are instructions and which are enforced by tests or hooks.
+Expected result: a discoverable directive, one appropriately scoped ceremony definition, a `.squad/governance/lockouts.json` record if you rejected work, and a reviewer handoff policy that can be followed without inventing undocumented commands. You should also be able to explain which safeguards are instructions and which are enforced by tests or hooks.
 
 ## Configuration Reference
 
@@ -230,15 +253,25 @@ Expected result: a discoverable directive, one appropriately scoped ceremony def
 | Reviewer lockout skill | `templates/skills/reviewer-protocol/SKILL.md` in source distribution | Strict independent revision and escalation policy |
 | SDK hook config | `PolicyConfig.reviewerLockout` | Optional boolean; false unless configured by consumer |
 | Hook artifact state | `ReviewerLockoutHook` in `packages/squad-sdk/src/hooks/index.ts` | In-memory map; not documented persistent orchestration storage |
+| Durable lockout record | `.squad/governance/lockouts.json` | Written by `squad lockout`; version 1, one record per subject |
+| `squad lockout reject <subject> --author <id> --reviewer <id> --reason "<text>" [--paths <glob,...>]` | Lock the revision author out | State `author-locked`, or `deadlocked` when no eligible successor remains |
+| `squad lockout assign <subject> --successor <id>` / `submit <subject> --author <id>` / `approve <subject> --reviewer <id>` | Move the revision through review | States `revision-assigned`, `revision-submitted`, `cleared` |
+| `squad lockout override <subject> --author <id> --by <authority> --reason "<text>"` | Readmit a locked-out author | `--by` must be `user` or listed in `governance.authorities` |
+| `squad lockout status [subject] [--json]` | Show records and eligible successors | No detailed `--help` output |
+| `governance.authorities` | `.squad/config.json` array | Extra names allowed to override; `user` is always allowed |
+| Human sign-off guidance | `.squad/templates/human-members.md` | A request to do gated work is not the sign-off |
+| `claudeHooks` | `.squad/config.json`, `"advisory"` | Claude Code only; any other value is off; hooks warn, never block |
 | Stable CLI ceremony command | None verified | Trigger ceremonies in coordinator interaction; CLI `triage --retro` is a separate capability |
 
 ## Under the Hood
 
-Governance in v1.1.0 is a composition of prompt policy, shipped templates, and optional SDK enforcement—not one universal database-backed state machine. The main coordinator prompt tells the model when to capture directives, how to check for ceremonies, and what to do after a reviewer rejection. The user-facing ceremony config is Markdown, so its interpretation is driven by the coordinator and the ceremony reference rather than a CLI parser that guarantees all fields are valid.
+Governance in v2.0.0 is a composition of prompt policy, shipped templates, a durable lockout ledger, and optional SDK enforcement, not one universal database-backed state machine. The main coordinator prompt tells the model when to capture directives, how to check for ceremonies, and what to do after a reviewer rejection. The user-facing ceremony config is Markdown, so its interpretation is driven by the coordinator and the ceremony reference rather than a CLI parser that guarantees all fields are valid.
 
 The current directive rules emphasize governed tools and a no-fake-persistence boundary. The coordinator prefers the `memory.write` path with `DECISION` classification; when tools are absent, it requires honest acknowledgement rather than an invented local write. This is materially different from older docs that assume a Scribe merges inbox Markdown. The repository's source-of-truth hierarchy and state-backend rules in the coordinator prompt explain why the distinction matters: runtime-managed state must be changed through its configured bridge, while tracked behavior changes need an accountable source edit.
 
 The ceremony reference supplies the facilitator prompt, participant resolution, summary shape, Scribe integration, cooldown, and failure handling. The coordinator core logic in `.github/agents/squad.agent.md` says to run matching before ceremonies after routing and before agent spawn, and after ceremonies when the batch completes. That arrangement lets a ceremony summary influence downstream prompts while avoiding a blocked pipeline if a meeting fails.
+
+The lockout ledger is a separate, file-backed layer. `packages/squad-cli/src/cli/commands/lockout.ts` parses the subcommands, resolves the team with `resolveSquadState()`, and reads, transitions and writes the record under one interprocess lock. The transitions themselves (`rejectRevision`, `assignRevision`, `submitRevision`, `approveRevision`, `overrideLockout`) live in `packages/squad-sdk/src/client/adapters/lockout.ts`, which also excludes the coordinator, Scribe, Ralph, Rai and Fact Checker from the pool of eligible authors.
 
 The following excerpt shows the SDK hook's deliberately small state surface:
 
@@ -262,7 +295,7 @@ export class ReviewerLockoutHook {
 
 The hook is activated only when a consumer configures `reviewerLockout`. Its pre-tool hook checks write tools such as `edit`, `create`, `write_file`, and `create_file`; it then compares the requested path with locked artifact IDs. That is a useful primitive for enforcing independent revision in an SDK application, but the registry is process memory, and path matching is intentionally simple. The orchestration contract remains the coordinator policy: record the rejection, bar the original author from the specific revision, choose a different owner, and escalate if that cannot be done.
 
-The shipped ceremony template includes a recurring weekly “Retrospective with Enforcement” proposal, but its custom enforcement-skill reference is not present in the inspected v1.1.0 templates. The CLI's `triage --retro` option should not be confused with the prompt-level ceremony mechanism. This distinction—what a document proposes, what a prompt instructs, and what executable code guarantees—is a governance habit in its own right.
+The shipped ceremony template includes a recurring weekly “Retrospective with Enforcement” proposal. Its `retro-enforcement` skill is in `templates/skills/` but is not one of the skills `squad init` installs, and its check is PowerShell in Markdown rather than code Squad executes. The CLI's `triage --retro` option should not be confused with the prompt-level ceremony mechanism. This distinction—what a document proposes, what a prompt instructs, and what executable code guarantees—is a governance habit in its own right.
 
 ## Pitfalls and Troubleshooting
 
@@ -275,6 +308,8 @@ The shipped ceremony template includes a recurring weekly “Retrospective with 
 - **Reassigning rejected work to the original author:** Lockout prohibits all contribution to that revision, not merely final edits.
 - **Clearing lockout too early or applying it globally:** Scope is one artifact and one revision cycle; another rejection locks out that cycle's author too.
 - **Believing a sample log proves durable enforcement:** Verify runtime persistence and hook activation in the actual deployment.
+- **Expecting the Copilot coordinator to fill `lockouts.json`:** only the Claude Code coordinator records transitions automatically. On the Copilot path, run `squad lockout` yourself, and remember the file blocks nothing.
+- **Treating a request as the sign-off:** "cut the release" is not approval when a human gate is recorded. Ask the named human, and enforce merges and releases with repository controls.
 - **Confusing CLI retro triage with automatic ceremony execution:** These are different pathways; validate the version and configuration before describing behavior as automatic.
 
 ## Summary
@@ -287,7 +322,7 @@ Directives express durable expectations, but capture is not implementation and a
 2. Draft a ceremony definition for a pre-work review of changes to a shared Tasktrack endpoint. Include every field from the ceremony reference and a four-item agenda.
 3. A reviewer rejects a change by agent Ada and says “Ada should fix the null handling.” Describe the coordinator's correct response. What changes if the next independent revision is also rejected?
 4. Compare a prompt-level rule, a test, a hook, and branch protection for enforcing “do not merge API changes without tests.” Which combination would you choose and why?
-5. Find the “Retrospective with Enforcement” proposal in the ceremony template. Identify what it proposes, which related implementation could not be verified in the v1.1.0 source, and what you should say before claiming weekly enforcement is live.
+5. Find the “Retrospective with Enforcement” proposal in the ceremony template. Identify what it proposes, which related pieces exist in the v2.0.0 source but are not installed or executed by Squad, and what you should say before claiming weekly enforcement is live.
 
 ## Quiz
 
@@ -301,11 +336,11 @@ Directives express durable expectations, but capture is not implementation and a
 
 ## Further Reading
 
-- [Directives](https://bradygaster.github.io/squad/docs/features/directives/)
-- [Ceremonies](https://bradygaster.github.io/squad/docs/features/ceremonies/)
-- [Reviewer Rejection Protocol](https://bradygaster.github.io/squad/docs/features/reviewer-protocol/)
-- [Ceremony configuration reference](https://github.com/bradygaster/squad/blob/v1.1.0/templates/ceremony-reference.md)
-- [Ceremony template](https://github.com/bradygaster/squad/blob/v1.1.0/templates/ceremonies.md)
-- [Reviewer protocol skill](https://github.com/bradygaster/squad/blob/v1.1.0/templates/skills/reviewer-protocol/SKILL.md)
-- [Coordinator prompt](https://github.com/bradygaster/squad/blob/v1.1.0/.github/agents/squad.agent.md)
-- [SDK hook pipeline](https://github.com/bradygaster/squad/blob/v1.1.0/packages/squad-sdk/src/hooks/index.ts)
+- [Directives](https://github.github.com/squad/docs/features/directives/)
+- [Ceremonies](https://github.github.com/squad/docs/features/ceremonies/)
+- [Reviewer Rejection Protocol](https://github.github.com/squad/docs/features/reviewer-protocol/)
+- [Ceremony configuration reference](https://github.com/github/squad/blob/v2.0.0/templates/ceremony-reference.md)
+- [Ceremony template](https://github.com/github/squad/blob/v2.0.0/templates/ceremonies.md)
+- [Reviewer protocol skill](https://github.com/github/squad/blob/v2.0.0/templates/skills/reviewer-protocol/SKILL.md)
+- [Coordinator prompt](https://github.com/github/squad/blob/v2.0.0/.github/agents/squad.agent.md)
+- [SDK hook pipeline](https://github.com/github/squad/blob/v2.0.0/packages/squad-sdk/src/hooks/index.ts)

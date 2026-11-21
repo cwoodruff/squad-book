@@ -8,14 +8,14 @@
 - Compare the documented Copilot CLI and VS Code workflows without assuming feature parity.
 - Design a portable workflow with an inline fallback when delegation is unavailable.
 - Distinguish shared repository team files from client-specific instructions and local runtime behavior.
-- Identify what the v1.1.0 SDK adapter and `SquadClient` provide to programmatic callers.
-- Find the Squad 2.0 multi-client projection model in Chapters 19–20.
+- Identify what the v2.0.0 SDK adapter and `SquadClient` provide to programmatic callers.
+- Know where the other six hosts are covered: Part IV, Chapters 19–20.
 
 ## A Client Is a Capability Boundary
 
 A Squad coordinator is prompt-driven, but its available tools depend on the client that hosts it. A useful design treats delegation as an optional capability rather than a universal assumption. Shared repository files can provide team instructions, charters, routing, and skills; they do not make every host expose the same tool calls, background execution, model controls, filesystem access, or approval flow.
 
-The v1.1.0 client-compatibility reference compares Copilot CLI and VS Code. In the CLI, the documented `task` tool can start agents with parameters such as agent type, model, and background execution; `read_agent` collects results later. VS Code's documented `runSubagent` behavior returns results with the call, and multiple calls issued together may run concurrently. Those are different interaction contracts, not merely alternate spellings for the same API. The reference does not establish equivalent behavior for every Copilot surface or version, so verify your exact extension, workspace mode, tools, policies, and agent definitions.
+The v2.0.0 client-compatibility reference compares Copilot CLI and VS Code. In the CLI, the documented `task` tool can start agents with parameters such as agent type, model, and background execution; `read_agent` collects results later. VS Code's documented `runSubagent` behavior returns results with the call, and multiple calls issued together may run concurrently. Those are different interaction contracts, not merely alternate spellings for the same API. The reference does not establish equivalent behavior for every Copilot surface or version, so verify your exact extension, workspace mode, tools, policies, and agent definitions.
 
 | Capability | Copilot CLI | VS Code Copilot | How to make a workflow resilient |
 |---|---|---|---|
@@ -46,13 +46,13 @@ The shared `.squad/` directory can hold team-wide policy and agent definitions, 
 
 Treat file-write and MCP permissions as host-specific. A successful tool call in one client is not evidence that another client has the same access. Likewise, a coordinator's report is not durable proof of a change: inspect the diff, run the relevant test, and confirm the intended branch before merging work.
 
-### Squad 2.0 looks across more hosts
+### Copilot here, the other hosts in Part IV
 
-Squad 1.1's compatibility discussion focuses on Copilot interaction surfaces and their differing tools. Squad 2.0 introduces generated, native host projections for multiple AI clients. That newer model is covered in Part IV, especially Chapters 19–20; those chapters are the home for the 2.0 setup flow and host-adapter behavior. Do not mix the 2.0 projection commands with the v1.1.0 workflows in this chapter.
+This chapter covers the Copilot surfaces (CLI, VS Code and the app) and programmatic Copilot sessions through the SDK. Squad 2.0 also projects the same team into six more hosts: Claude Code, Kiro, OpenCode, Cursor, OpenAI Codex and Google Antigravity, selected with `squad init --client <list>` or `squad client add`. Part IV is the home for that material, Chapter 19 for setup and Chapter 20 for host projections and capability negotiation. The client-compatibility scenario page now has its own Claude Code section; this chapter draws only on its Copilot parts. One difference is worth knowing here: per-agent model selection works in Copilot CLI and the Copilot app, while VS Code (like most other hosts) runs every subagent on the session model.
 
 ## Programmatic Sessions Through the SDK
 
-The SDK's `adapter` layer is a boundary around `@github/copilot-sdk`. In v1.1.0, `adapter/types.ts` defines Squad's session configuration, tool, hook, event, model, and response types, so consumers can work with Squad's contract rather than depending on upstream type names throughout their code. `adapter/client.ts` wraps the Copilot client, normalizes tool names for the upstream wire format, adapts session methods and events, and manages connection lifecycle.
+The SDK's `adapter` layer is a boundary around `@github/copilot-sdk`. In v2.0.0, `adapter/types.ts` defines Squad's session configuration, tool, hook, event, model, and response types, so consumers can work with Squad's contract rather than depending on upstream type names throughout their code. `adapter/client.ts` wraps the Copilot client, normalizes tool names for the upstream wire format, adapts session methods and events, and manages connection lifecycle.
 
 For example, Squad permits canonical dotted tool names such as `memory.classify`, while the Copilot external-tool wire format allows a narrower character set. The adapter normalizes dots to underscores before the call and maps hook names back for the caller. It detects collisions so that two canonical names cannot silently become the same wire name.
 
@@ -112,7 +112,7 @@ The Copilot client boundary is implemented by `packages/squad-sdk/src/adapter/cl
 
 ## Summary
 
-In Squad 1.1, the client is a capability boundary: repository-level team files can be shared, but delegation, result collection, model controls, SQL, file permissions, and MCP access depend on the host. Design portable work around explicit capability checks and an honest inline fallback, then verify every change through Git and tests. The SDK's `adapter` and `client` modules support programmatic Copilot sessions; they do not make every editor behave like Copilot CLI. Squad 2.0 multi-client projections are covered separately in Chapters 19–20.
+In Squad 2.0, the client is still a capability boundary: repository-level team files can be shared, but delegation, result collection, model controls, SQL, file permissions, and MCP access depend on the host. Design portable work around explicit capability checks and an honest inline fallback, then verify every change through Git and tests. The SDK's `adapter` and `client` modules support programmatic Copilot sessions; they do not make every editor behave like Copilot CLI. Projections for the other six hosts are covered in Chapters 19–20.
 
 ## Exercises
 
@@ -132,5 +132,5 @@ In Squad 1.1, the client is a capability boundary: repository-level team files c
 
 ## Further Reading
 
-- [Client Compatibility Scenario](https://bradygaster.github.io/squad/docs/scenarios/client-compatibility/)
-- [Client Compatibility Reference Template](https://github.com/bradygaster/squad/blob/v1.1.0/templates/client-compatibility-reference.md)
+- [Client Compatibility Scenario](https://github.github.com/squad/docs/scenarios/client-compatibility/)
+- [Client Compatibility Reference Template](https://github.com/github/squad/blob/v2.0.0/templates/client-compatibility-reference.md)
