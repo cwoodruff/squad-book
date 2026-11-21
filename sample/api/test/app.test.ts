@@ -5,10 +5,17 @@ import { createApp } from '../src/app.ts';
 
 const server = createApp();
 let base = '';
-before(() => new Promise<void>((resolve) => server.listen(0, () => {
-  base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-  resolve();
-})));
+before(() => new Promise<void>((resolve, reject) => {
+  const onError = (err: Error) => { server.off('listening', onListening); reject(err); };
+  const onListening = () => {
+    server.off('error', onError);
+    base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    resolve();
+  };
+  server.once('error', onError);
+  server.once('listening', onListening);
+  server.listen(0);
+}));
 after(() => { server.close(); });
 
 const json = (method: string, body?: unknown) =>
