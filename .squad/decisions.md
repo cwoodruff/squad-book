@@ -330,7 +330,7 @@ V3 is unchanged: l.43 must state the final status of the Ch 22 F1-F3 fixes once 
 **References:** research/VALIDATION.md, research/reviews/inventories-review.md, trillian, marvin, arthur
 **Why:** V1 (l.29): the scan scope is book/ and exercises/ only, which matches scripts/check-links.sh:4,27. V2 (l.40): the text records the approved run (exit 0, 308 found, 301 checked, 7 skipped, 0 broken) and the no-retry limitation, matching build-review.md (Marvin's re-review). V3 (l.43): F1-F3 are fixed and approved, matching e2e-checks.md and Arthur's Re-review (R1) of Ford's l.392 fix. l.39 is still true: the EPUBs in dist/ are older than the later edits to ch22, ch23 and ch25. l.55 is still true: the changes are uncommitted, so no CI run covers them. No required changes. Details are in research/reviews/inventories-review.md under "Re-review: VALIDATION.md".
 
-**Subject: Tasktrack test follow-ups (commits a922ed1, 42a10c3, 960e97e). Final state: APPROVE (all three changes approved; the test-count correction passed on re-review after Trillian's revision).**
+**Subject: Tasktrack test follow-ups (commits a922ed1, 42a10c3, 960e97e, 66c91bd). Final state: APPROVE (all four changes approved; the test-count correction passed on re-review after Trillian's revision).**
 
 ### 2026-11-21: Review: Tasktrack fail-fast before hook: APPROVE (commit a922ed1)
 **By:** Slartibartfast
@@ -395,6 +395,23 @@ R3, Volume 2 gives no fixed count of the sample's tests. Pass. The four lines ch
 R4, minimal edits in the existing style. Pass. Each edit replaces only the count phrase. The sentence structure and the surrounding text are unchanged, and nothing else in the diff is reworded.
 
 The earlier Ch 12 example-task advisory is out of scope, per the coordinator, and was not counted.
+
+(The Ch 12 example-task advisory was taken up by the example-task fix below; ch12:210 now uses a trimming test.)
+
+### 2026-11-21: APPROVE: Ford's Vol 2 Ch 12 Hands-On example task fix ("add a test for trimming whitespace from a new task's title") (commit 66c91bd)
+**By:** arthur
+**References:** ford, book/vol2/part-03/ch12-coordinator-internals.md, .squad/decisions.md:379
+**Why:** Verdict: APPROVE. Scope: uncommitted change to book/vol2/part-03/ch12-coordinator-internals.md (git diff -- book exercises: 1 file, +1/-1, line 210 only).
+
+Req 1 (new to the reader at Vol 2 Ch 12): Pass. sample/api/test/app.test.ts has 6 tests: health check; creates and lists tasks; rejects empty titles; rejects malformed, non-object, and oversized input; updates status, validates input, and 404s on unknown ids; deletes tasks. None of them asserts title trimming. "creates and lists tasks" posts 'Read chapter 1', which has no surrounding whitespace. A grep of book/ and exercises/ for trim|whitespace finds no title-trimming test in Vol 1 or Vol 2 Chs 1-11. The trim hits are tag trimming (Vol 1 Ch 10/11 and their solutions), client-ID normalization (Vol 2 Ch 19/20), and unrelated prose. The tests readers are told to add earlier are: invalid/valid due date (V1 Ch 6, Ch 7, Ch 12), tag tests (V1 Ch 11), and empty GET /tasks in a fresh store (V2 Ch 9). None of them overlaps with this task.
+
+Req 2 (existing behavior, no production change): Pass. sample/api/src/tasks.ts:24 TaskStore.create stores title.trim(). app.ts:56-59 passes body.title to store.create and returns the created task with 201. The trimmed title is visible in the POST response and in GET /tasks. Checked by running the code: new TaskStore().create('  Buy milk  ').title === "Buy milk". The HTTP round trip could not run because the sandbox blocks binding a port, but the route code passes the store result through unchanged.
+
+Req 3 (Hands-On fit): Pass. The task covers one domain, has one tester owner, touches only api/test/app.test.ts, and needs no production code. The rest of the Hands-On is byte-identical, including the expected result "all existing tests still pass, along with any new test the specialist added". No test count was added.
+
+Req 4 (minimal and in style): Pass. Only the example phrase inside the existing curly quotes changed. The curly apostrophe in "task’s" is the only ’ in the chapter, but the book has precedent for curly apostrophes inside curly-quoted examples (for example “Keep the API dependency-free and use Node’s built-in…”), and scripts/build.sh uses markdown+smart, so the rendered output is the same either way. Other copies of the task: exercises/solutions/vol2/ch12.md does not repeat the Hands-On task. A repo-wide grep for "bounded handoff|rejecting an empty|testing specialist" finds only ch12:208/210, my earlier advisory in .squad/decisions.md:379 (a historical record that should stay), and Ford's history entry.
+
+Advisories: none.
 
 ## Governance
 
