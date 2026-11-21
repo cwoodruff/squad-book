@@ -195,7 +195,7 @@ Report the route contract and one low-risk next improvement. Run the existing
 Node tests and preserve the zero-dependency design.
 ```
 
-This is intentionally a read-first task. Check the report against `api/src/app.ts`, `api/src/tasks.ts`, and `api/test/app.test.ts`. The known API surface is `GET /health`, `GET /tasks`, `POST /tasks`, `PATCH /tasks/:id`, and `DELETE /tasks/:id`; statuses are `todo`, `doing`, and `done`. The tests cover health, task create/list, empty title rejection, status updates/validation/unknown IDs, and deletion. The API’s current store is in-memory, so a restart clears it. Those are facts you can verify before accepting a proposed change.
+This is intentionally a read-first task. Check the report against `api/src/app.ts`, `api/src/tasks.ts`, and `api/test/app.test.ts`. The known API surface is `GET /health`, `GET /tasks`, `POST /tasks`, `PATCH /tasks/:id`, and `DELETE /tasks/:id`; statuses are `todo`, `doing`, and `done`. The tests cover health, task create/list, empty title rejection, malformed/non-object/oversized input rejection, status updates/validation/unknown IDs, and deletion. The API’s current store is in-memory, so a restart clears it. Those are facts you can verify before accepting a proposed change.
 
 Then ask for a small implementation and name the expected verification:
 
