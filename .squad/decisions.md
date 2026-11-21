@@ -330,6 +330,72 @@ V3 is unchanged: l.43 must state the final status of the Ch 22 F1-F3 fixes once 
 **References:** research/VALIDATION.md, research/reviews/inventories-review.md, trillian, marvin, arthur
 **Why:** V1 (l.29): the scan scope is book/ and exercises/ only, which matches scripts/check-links.sh:4,27. V2 (l.40): the text records the approved run (exit 0, 308 found, 301 checked, 7 skipped, 0 broken) and the no-retry limitation, matching build-review.md (Marvin's re-review). V3 (l.43): F1-F3 are fixed and approved, matching e2e-checks.md and Arthur's Re-review (R1) of Ford's l.392 fix. l.39 is still true: the EPUBs in dist/ are older than the later edits to ch22, ch23 and ch25. l.55 is still true: the changes are uncommitted, so no CI run covers them. No required changes. Details are in research/reviews/inventories-review.md under "Re-review: VALIDATION.md".
 
+**Subject: Tasktrack test follow-ups (commits a922ed1, 42a10c3, 960e97e). Final state: APPROVE (all three changes approved; the test-count correction passed on re-review after Trillian's revision).**
+
+### 2026-11-21: Review: Tasktrack fail-fast before hook: APPROVE (commit a922ed1)
+**By:** Slartibartfast
+**References:** marvin, sample/api/test/app.test.ts
+**Why:** Reviewed Marvin's uncommitted change to sample/api/test/app.test.ts (before hook: reject on server 'error', resolve on 'listening', each handler removes the other via once/off).
+
+Req 1 (fail fast on blocked port): verified. `timeout 60 npm test` in sample/ inside the sandbox exits 1 in under 1 s. All 6 tests fail with `Error: listen EPERM: operation not permitted 0.0.0.0` (code EPERM, syscall listen), with 0 cancelled and no hang.
+Req 2 (passes when binding works): verified. Outside the sandbox, 6/6 pass, exit 0, about 126 ms. listen(0) uses the same default host as before and the same port, and base is set the same way.
+Req 3 (no leftover listeners, minimal, in style, one file): verified with a scratch probe of the same handler logic against createApp(). The error/listening listener counts return to baseline (0/1) after both the EPERM path and the success path. The diff is +11/-4, uses the file's 2-space arrow-function style and touches only app.test.ts in code.
+
+Scope note: git status also shows .squad/agents/marvin/history.md modified (+2 lines, Marvin's history entries about this task). I treated that as Squad-mandated agent bookkeeping, not part of the change. If the coordinator reads "only this file changes" as literally the whole working tree, this becomes a REJECT on that point alone.
+
+Advisory (not required): Marvin's history entry says listen(0) with no host binds 0.0.0.0. Node normally binds :: on dual-stack hosts. 0.0.0.0 here likely reflects the sandbox environment.
+
+### 2026-11-21: APPROVE: Ford's Ch 3 test-list correction (ch03-first-session.md line 198 and exercises/solutions/vol1/ch03.md item 1) (commit 42a10c3)
+**By:** arthur
+**References:** ford, book/vol1/part-01/ch03-first-session.md, exercises/solutions/vol1/ch03.md, sample/api/test/app.test.ts
+**Why:** Verdict: APPROVE.
+
+Req 1: sample/api/test/app.test.ts has 6 test() calls: health check; creates and lists tasks; rejects empty titles; rejects malformed, non-object, and oversized input; updates status, validates input, and 404s on unknown ids; deletes tasks. The line 198 list now covers all six. The only new item is "malformed/non-object/oversized input rejection", which matches the existing slash style ("task create/list", "status updates/validation/unknown IDs") and sits in test order.
+
+Req 2: Solutions item 1 gets the same fix in that file's own prose style: "rejection of blank titles and of malformed, non-object, or oversized input". Same order, same coverage.
+
+Req 3: Each file changes by one line and nothing else is reworded. No other file under book/ or exercises/ changed. .squad/agents/ford/history.md is also modified, but that is team state, not book or exercise content.
+
+Advisory (not required by the request, and not on the out-of-scope list): Ch 3 line 33 still says `node --test api/test/` "passed all five starter tests". The chapter now lists six tests a few paragraphs later, so it contradicts itself. Line 33 records an observed run, so fixing it means re-running the suite and not just editing the number. Recommend adding it to the separate "five tests" cleanup with Ch 1, Ch 2 and exercises/solutions/vol1/ch02.md.
+
+(The Ch 3 line 33 advisory was taken up by the test-count correction below; ch03:33 now says "six starter tests".)
+
+### 2026-11-21: REJECT Ford's five-to-six test-count correction: the Vol 2 Hands-On lines must not state a fixed count (ch12:219, ch11:190, ch08:227, solutions/vol2/ch08.md:5)
+**By:** Arthur
+**References:** ford, book/vol2/part-03/ch12-coordinator-internals.md, book/vol2/part-03/ch11-architecture.md, book/vol2/part-02/ch08-cicd-release.md, exercises/solutions/vol2/ch08.md
+**Why:** Verdict: REJECT.
+
+What passes:
+- Req 1 (Vol 1 side): ch01:153, ch02:300, ch02:384, ch03:33 and solutions/vol1/ch02.md:9 now say six. A grep of book/ and exercises/ for "five" or a numeric count near test, pass or case finds no other stale count. The other "five" hits are about unrelated things like capabilities, nap sections and hosts.
+- Req 2: solutions/vol1/ch02.md:9 adds "rejection of malformed, non-object, or oversized input". That uses the same phrase as solutions/vol1/ch03.md:5.
+- Req 3 (starter): `npm test` in sample/ prints `tests 6`, `suites 0`, `pass 6`, `fail 0`. All six are top-level `test()` calls, so changing "subtests" to "tests" is correct at ch03:33 and ch11:190.
+- Req 4: each edit is a one-token swap. The one addition is a single list item. Nothing else is reworded.
+
+Required changes:
+R1. book/vol2/part-03/ch12-coordinator-internals.md:219, "all six existing tests still pass". A fixed count is wrong here. The Vol 2 preface (00-front/01-preface.md:41-49) says Tasktrack "continues here" and tells readers to use the starter only if they skipped Volume 1. Vol 1 Ch 3 (ch03-first-session.md:203-206) already has the reader add node:test coverage for GET /tasks/:id. By Vol 2 Ch 12, the reader's suite is larger than the starter. Suggested fix: "all existing tests still pass, along with any new test the specialist added."
+R2. book/vol2/part-03/ch11-architecture.md:190 has the same problem. Line 182 says "Use the Tasktrack checkout you have been operating throughout the book", and the expected result then gives the starter's count. This is a known gap against Req 3, because the output it describes does not match what that checkout prints. Suggested fix: "Node's test runner reports no failures."
+R3. book/vol2/part-02/ch08-cicd-release.md:227 and exercises/solutions/vol2/ch08.md:5 have the same problem: a Vol 2 Hands-On run on the carried-forward checkout. Suggested fixes: "`npm test` passes with no failures" and "`npm test` should pass every `node:test` case." Keep the counts in the Vol 1 Ch 1-3 starter lines. Those are correct.
+
+Advisory (outside the requirements): the ch12 Hands-On example task, "add a test for rejecting an empty title", duplicates the starter test 'rejects empty titles'. A specialist could correctly report that nothing needs adding. Consider a different example in a later pass.
+**Superseded by:** "APPROVE: Tasktrack test-count correction (Ford Vol 1 edits plus Trillian's Vol 2 revision), re-review" (2026-11-21). Ford was locked out under strict lockout; Trillian revised the Vol 2 lines as the successor.
+
+### 2026-11-21: APPROVE: Tasktrack test-count correction (Ford Vol 1 edits plus Trillian's Vol 2 revision), re-review (commit 960e97e)
+**By:** Arthur
+**References:** ford, trillian, book/vol2/part-02/ch08-cicd-release.md, book/vol2/part-03/ch11-architecture.md, book/vol2/part-03/ch12-coordinator-internals.md, exercises/solutions/vol2/ch08.md, exercises/solutions/vol1/ch02.md
+**Why:** Verdict: APPROVE. No required changes, no advisories.
+
+Scope: the uncommitted `git diff -- book exercises` (8 files, 9 lines).
+
+R1, Volume 1 starter lines say six. Pass. ch01:153 says "six tests pass", ch02:300 "six passing tests", ch02:384 "six tests", ch03:33 "six starter tests", exercises/solutions/vol1/ch02.md:9 "six passing tests under Node 22.18+".
+
+R2, the vol1/ch02 solution list includes the malformed-input test. Pass. "rejection of malformed, non-object, or oversized input" uses the same phrase as exercises/solutions/vol1/ch03.md:5 and sits in the same order (after empty-title rejection, before status updates).
+
+R3, Volume 2 gives no fixed count of the sample's tests. Pass. The four lines changed are ch08:227 ("`npm test` passes with no failures"), solutions/vol2/ch08.md:5 ("should pass every `node:test` case"), ch11:190 ("Node's test runner reports no failures") and ch12:219 ("all existing tests still pass, along with any new test the specialist added"). I grepped book/vol2 and exercises/solutions/vol2 for number words and digits near test/tests/subtests/passing. The only remaining hits are ch17:431 (five SDK manifest capabilities), ch12:268 (six restraint bullets), ch20:528 (five evidence labels) and ch24:384 ("at least three acceptance tests", a reader-authored spec). None of them counts the Tasktrack tests.
+
+R4, minimal edits in the existing style. Pass. Each edit replaces only the count phrase. The sentence structure and the surrounding text are unchanged, and nothing else in the diff is reworded.
+
+The earlier Ch 12 example-task advisory is out of scope, per the coordinator, and was not counted.
+
 ## Governance
 
 - All meaningful changes require team consensus
